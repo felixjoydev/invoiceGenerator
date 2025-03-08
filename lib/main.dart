@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:invoicegenerator/screens/splash/splash_screen.dart';
+import 'package:invoicegenerator/screens/onboarding/company_basic_details_screen.dart';
 import 'package:invoicegenerator/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -22,8 +22,8 @@ class InvoiceGeneratorApp extends StatelessWidget {
       title: 'Invoice Generator',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme(),
-      // We'll implement the SplashScreen first
-      home: const SplashScreen(),
+      // Show the CompanyBasicDetailsScreen
+      home: const CompanyBasicDetailsScreen(),
     );
   }
 }
