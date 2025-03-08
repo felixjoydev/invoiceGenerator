@@ -4,7 +4,6 @@ import 'package:invoicegenerator/widgets/display/MainHeading.dart';
 import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
 import 'package:invoicegenerator/theme/app_theme.dart';
 import 'package:invoicegenerator/widgets/utils/keyboard_dismiss_wrapper.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/widgets/navigation/top_nav.dart';
 import 'package:invoicegenerator/widgets/inputs/dropdown_input.dart';
 import 'package:invoicegenerator/widgets/inputs/text_input.dart';
@@ -25,8 +24,12 @@ class _CompanyAddressScreenState extends State<CompanyAddressScreen> {
   final TextEditingController _cityController = TextEditingController();
   final TextEditingController _zipController = TextEditingController();
 
-  // Validation state
+  // Selected country (default to US)
+  String _selectedCountry = 'US';
+
+  // Validation state and message
   bool _isZipValid = true;
+  String? _zipErrorMessage;
 
   @override
   void dispose() {
@@ -37,12 +40,77 @@ class _CompanyAddressScreenState extends State<CompanyAddressScreen> {
     super.dispose();
   }
 
-  // Validate ZIP code
+  // ZIP code validation patterns for different countries
+  final Map<String, Pattern> _zipPatterns = {
+    'US': r'^\d{5}(-\d{4})?$', // US: 12345 or 12345-6789
+    'UK':
+        r'^[A-Z]{1,2}[0-9][A-Z0-9]? ?[0-9][A-Z]{2}$', // UK: AA9A 9AA, A9A 9AA, A9 9AA, A99 9AA, AA9 9AA, AA99 9AA
+    'CA':
+        r'^[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z] ?\d[ABCEGHJ-NPRSTV-Z]\d$', // Canada: A1A 1A1
+    'DE': r'^\d{5}$', // Germany: 12345
+    'FR': r'^\d{5}$', // France: 12345
+    'IT': r'^\d{5}$', // Italy: 12345
+    'AU': r'^\d{4}$', // Australia: 1234
+    'NL': r'^\d{4} ?[A-Z]{2}$', // Netherlands: 1234 AB
+    'ES': r'^\d{5}$', // Spain: 12345
+    'IN': r'^\d{6}$', // India: 123456
+    'CN': r'^\d{6}$', // China: 123456
+    'JP': r'^\d{3}-\d{4}$', // Japan: 123-4567
+    'BR': r'^\d{5}-?\d{3}$', // Brazil: 12345-678 or 12345678
+    'RU': r'^\d{6}$', // Russia: 123456
+  };
+
+  // Store ZIP value without showing error
+  void _handleZipChange(String value) {
+    // Only clear error message when typing if the new value is valid
+    if (_zipErrorMessage != null) {
+      _validateZip(value);
+    }
+  }
+
+  // Validate ZIP code based on country
   void _validateZip(String value) {
-    // Basic validation - can be enhanced based on selected country
     setState(() {
-      _isZipValid = value.isNotEmpty;
+      if (value.isEmpty) {
+        _isZipValid = true; // Empty ZIP is valid since it's optional
+        _zipErrorMessage = null;
+        return;
+      }
+
+      // Get the pattern for the selected country
+      final pattern = _zipPatterns[_selectedCountry] ?? _zipPatterns['US'];
+
+      if (pattern is String) {
+        final RegExp regex = RegExp(pattern);
+        final bool isValid = regex.hasMatch(value);
+        _isZipValid = isValid;
+        _zipErrorMessage =
+            isValid
+                ? null
+                : 'Invalid ZIP format for ${_getCountryName(_selectedCountry)}';
+      }
     });
+  }
+
+  // Get country name from code
+  String _getCountryName(String code) {
+    final Map<String, String> countryNames = {
+      'US': 'United States',
+      'UK': 'United Kingdom',
+      'CA': 'Canada',
+      'DE': 'Germany',
+      'FR': 'France',
+      'IT': 'Italy',
+      'AU': 'Australia',
+      'NL': 'Netherlands',
+      'ES': 'Spain',
+      'IN': 'India',
+      'CN': 'China',
+      'JP': 'Japan',
+      'BR': 'Brazil',
+      'RU': 'Russia',
+    };
+    return countryNames[code] ?? code;
   }
 
   @override
@@ -87,7 +155,7 @@ class _CompanyAddressScreenState extends State<CompanyAddressScreen> {
                         // Main Heading - Business Address with address icon
                         MainHeading.address(),
 
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 12),
 
                         // Country Dropdown
                         GestureDetector(
@@ -149,12 +217,16 @@ class _CompanyAddressScreenState extends State<CompanyAddressScreen> {
                         // ZIP
                         GenericInputField(
                           label: 'ZIP',
-                          hintText: 'Enter ZIP',
+                          hintText: 'Enter ZIP code',
                           controller: _zipController,
-                          onChanged: (value) {
-                            _validateZip(value);
-                          },
-                          errorText: !_isZipValid ? 'Invalid ZIP' : null,
+                          onChanged: _handleZipChange,
+                          onBlur: () => _validateZip(_zipController.text),
+                          errorText: _zipErrorMessage,
+                          errorStyle: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                          ),
+                          errorAlignment: Alignment.centerRight,
                         ),
                       ],
                     ),
@@ -169,15 +241,19 @@ class _CompanyAddressScreenState extends State<CompanyAddressScreen> {
               child: PrimaryButton(
                 label: 'CONTINUE',
                 onPressed: () {
-                  // Validate inputs before proceeding
-                  if (!_isZipValid) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please enter a valid ZIP code'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                    return;
+                  // Validate ZIP only if it's not empty
+                  if (_zipController.text.isNotEmpty) {
+                    _validateZip(_zipController.text);
+
+                    if (!_isZipValid) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please enter a valid ZIP code'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                      return;
+                    }
                   }
 
                   // Save and process address data
@@ -191,7 +267,7 @@ class _CompanyAddressScreenState extends State<CompanyAddressScreen> {
                   print('City: $city');
                   print('ZIP: $zip');
 
-                  // Navigate to contact details screen
+                  // Navigate to next screen
                   Navigator.of(context).push(
                     SlidePageRoute(
                       page: const CompanyContactScreen(),
@@ -204,41 +280,6 @@ class _CompanyAddressScreenState extends State<CompanyAddressScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// TopNav with a back button, extends from the base TopNav design
-class TopNavWithBack extends StatelessWidget {
-  final VoidCallback onBackPressed;
-
-  const TopNavWithBack({Key? key, required this.onBackPressed})
-    : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    // Use the TopNav class as a base and add back button
-    return Stack(
-      children: [
-        const TopNav(),
-        Positioned(
-          left: 0,
-          top: 0,
-          bottom: 0,
-          child: IconButton(
-            icon: SvgPicture.asset(
-              'assets/icons/back.svg',
-              width: 24,
-              height: 24,
-              colorFilter: const ColorFilter.mode(
-                Color(0xFF373C3A),
-                BlendMode.srcIn,
-              ),
-            ),
-            onPressed: onBackPressed,
-          ),
-        ),
-      ],
     );
   }
 }
