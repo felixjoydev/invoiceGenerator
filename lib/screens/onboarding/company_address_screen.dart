@@ -9,6 +9,7 @@ import 'package:invoicegenerator/widgets/navigation/top_nav.dart';
 import 'package:invoicegenerator/widgets/inputs/dropdown_input.dart';
 import 'package:invoicegenerator/widgets/inputs/text_input.dart';
 import 'package:invoicegenerator/widgets/utils/slide_page_route.dart';
+import 'package:invoicegenerator/screens/onboarding/company_contact_screen.dart';
 
 class CompanyAddressScreen extends StatefulWidget {
   const CompanyAddressScreen({super.key});
@@ -190,15 +191,10 @@ class _CompanyAddressScreenState extends State<CompanyAddressScreen> {
                   print('City: $city');
                   print('ZIP: $zip');
 
-                  // Navigate to next screen
+                  // Navigate to contact details screen
                   Navigator.of(context).push(
                     SlidePageRoute(
-                      page: Scaffold(
-                        appBar: AppBar(title: const Text('Contact Details')),
-                        body: const Center(
-                          child: Text('Next screen placeholder'),
-                        ),
-                      ),
+                      page: const CompanyContactScreen(),
                       direction: SlideDirection.right,
                     ),
                   );
