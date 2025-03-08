@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class TextInput extends StatelessWidget {
-  const TextInput({super.key});
+class CreateNavBlock extends StatelessWidget {
+  const CreateNavBlock({super.key});
 
   @override
   Widget build(BuildContext context) {

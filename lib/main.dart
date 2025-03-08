@@ -21,7 +21,7 @@ class InvoiceGeneratorApp extends StatelessWidget {
     return MaterialApp(
       title: 'Invoice Generator',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme(AppTheme.defaultPrimaryColor),
+      theme: AppTheme.lightTheme(),
       // We'll implement the SplashScreen first
       home: const SplashScreen(),
     );

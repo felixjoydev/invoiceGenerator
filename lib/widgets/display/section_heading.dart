@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class TextInput extends StatelessWidget {
-  const TextInput({super.key});
+class SectionHeading extends StatelessWidget {
+  const SectionHeading({super.key});
 
   @override
   Widget build(BuildContext context) {

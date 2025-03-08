@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class TextInput extends StatelessWidget {
-  const TextInput({super.key});
+class CarouselDots extends StatelessWidget {
+  const CarouselDots({super.key});
 
   @override
   Widget build(BuildContext context) {
