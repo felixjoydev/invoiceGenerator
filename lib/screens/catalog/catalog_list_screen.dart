@@ -8,6 +8,7 @@ import 'package:invoicegenerator/widgets/cards/CatalogCard.dart';
 import 'package:invoicegenerator/screens/invoices/invoice_list_screen.dart';
 import 'package:invoicegenerator/screens/home/home_screen.dart';
 import 'package:invoicegenerator/screens/clients/client_list_screen.dart';
+import 'package:invoicegenerator/utils/route_transitions.dart';
 
 class CatalogListScreen extends StatefulWidget {
   const CatalogListScreen({super.key});
@@ -105,19 +106,13 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
 
     if (item == BottomNavItem.home) {
       // Navigate to home screen with replacement
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-      );
+      context.navigateWithSlide(const HomeScreen());
     } else if (item == BottomNavItem.invoice) {
       // Navigate to invoice list screen with replacement
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const InvoiceListScreen()),
-      );
+      context.navigateWithSlide(const InvoiceListScreen());
     } else if (item == BottomNavItem.clients) {
       // Navigate to clients list screen with replacement
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const ClientListScreen()),
-      );
+      context.navigateWithSlide(const ClientListScreen());
     }
     // Other navigation options would be handled here
   }
@@ -212,7 +207,7 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
             ),
 
             // 32px spacing after TopNav
-            const SizedBox(height: 32),
+            const SizedBox(height: 16),
 
             // Search Input
             Padding(
@@ -229,9 +224,18 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
 
             // Main content area with catalog cards
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: SingleChildScrollView(child: _buildCatalogCards()),
+              child: ContentSlideTransition(
+                // Direction determination happens in the route
+                slideFromRight:
+                    ModalRoute.of(context)?.settings.arguments is HomeScreen ||
+                    ModalRoute.of(context)?.settings.arguments
+                        is InvoiceListScreen ||
+                    ModalRoute.of(context)?.settings.arguments
+                        is ClientListScreen,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: SingleChildScrollView(child: _buildCatalogCards()),
+                ),
               ),
             ),
 

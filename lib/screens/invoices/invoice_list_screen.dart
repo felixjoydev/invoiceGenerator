@@ -12,6 +12,7 @@ import 'package:invoicegenerator/widgets/cards/PaidCard.dart' as Paid;
 import 'package:invoicegenerator/screens/clients/client_list_screen.dart';
 import 'package:invoicegenerator/screens/home/home_screen.dart';
 import 'package:invoicegenerator/screens/catalog/catalog_list_screen.dart';
+import 'package:invoicegenerator/utils/route_transitions.dart';
 
 class InvoiceListScreen extends StatefulWidget {
   const InvoiceListScreen({super.key});
@@ -235,19 +236,13 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
     if (item == BottomNavItem.home) {
       // Go back to home screen with replacement
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-      );
+      context.navigateWithSlide(const HomeScreen());
     } else if (item == BottomNavItem.clients) {
       // Navigate to client list screen with replacement
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const ClientListScreen()),
-      );
+      context.navigateWithSlide(const ClientListScreen());
     } else if (item == BottomNavItem.catalog) {
       // Navigate to catalog list screen with replacement
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const CatalogListScreen()),
-      );
+      context.navigateWithSlide(const CatalogListScreen());
     }
     // Other navigation options would be handled here
   }
@@ -342,7 +337,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
             ),
 
             // 32px spacing after TopNav
-            const SizedBox(height: 32),
+            const SizedBox(height: 16),
 
             // Tabs for invoice categories
             Padding(
@@ -376,15 +371,20 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
             // Main content area with cards based on selected tab
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: SingleChildScrollView(
-                  child:
-                      _selectedTabIndex == 0
-                          ? _buildOverdueCards()
-                          : _selectedTabIndex == 1
-                          ? _buildOutstandingCards()
-                          : _buildPaidCards(),
+              child: ContentSlideTransition(
+                // Direction determination happens in the route
+                slideFromRight:
+                    ModalRoute.of(context)?.settings.arguments is HomeScreen,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: SingleChildScrollView(
+                    child:
+                        _selectedTabIndex == 0
+                            ? _buildOverdueCards()
+                            : _selectedTabIndex == 1
+                            ? _buildOutstandingCards()
+                            : _buildPaidCards(),
+                  ),
                 ),
               ),
             ),
