@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:invoicegenerator/theme/app_theme.dart';
 
 /// Base container for navigation with consistent styling
 class NavContainer extends StatelessWidget {
@@ -12,7 +13,7 @@ class NavContainer extends StatelessWidget {
     return Container(
       width: double.infinity,
       height: 60,
-      color: const Color.fromRGBO(218, 228, 225, 1),
+      color: AppTheme.background, // Using theme background color
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: child,
     );
@@ -50,8 +51,8 @@ class TopNav extends StatelessWidget {
               'assets/icons/settings.svg',
               width: 24,
               height: 24,
-              colorFilter: const ColorFilter.mode(
-                Color(0xFF373C3A),
+              colorFilter: ColorFilter.mode(
+                const Color(0xFF373C3A), // Icon primary color from docs
                 BlendMode.srcIn,
               ),
             ),
@@ -100,8 +101,8 @@ class OnboardingNav extends StatelessWidget {
               'assets/icons/back.svg',
               width: 24,
               height: 24,
-              colorFilter: const ColorFilter.mode(
-                Color(0xFF373C3A),
+              colorFilter: ColorFilter.mode(
+                const Color(0xFF373C3A), // Icon primary color from docs
                 BlendMode.srcIn,
               ),
             ),
@@ -129,11 +130,11 @@ class TopNavWithBack extends StatelessWidget {
         Container(
           width: double.infinity,
           height: 60,
-          color: const Color.fromRGBO(218, 228, 225, 1),
+          color: AppTheme.background, // Using theme background color
         ),
         // Back button - using GestureDetector instead of IconButton to eliminate any implicit padding
         Positioned(
-          left: 16, 
+          left: 16,
           top: 18, // Centered vertically (60 height - 24 icon height)/2 = 18
           child: GestureDetector(
             onTap: onBackPressed,
@@ -141,8 +142,8 @@ class TopNavWithBack extends StatelessWidget {
               'assets/icons/back.svg',
               width: 24,
               height: 24,
-              colorFilter: const ColorFilter.mode(
-                Color(0xFF373C3A),
+              colorFilter: ColorFilter.mode(
+                const Color(0xFF373C3A), // Icon primary color from docs
                 BlendMode.srcIn,
               ),
             ),
