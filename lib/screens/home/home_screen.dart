@@ -7,6 +7,8 @@ import 'package:invoicegenerator/widgets/cards/RevenueCard.dart';
 import 'package:invoicegenerator/widgets/cards/OverviewCard.dart';
 import 'package:invoicegenerator/widgets/cards/TopClients.dart';
 import 'package:invoicegenerator/screens/invoices/invoice_list_screen.dart';
+import 'package:invoicegenerator/screens/clients/client_list_screen.dart';
+import 'package:invoicegenerator/screens/catalog/catalog_list_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,9 +27,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Handle navigation based on selected item
     if (item == BottomNavItem.invoice) {
-      // Navigate to invoice list screen
-      Navigator.of(context).push(
+      // Navigate to invoice list screen with replacement
+      Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const InvoiceListScreen()),
+      );
+    } else if (item == BottomNavItem.clients) {
+      // Navigate to client list screen with replacement
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const ClientListScreen()),
+      );
+    } else if (item == BottomNavItem.catalog) {
+      // Navigate to catalog list screen with replacement
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const CatalogListScreen()),
       );
     } else {
       // For other tabs, just update the state for now
