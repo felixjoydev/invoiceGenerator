@@ -70,7 +70,7 @@ This document provides comprehensive technical specifications for the Invoice Ge
 
 **Status Colors**
 
-- Status Paid: `#14D66D`
+- Status Paid: `#13AF5B`
 - Status Outstanding: `#D68814`
 - Status Overdue: `#D61443`
 

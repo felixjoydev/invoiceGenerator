@@ -92,11 +92,11 @@ class AppTheme {
 
   // Button Styles
   static const ButtonStyle primaryButtonStyle = ButtonStyle(
-    padding: MaterialStatePropertyAll<EdgeInsets>(
+    padding: WidgetStatePropertyAll<EdgeInsets>(
       EdgeInsets.symmetric(vertical: 12),
     ),
-    backgroundColor: MaterialStatePropertyAll<Color>(primaryColor),
-    shape: MaterialStatePropertyAll<RoundedRectangleBorder>(
+    backgroundColor: WidgetStatePropertyAll<Color>(primaryColor),
+    shape: WidgetStatePropertyAll<RoundedRectangleBorder>(
       RoundedRectangleBorder(borderRadius: BorderRadius.zero),
     ),
   );
@@ -198,5 +198,10 @@ class AppTheme {
         space: 1,
       ),
     );
+  }
+
+  // Utility function to ensure Victor Mono text is always uppercase
+  static String ensureVictorMonoUppercase(String text) {
+    return text.toUpperCase();
   }
 }
