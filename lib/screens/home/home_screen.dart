@@ -9,6 +9,7 @@ import 'package:invoicegenerator/widgets/cards/TopClients.dart';
 import 'package:invoicegenerator/screens/invoices/invoice_list_screen.dart';
 import 'package:invoicegenerator/screens/clients/client_list_screen.dart';
 import 'package:invoicegenerator/screens/catalog/catalog_list_screen.dart';
+import 'package:invoicegenerator/utils/route_transitions.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,20 +28,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Handle navigation based on selected item
     if (item == BottomNavItem.invoice) {
-      // Navigate to invoice list screen with replacement
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const InvoiceListScreen()),
-      );
+      // Navigate to invoice list screen with animation
+      context.navigateWithSlide(const InvoiceListScreen());
     } else if (item == BottomNavItem.clients) {
-      // Navigate to client list screen with replacement
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const ClientListScreen()),
-      );
+      // Navigate to client list screen with animation
+      context.navigateWithSlide(const ClientListScreen());
     } else if (item == BottomNavItem.catalog) {
-      // Navigate to catalog list screen with replacement
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const CatalogListScreen()),
-      );
+      // Navigate to catalog list screen with animation
+      context.navigateWithSlide(const CatalogListScreen());
     } else {
       // For other tabs, just update the state for now
       setState(() {
@@ -78,41 +73,44 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // Scrollable content area
+          // Scrollable content area with slide transition
           Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  // 32px spacing after TopNav
-                  const SizedBox(height: 32),
+            child: ContentSlideTransition(
+              slideFromRight: false, // Not applicable for initial screen load
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    // 32px spacing after TopNav
+                    const SizedBox(height: 32),
 
-                  // Revenue Card
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0),
-                    child: RevenueCard(),
-                  ),
+                    // Revenue Card
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.0),
+                      child: RevenueCard(),
+                    ),
 
-                  // 32px spacing after RevenueCard
-                  const SizedBox(height: 32),
+                    // 32px spacing after RevenueCard
+                    const SizedBox(height: 32),
 
-                  // Overview Card
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0),
-                    child: OverviewCard(),
-                  ),
+                    // Overview Card
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.0),
+                      child: OverviewCard(),
+                    ),
 
-                  // 32px spacing after OverviewCard
-                  const SizedBox(height: 32),
+                    // 32px spacing after OverviewCard
+                    const SizedBox(height: 32),
 
-                  // Top Clients Card
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0),
-                    child: TopClients(),
-                  ),
+                    // Top Clients Card
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.0),
+                      child: TopClients(),
+                    ),
 
-                  // Add some bottom padding to ensure content doesn't get cut off
-                  const SizedBox(height: 16),
-                ],
+                    // Add some bottom padding to ensure content doesn't get cut off
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
             ),
           ),

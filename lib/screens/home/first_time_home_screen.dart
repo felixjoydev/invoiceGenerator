@@ -6,6 +6,7 @@ import 'package:invoicegenerator/widgets/display/information_box.dart';
 import 'package:invoicegenerator/widgets/display/welcome_header.dart';
 import 'package:invoicegenerator/widgets/cards/welcome_action.dart';
 import 'package:invoicegenerator/screens/home/home_screen.dart';
+import 'package:invoicegenerator/utils/route_transitions.dart';
 
 class FirstTimeHomeScreen extends StatefulWidget {
   const FirstTimeHomeScreen({super.key});
@@ -64,9 +65,7 @@ class _FirstTimeHomeScreenState extends State<FirstTimeHomeScreen> {
             child: HomeTopNav(
               onThemeToggle: () {
                 // For testing: Navigate to HomeScreen when logo is clicked
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => const HomeScreen()),
-                );
+                context.navigateWithSlide(const HomeScreen());
               },
               onSettingsPressed: () {
                 debugPrint('Settings pressed');
