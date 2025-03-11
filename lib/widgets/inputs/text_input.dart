@@ -5,9 +5,14 @@ import 'package:invoicegenerator/widgets/inputs/utils/dashed_line_painter.dart';
 class BusinessNameField extends StatefulWidget {
   final TextEditingController? controller;
   final Function(String)? onChanged;
+  final TextInputAction textInputAction;
 
-  const BusinessNameField({Key? key, this.controller, this.onChanged})
-    : super(key: key);
+  const BusinessNameField({
+    super.key,
+    this.controller,
+    this.onChanged,
+    this.textInputAction = TextInputAction.next,
+  });
 
   @override
   State<BusinessNameField> createState() => _BusinessNameFieldState();
@@ -35,7 +40,7 @@ class _BusinessNameFieldState extends State<BusinessNameField> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
+        SizedBox(
           width: double.infinity,
           height: 56,
           child: Row(
@@ -58,25 +63,44 @@ class _BusinessNameFieldState extends State<BusinessNameField> {
                       _hasFocus = hasFocus;
                     });
                   },
-                  child: TextField(
-                    controller: _controller,
-                    textAlign: TextAlign.right,
-                    decoration: const InputDecoration(
-                      hintText: 'Enter business name',
-                      hintStyle: TextStyle(
-                        fontFamily: 'Helvetica Now Display',
-                        fontSize: 16,
-                        color: Color(0xFF8D9694),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (_) {
+                      // Set cursor to end when tapping anywhere
+                      _controller.selection = TextSelection.fromPosition(
+                        TextPosition(offset: _controller.text.length),
+                      );
+                    },
+                    child: Container(
+                      alignment: Alignment.centerRight,
+                      child: TextField(
+                        controller: _controller,
+                        textAlign: TextAlign.right,
+                        decoration: const InputDecoration(
+                          hintText: 'Enter business name',
+                          hintStyle: TextStyle(
+                            fontFamily: 'Helvetica Now Display',
+                            fontSize: 16,
+                            color: Color(0xFF8D9694),
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        style: const TextStyle(
+                          fontFamily: 'Helvetica Now Display',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF373C3A),
+                        ),
+                        onChanged: widget.onChanged,
+                        textInputAction: widget.textInputAction,
+                        onSubmitted: (_) {
+                          if (widget.textInputAction == TextInputAction.next) {
+                            FocusScope.of(context).nextFocus();
+                          }
+                        },
                       ),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
                     ),
-                    style: const TextStyle(
-                      fontFamily: 'Helvetica Now Display',
-                      fontSize: 16,
-                      color: Color(0xFF373C3A),
-                    ),
-                    onChanged: widget.onChanged,
                   ),
                 ),
               ),
@@ -105,9 +129,14 @@ class GenericInputField extends StatefulWidget {
   final String? errorText;
   final TextStyle? errorStyle;
   final Alignment? errorAlignment;
+  final TextInputAction? textInputAction;
+  final FocusNode? focusNode;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
+  final Function(String)? onSubmitted;
 
   const GenericInputField({
-    Key? key,
+    super.key,
     required this.label,
     required this.hintText,
     this.controller,
@@ -116,7 +145,12 @@ class GenericInputField extends StatefulWidget {
     this.errorText,
     this.errorStyle,
     this.errorAlignment,
-  }) : super(key: key);
+    this.textInputAction,
+    this.focusNode,
+    this.keyboardType,
+    this.inputFormatters,
+    this.onSubmitted,
+  });
 
   @override
   State<GenericInputField> createState() => _GenericInputFieldState();
@@ -165,7 +199,7 @@ class _GenericInputFieldState extends State<GenericInputField> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
+            SizedBox(
               width: double.infinity,
               height: 56,
               child: Row(
@@ -182,30 +216,55 @@ class _GenericInputFieldState extends State<GenericInputField> {
                     ),
                   ),
                   Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      focusNode: _focusNode,
-                      textAlign: TextAlign.right,
-                      decoration: InputDecoration(
-                        hintText: widget.hintText,
-                        hintStyle: TextStyle(
-                          fontFamily: 'Helvetica Now Display',
-                          fontSize: 16,
-                          color:
-                              hasError
-                                  ? Colors.red.withOpacity(0.7)
-                                  : const Color(0xFF8D9694),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapDown: (_) {
+                        // Set cursor to end when tapping anywhere
+                        _controller.selection = TextSelection.fromPosition(
+                          TextPosition(offset: _controller.text.length),
+                        );
+                      },
+                      child: Container(
+                        alignment: Alignment.centerRight,
+                        child: TextField(
+                          controller: _controller,
+                          focusNode: widget.focusNode ?? _focusNode,
+                          textAlign: TextAlign.right,
+                          keyboardType: widget.keyboardType,
+                          inputFormatters: widget.inputFormatters,
+                          decoration: InputDecoration(
+                            hintText: widget.hintText,
+                            hintStyle: TextStyle(
+                              fontFamily: 'Helvetica Now Display',
+                              fontSize: 16,
+                              color:
+                                  hasError
+                                      ? Colors.red.withOpacity(0.7)
+                                      : const Color(0xFF8D9694),
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            errorText: null, // We handle error text separately
+                          ),
+                          style: const TextStyle(
+                            fontFamily: 'Helvetica Now Display',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF373C3A),
+                          ),
+                          textInputAction:
+                              widget.textInputAction ?? TextInputAction.next,
+                          onSubmitted:
+                              widget.onSubmitted ??
+                              (_) {
+                                if (widget.textInputAction ==
+                                    TextInputAction.next) {
+                                  FocusScope.of(context).nextFocus();
+                                }
+                              },
+                          onChanged: widget.onChanged,
                         ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                        errorText: null, // We handle error text separately
                       ),
-                      style: TextStyle(
-                        fontFamily: 'Helvetica Now Display',
-                        fontSize: 16,
-                        color: hasError ? Colors.red : const Color(0xFF373C3A),
-                      ),
-                      onChanged: widget.onChanged,
                     ),
                   ),
                 ],
@@ -259,9 +318,10 @@ class PhoneInputField extends StatefulWidget {
   final String? errorText;
   final TextStyle? errorStyle;
   final Alignment? errorAlignment;
+  final TextInputAction? textInputAction;
 
   const PhoneInputField({
-    Key? key,
+    super.key,
     this.label = 'PHONE',
     this.hintText = 'Enter your phone number',
     this.controller,
@@ -270,7 +330,8 @@ class PhoneInputField extends StatefulWidget {
     this.errorText,
     this.errorStyle,
     this.errorAlignment,
-  }) : super(key: key);
+    this.textInputAction,
+  });
 
   @override
   State<PhoneInputField> createState() => _PhoneInputFieldState();
@@ -314,9 +375,10 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
 
       // Basic phone validation - at least 6 digits
       final RegExp phoneRegex = RegExp(r'^[0-9]{6,}$');
-      _localErrorText = phoneRegex.hasMatch(value) 
-          ? null 
-          : 'Please enter a valid phone number';
+      _localErrorText =
+          phoneRegex.hasMatch(value)
+              ? null
+              : 'Please enter a valid phone number';
     });
   }
 
@@ -340,7 +402,7 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
+            SizedBox(
               width: double.infinity,
               height: 56,
               child: Row(
@@ -357,43 +419,60 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
                     ),
                   ),
                   Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      focusNode: _focusNode,
-                      textAlign: TextAlign.right,
-                      keyboardType: TextInputType.phone, // Use phone keyboard
-                      // Only allow digits
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: InputDecoration(
-                        hintText: widget.hintText,
-                        hintStyle: TextStyle(
-                          fontFamily: 'Helvetica Now Display',
-                          fontSize: 16,
-                          color:
-                              hasError
-                                  ? Colors.red.withOpacity(0.7)
-                                  : const Color(0xFF8D9694),
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                        errorText: null, // We handle error text separately
-                      ),
-                      style: TextStyle(
-                        fontFamily: 'Helvetica Now Display',
-                        fontSize: 16,
-                        color: hasError ? Colors.red : const Color(0xFF373C3A),
-                      ),
-                      onChanged: (value) {
-                        // Clear error when typing
-                        if (_localErrorText != null) {
-                          setState(() {
-                            _localErrorText = null;
-                          });
-                        }
-                        if (widget.onChanged != null) {
-                          widget.onChanged!(value);
-                        }
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapDown: (_) {
+                        // Set cursor to end when tapping anywhere
+                        _controller.selection = TextSelection.fromPosition(
+                          TextPosition(offset: _controller.text.length),
+                        );
                       },
+                      child: Container(
+                        alignment: Alignment.centerRight,
+                        child: TextField(
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          textAlign: TextAlign.right,
+                          keyboardType:
+                              TextInputType.phone, // Use phone keyboard
+                          // Only allow digits
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          decoration: InputDecoration(
+                            hintText: widget.hintText,
+                            hintStyle: TextStyle(
+                              fontFamily: 'Helvetica Now Display',
+                              fontSize: 16,
+                              color:
+                                  hasError
+                                      ? Colors.red.withOpacity(0.7)
+                                      : const Color(0xFF8D9694),
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            errorText: null, // We handle error text separately
+                          ),
+                          style: const TextStyle(
+                            fontFamily: 'Helvetica Now Display',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF373C3A),
+                          ),
+                          textInputAction: TextInputAction.next,
+                          onChanged: (value) {
+                            // Clear error when typing
+                            if (_localErrorText != null) {
+                              setState(() {
+                                _localErrorText = null;
+                              });
+                            }
+                            if (widget.onChanged != null) {
+                              widget.onChanged!(value);
+                            }
+                          },
+                        ),
+                      ),
                     ),
                   ),
                 ],

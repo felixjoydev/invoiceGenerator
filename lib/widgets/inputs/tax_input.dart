@@ -9,12 +9,12 @@ class TaxInputRow extends StatefulWidget {
   final Function(bool)? onToggle;
 
   const TaxInputRow({
-    Key? key,
+    super.key,
     this.controller,
     this.onChanged,
     this.enabled = true,
     this.onToggle,
-  }) : super(key: key);
+  });
 
   @override
   State<TaxInputRow> createState() => _TaxInputRowState();
@@ -153,7 +153,7 @@ class _TaxInputRowState extends State<TaxInputRow> {
     const TextStyle inputTextStyle = TextStyle(
       fontFamily: 'Helvetica Now Display',
       fontSize: 16.0,
-      fontWeight: FontWeight.normal,
+      fontWeight: FontWeight.w500,
       letterSpacing: 0,
       height: 1.0,
       color: Color(0xFF373C3A),
@@ -162,7 +162,7 @@ class _TaxInputRowState extends State<TaxInputRow> {
     const TextStyle placeholderStyle = TextStyle(
       fontFamily: 'Helvetica Now Display',
       fontSize: 16.0,
-      fontWeight: FontWeight.normal,
+      fontWeight: FontWeight.w500,
       letterSpacing: 0,
       height: 1.0,
       color: Color(0xFF8D9694),
@@ -171,7 +171,7 @@ class _TaxInputRowState extends State<TaxInputRow> {
     const TextStyle disabledStyle = TextStyle(
       fontFamily: 'Helvetica Now Display',
       fontSize: 16.0,
-      fontWeight: FontWeight.normal,
+      fontWeight: FontWeight.w500,
       letterSpacing: 0,
       height: 1.0,
       color: Color(0xFFB6BAC0),
@@ -179,7 +179,7 @@ class _TaxInputRowState extends State<TaxInputRow> {
 
     return Column(
       children: [
-        Container(
+        SizedBox(
           width: double.infinity,
           height: 56,
           child: Row(
@@ -203,81 +203,94 @@ class _TaxInputRowState extends State<TaxInputRow> {
               Expanded(
                 child:
                     widget.enabled
-                        ? TextField(
-                          focusNode: _focusNode,
-                          controller: _controller,
-                          textAlign: TextAlign.right,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          onTap: () {
-                            // When tapped, explicitly set focus state
-                            setState(() {
-                              _hasFocus = true;
-                            });
+                        ? GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTapDown: (_) {
+                            // Set cursor to end when tapping anywhere
+                            _controller.selection = TextSelection.fromPosition(
+                              TextPosition(offset: _controller.text.length),
+                            );
                           },
-                          onEditingComplete: () {
-                            // Handle when editing is done but focus isn't necessarily lost
-                            if (_controller.text == '%' ||
-                                _controller.text.isEmpty) {
-                              _controller.text = '';
-                            }
-                            FocusScope.of(context).unfocus();
-                          },
-                          inputFormatters: [
-                            // This formatter will prevent values above 100
-                            TextInputFormatter.withFunction((
-                              oldValue,
-                              newValue,
-                            ) {
-                              // Allow empty values
-                              if (newValue.text.isEmpty ||
-                                  newValue.text == '%') {
-                                return newValue;
-                              }
-
-                              // Process the text without the % symbol
-                              String textWithoutPercent = newValue.text
-                                  .replaceAll('%', '');
-
-                              // Try to parse as a number
-                              double? value = double.tryParse(
-                                textWithoutPercent,
-                              );
-
-                              // If we can't parse it or it's above 100, reject or modify
-                              if (value == null) {
-                                return oldValue;
-                              }
-
-                              if (value > 100) {
-                                String newText = '100%';
-                                return TextEditingValue(
-                                  text: newText,
-                                  selection: TextSelection.collapsed(
-                                    offset: newText.length - 1,
+                          child: Container(
+                            alignment: Alignment.centerRight,
+                            child: TextField(
+                              focusNode: _focusNode,
+                              controller: _controller,
+                              textAlign: TextAlign.right,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
                                   ),
-                                );
-                              }
+                              onTap: () {
+                                // When tapped, explicitly set focus state
+                                setState(() {
+                                  _hasFocus = true;
+                                });
+                              },
+                              onEditingComplete: () {
+                                // Handle when editing is done but focus isn't necessarily lost
+                                if (_controller.text == '%' ||
+                                    _controller.text.isEmpty) {
+                                  _controller.text = '';
+                                }
+                                FocusScope.of(context).unfocus();
+                              },
+                              inputFormatters: [
+                                // This formatter will prevent values above 100
+                                TextInputFormatter.withFunction((
+                                  oldValue,
+                                  newValue,
+                                ) {
+                                  // Allow empty values
+                                  if (newValue.text.isEmpty ||
+                                      newValue.text == '%') {
+                                    return newValue;
+                                  }
 
-                              return newValue;
-                            }),
-                            // Also keep the original formatter to allow only numbers and dots
-                            FilteringTextInputFormatter.allow(
-                              RegExp(r'[0-9.%]'),
+                                  // Process the text without the % symbol
+                                  String textWithoutPercent = newValue.text
+                                      .replaceAll('%', '');
+
+                                  // Try to parse as a number
+                                  double? value = double.tryParse(
+                                    textWithoutPercent,
+                                  );
+
+                                  // If we can't parse it or it's above 100, reject or modify
+                                  if (value == null) {
+                                    return oldValue;
+                                  }
+
+                                  if (value > 100) {
+                                    String newText = '100%';
+                                    return TextEditingValue(
+                                      text: newText,
+                                      selection: TextSelection.collapsed(
+                                        offset: newText.length - 1,
+                                      ),
+                                    );
+                                  }
+
+                                  return newValue;
+                                }),
+                                // Also keep the original formatter to allow only numbers and dots
+                                FilteringTextInputFormatter.allow(
+                                  RegExp(r'[0-9.%]'),
+                                ),
+                              ],
+                              decoration: const InputDecoration(
+                                hintText: "Enter tax %",
+                                hintStyle: placeholderStyle,
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.zero,
+                                isDense: true,
+                              ),
+                              style: inputTextStyle,
+                              onChanged: (value) {
+                                // Let the listener handle formatting
+                              },
                             ),
-                          ],
-                          decoration: const InputDecoration(
-                            hintText: "Enter tax %",
-                            hintStyle: placeholderStyle,
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.zero,
-                            isDense: true,
                           ),
-                          style: inputTextStyle,
-                          onChanged: (value) {
-                            // Let the listener handle formatting
-                          },
                         )
                         : Container(
                           alignment: Alignment.centerRight,

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/widgets/navigation/top_nav.dart';
 import 'package:invoicegenerator/theme/app_theme.dart';
 import 'package:invoicegenerator/widgets/display/ItemDivider.dart';
 import 'package:invoicegenerator/widgets/inputs/text_input.dart';
 import 'package:invoicegenerator/widgets/buttons/secondary_button.dart';
+import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
 
 class AddCatalogScreen extends StatefulWidget {
   const AddCatalogScreen({super.key});
@@ -139,6 +141,20 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
               ),
             ),
           ),
+
+          // Primary Button at bottom
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: PrimaryButton(
+                label: 'ADD TO CATALOG',
+                onPressed: () {
+                  // Add to catalog functionality will go here
+                },
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -187,6 +203,11 @@ class _CatalogItemInputState extends State<CatalogItemInput> {
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _qtyController = TextEditingController();
 
+  // Focus nodes for managing keyboard navigation
+  final FocusNode _nameFocus = FocusNode();
+  final FocusNode _priceFocus = FocusNode();
+  final FocusNode _qtyFocus = FocusNode();
+
   @override
   void initState() {
     super.initState();
@@ -199,6 +220,9 @@ class _CatalogItemInputState extends State<CatalogItemInput> {
     _nameController.dispose();
     _priceController.dispose();
     _qtyController.dispose();
+    _nameFocus.dispose();
+    _priceFocus.dispose();
+    _qtyFocus.dispose();
     super.dispose();
   }
 
@@ -206,13 +230,11 @@ class _CatalogItemInputState extends State<CatalogItemInput> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Item Divider with delete button only if showDeleteButton is true
+        // Item Divider with delete button visibility controlled by showDeleteButton
         ItemDivider(
           number: widget.itemNumber,
-          onDelete:
-              widget.showDeleteButton
-                  ? () => widget.onDelete(widget.index)
-                  : () {},
+          onDelete: () => widget.onDelete(widget.index),
+          showDeleteButton: widget.showDeleteButton,
         ),
 
         // 8px spacing after ItemDivider
@@ -223,20 +245,38 @@ class _CatalogItemInputState extends State<CatalogItemInput> {
           label: 'ITEM NAME',
           hintText: 'Enter item name',
           controller: _nameController,
+          focusNode: _nameFocus,
+          textInputAction: TextInputAction.next,
+          onSubmitted: (_) {
+            _priceFocus.requestFocus();
+          },
         ),
 
-        // Price input
+        // Price input (numbers only)
         GenericInputField(
           label: 'PRICE (USD)',
           hintText: 'Enter price',
           controller: _priceController,
+          focusNode: _priceFocus,
+          textInputAction: TextInputAction.next,
+          onSubmitted: (_) {
+            _qtyFocus.requestFocus();
+          },
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+          ],
         ),
 
-        // Quantity input (pre-filled with "1")
+        // Quantity input (pre-filled with "1", numbers only)
         GenericInputField(
           label: 'QTY',
           hintText: '',
           controller: _qtyController,
+          focusNode: _qtyFocus,
+          textInputAction: TextInputAction.next,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         ),
       ],
     );

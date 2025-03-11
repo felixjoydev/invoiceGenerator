@@ -3,13 +3,15 @@ import 'package:invoicegenerator/widgets/inputs/utils/dashed_line_painter.dart';
 import 'package:invoicegenerator/widgets/display/app_icon.dart';
 
 class CurrencySelector extends StatelessWidget {
-  const CurrencySelector({Key? key}) : super(key: key);
+  final String? value;
+
+  const CurrencySelector({super.key, this.value});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
+        SizedBox(
           width: double.infinity,
           height: 56,
           child: Row(
@@ -27,13 +29,22 @@ class CurrencySelector extends StatelessWidget {
               ),
               Row(
                 children: [
-                  const Text(
-                    'Select currency',
-                    style: TextStyle(
-                      fontFamily: 'Helvetica Now Display',
-                      fontSize: 16,
-                      color: Color(0xFF8D9694),
-                    ),
+                  Text(
+                    value ?? 'Select currency',
+                    style:
+                        value != null
+                            ? const TextStyle(
+                              fontFamily: 'Helvetica Now Display',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF373C3A),
+                            )
+                            : const TextStyle(
+                              fontFamily: 'Helvetica Now Display',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF8D9694),
+                            ),
                   ),
                   const SizedBox(width: 5),
                   AppIcon(
@@ -56,7 +67,7 @@ class CurrencySelector extends StatelessWidget {
 }
 
 class CustomChevronIcon extends StatelessWidget {
-  const CustomChevronIcon({Key? key}) : super(key: key);
+  const CustomChevronIcon({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -100,18 +111,20 @@ class ChevronPainter extends CustomPainter {
 class GenericSelectorField extends StatelessWidget {
   final String label;
   final String hintText;
+  final String? value;
 
   const GenericSelectorField({
-    Key? key,
+    super.key,
     required this.label,
     required this.hintText,
-  }) : super(key: key);
+    this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
+        SizedBox(
           width: double.infinity,
           height: 56,
           child: Row(
@@ -130,12 +143,21 @@ class GenericSelectorField extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    hintText,
-                    style: const TextStyle(
-                      fontFamily: 'Helvetica Now Display',
-                      fontSize: 16,
-                      color: Color(0xFF8D9694),
-                    ),
+                    value ?? hintText,
+                    style:
+                        value != null
+                            ? const TextStyle(
+                              fontFamily: 'Helvetica Now Display',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF373C3A),
+                            )
+                            : const TextStyle(
+                              fontFamily: 'Helvetica Now Display',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF8D9694),
+                            ),
                   ),
                   const SizedBox(width: 5),
                   AppIcon(
