@@ -7,7 +7,9 @@ class ClientCard extends StatelessWidget {
   final String currency;
   final double amount;
   final double outstandingAmount;
+  final double dueAmount;
   final bool hasOutstanding;
+  final bool hasDue;
 
   const ClientCard({
     Key? key,
@@ -17,7 +19,9 @@ class ClientCard extends StatelessWidget {
     this.currency = "USD",
     this.amount = 4500.00,
     this.outstandingAmount = 1000.00,
+    this.dueAmount = 0.00,
     this.hasOutstanding = true,
+    this.hasDue = false,
   }) : super(key: key);
 
   @override
@@ -46,7 +50,7 @@ class ClientCard extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    clientId,
+                    clientId.toUpperCase(),
                     style: TextStyle(
                       fontFamily: 'Victor Mono',
                       fontWeight: FontWeight.bold,
@@ -72,7 +76,7 @@ class ClientCard extends StatelessWidget {
                   ),
                   SizedBox(width: 4),
                   Text(
-                    "$invoiceCount invoices",
+                    "$invoiceCount invoices".toUpperCase(),
                     style: TextStyle(
                       fontFamily: 'Victor Mono',
                       fontWeight: FontWeight.bold,
@@ -84,7 +88,7 @@ class ClientCard extends StatelessWidget {
               ),
             ],
           ),
-          
+
           // Right side - Financial info
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -93,7 +97,7 @@ class ClientCard extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    currency,
+                    currency.toUpperCase(),
                     style: TextStyle(
                       fontFamily: 'Victor Mono',
                       fontWeight: FontWeight.bold,
@@ -121,7 +125,17 @@ class ClientCard extends StatelessWidget {
                     fontFamily: 'Victor Mono',
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
-                    color: Color(0xFFD68914),
+                    color: Color(0xFFD68814),
+                  ),
+                ),
+              if (hasDue)
+                Text(
+                  "$currency ${dueAmount.toStringAsFixed(0)} DUE",
+                  style: TextStyle(
+                    fontFamily: 'Victor Mono',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: Color(0xFFD61443),
                   ),
                 ),
             ],
@@ -162,6 +176,17 @@ class ClientCardExample extends StatelessWidget {
                 currency: "GBP",
                 amount: 1200.00,
                 hasOutstanding: false,
+              ),
+              SizedBox(height: 16),
+              ClientCard(
+                clientName: "Quantum Ltd",
+                clientId: "004",
+                invoiceCount: 3,
+                currency: "USD",
+                amount: 3500.00,
+                hasOutstanding: false,
+                hasDue: true,
+                dueAmount: 1500.00,
               ),
             ],
           ),

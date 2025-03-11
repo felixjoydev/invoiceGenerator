@@ -34,6 +34,8 @@ class _ClientListScreenState extends State<ClientListScreen> {
       'amount': 4500.00,
       'outstandingAmount': 1000.00,
       'hasOutstanding': true,
+      'dueAmount': 0.00,
+      'hasDue': false,
     },
     {
       'clientName': 'Thalamus',
@@ -41,8 +43,9 @@ class _ClientListScreenState extends State<ClientListScreen> {
       'invoiceCount': 3,
       'currency': 'USD',
       'amount': 6250.00,
-      'outstandingAmount': 1500.00,
-      'hasOutstanding': true,
+      'dueAmount': 1500.00,
+      'hasOutstanding': false,
+      'hasDue': true,
     },
     {
       'clientName': 'Cortex',
@@ -52,6 +55,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
       'amount': 3200.00,
       'outstandingAmount': 0.00,
       'hasOutstanding': false,
+      'hasDue': false,
     },
     {
       'clientName': 'Medula',
@@ -59,8 +63,9 @@ class _ClientListScreenState extends State<ClientListScreen> {
       'invoiceCount': 5,
       'currency': 'USD',
       'amount': 8500.00,
-      'outstandingAmount': 2200.00,
-      'hasOutstanding': true,
+      'dueAmount': 2200.00,
+      'hasOutstanding': false,
+      'hasDue': true,
     },
     {
       'clientName': 'Cerebrum',
@@ -70,6 +75,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
       'amount': 3700.00,
       'outstandingAmount': 0.00,
       'hasOutstanding': false,
+      'hasDue': false,
     },
     {
       'clientName': 'Neurox',
@@ -79,6 +85,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
       'amount': 5500.00,
       'outstandingAmount': 1200.00,
       'hasOutstanding': true,
+      'hasDue': false,
     },
     {
       'clientName': 'Synaptix',
@@ -88,6 +95,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
       'amount': 3200.00,
       'outstandingAmount': 800.00,
       'hasOutstanding': true,
+      'hasDue': false,
     },
     {
       'clientName': 'Axonify',
@@ -97,6 +105,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
       'amount': 4800.00,
       'outstandingAmount': 0.00,
       'hasOutstanding': false,
+      'hasDue': false,
     },
     {
       'clientName': 'BrainTech',
@@ -106,6 +115,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
       'amount': 2500.00,
       'outstandingAmount': 0.00,
       'hasOutstanding': false,
+      'hasDue': false,
     },
     {
       'clientName': 'Cognition',
@@ -115,6 +125,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
       'amount': 3800.00,
       'outstandingAmount': 1100.00,
       'hasOutstanding': true,
+      'hasDue': false,
     },
   ];
 
@@ -238,7 +249,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
             ),
 
             // 32px spacing after TopNav
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
             // Search Input
             Padding(
@@ -313,8 +324,10 @@ class _ClientListScreenState extends State<ClientListScreen> {
             invoiceCount: client['invoiceCount'],
             currency: client['currency'],
             amount: client['amount'],
-            outstandingAmount: client['outstandingAmount'],
+            outstandingAmount: client['outstandingAmount'] ?? 0.00,
             hasOutstanding: client['hasOutstanding'],
+            dueAmount: client['dueAmount'] ?? 0.00,
+            hasDue: client['hasDue'] ?? false,
           );
         }
         // Return divider for odd indices
