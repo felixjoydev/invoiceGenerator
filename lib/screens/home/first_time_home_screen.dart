@@ -111,7 +111,7 @@ class _FirstTimeHomeScreenState extends State<FirstTimeHomeScreen> {
           ),
 
           // 40px spacing above bottom nav
-          const SizedBox(height: 40),
+          const SizedBox(height: 24),
 
           // Bottom navigation
           BottomNav(

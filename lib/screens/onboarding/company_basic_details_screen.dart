@@ -39,7 +39,7 @@ class _CompanyBasicDetailsScreenState extends State<CompanyBasicDetailsScreen> {
             // Top Navigation with Carousel Dots
             Stack(
               children: [
-                const TopNav(),
+                const TopNav(showLogo: false),
                 Positioned.fill(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 0.0),

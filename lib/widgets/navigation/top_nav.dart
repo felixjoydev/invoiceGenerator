@@ -24,8 +24,14 @@ class NavContainer extends StatelessWidget {
 class TopNav extends StatelessWidget {
   final VoidCallback? onLogoPressed;
   final VoidCallback? onSettingsPressed;
+  final bool showLogo;
 
-  const TopNav({super.key, this.onLogoPressed, this.onSettingsPressed});
+  const TopNav({
+    super.key,
+    this.onLogoPressed,
+    this.onSettingsPressed,
+    this.showLogo = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -34,16 +40,18 @@ class TopNav extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Logo on the left (clickable for theme change)
-          GestureDetector(
-            onTap: onLogoPressed,
-            child: SvgPicture.asset(
-              'assets/icons/logo.svg',
-              width: 32,
-              height: 32,
-              // No color filter to preserve original colors
-            ),
-          ),
-
+          if (showLogo)
+            GestureDetector(
+              onTap: onLogoPressed,
+              child: SvgPicture.asset(
+                'assets/icons/logo.svg',
+                width: 32,
+                height: 32,
+                // No color filter to preserve original colors
+              ),
+            )
+          else
+            const SizedBox(width: 32), // Empty space when logo is hidden
           // Settings icon on the right (clickable for settings)
           GestureDetector(
             onTap: onSettingsPressed,

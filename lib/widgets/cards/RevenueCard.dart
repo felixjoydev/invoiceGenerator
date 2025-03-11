@@ -29,7 +29,7 @@ class RevenueCard extends StatelessWidget {
                           fontFamily: 'Victor Mono',
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
-                          color: Color(0xFF8D9694),
+                          color: Color(0xFFF05022),
                         ),
                       ),
                       SizedBox(height: 4),
@@ -44,7 +44,7 @@ class RevenueCard extends StatelessWidget {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(width: 7),
+                          SizedBox(width: 4),
                           Text(
                             '5900.00',
                             style: TextStyle(

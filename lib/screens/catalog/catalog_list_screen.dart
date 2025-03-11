@@ -207,7 +207,7 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
             ),
 
             // 32px spacing after TopNav
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
             // Search Input
             Padding(
