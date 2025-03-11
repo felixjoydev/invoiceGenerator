@@ -9,6 +9,9 @@ import 'package:invoicegenerator/screens/invoices/invoice_list_screen.dart';
 import 'package:invoicegenerator/screens/home/home_screen.dart';
 import 'package:invoicegenerator/screens/catalog/catalog_list_screen.dart';
 import 'package:invoicegenerator/utils/route_transitions.dart';
+import 'package:invoicegenerator/screens/clients/add_client_screen.dart';
+import 'package:invoicegenerator/models/client.dart';
+import 'package:invoicegenerator/services/client_service.dart';
 
 class ClientListScreen extends StatefulWidget {
   const ClientListScreen({super.key});
@@ -24,121 +27,99 @@ class _ClientListScreenState extends State<ClientListScreen> {
   // Search query
   String _searchQuery = '';
 
-  // Sample client data
-  final List<Map<String, dynamic>> _clients = [
-    {
-      'clientName': 'Acuro',
-      'clientId': '001',
-      'invoiceCount': 2,
-      'currency': 'USD',
-      'amount': 4500.00,
-      'outstandingAmount': 1000.00,
-      'hasOutstanding': true,
-      'dueAmount': 0.00,
-      'hasDue': false,
-    },
-    {
-      'clientName': 'Thalamus',
-      'clientId': '002',
-      'invoiceCount': 3,
-      'currency': 'USD',
-      'amount': 6250.00,
-      'dueAmount': 1500.00,
-      'hasOutstanding': false,
-      'hasDue': true,
-    },
-    {
-      'clientName': 'Cortex',
-      'clientId': '003',
-      'invoiceCount': 1,
-      'currency': 'USD',
-      'amount': 3200.00,
-      'outstandingAmount': 0.00,
-      'hasOutstanding': false,
-      'hasDue': false,
-    },
-    {
-      'clientName': 'Medula',
-      'clientId': '004',
-      'invoiceCount': 5,
-      'currency': 'USD',
-      'amount': 8500.00,
-      'dueAmount': 2200.00,
-      'hasOutstanding': false,
-      'hasDue': true,
-    },
-    {
-      'clientName': 'Cerebrum',
-      'clientId': '005',
-      'invoiceCount': 2,
-      'currency': 'USD',
-      'amount': 3700.00,
-      'outstandingAmount': 0.00,
-      'hasOutstanding': false,
-      'hasDue': false,
-    },
-    {
-      'clientName': 'Neurox',
-      'clientId': '006',
-      'invoiceCount': 4,
-      'currency': 'USD',
-      'amount': 5500.00,
-      'outstandingAmount': 1200.00,
-      'hasOutstanding': true,
-      'hasDue': false,
-    },
-    {
-      'clientName': 'Synaptix',
-      'clientId': '007',
-      'invoiceCount': 2,
-      'currency': 'USD',
-      'amount': 3200.00,
-      'outstandingAmount': 800.00,
-      'hasOutstanding': true,
-      'hasDue': false,
-    },
-    {
-      'clientName': 'Axonify',
-      'clientId': '008',
-      'invoiceCount': 3,
-      'currency': 'USD',
-      'amount': 4800.00,
-      'outstandingAmount': 0.00,
-      'hasOutstanding': false,
-      'hasDue': false,
-    },
-    {
-      'clientName': 'BrainTech',
-      'clientId': '009',
-      'invoiceCount': 1,
-      'currency': 'USD',
-      'amount': 2500.00,
-      'outstandingAmount': 0.00,
-      'hasOutstanding': false,
-      'hasDue': false,
-    },
-    {
-      'clientName': 'Cognition',
-      'clientId': '010',
-      'invoiceCount': 2,
-      'currency': 'USD',
-      'amount': 3800.00,
-      'outstandingAmount': 1100.00,
-      'hasOutstanding': true,
-      'hasDue': false,
-    },
-  ];
+  // Client service
+  final _clientService = ClientService();
+
+  // List of clients
+  List<Client> _clients = [];
+
+  @override
+  void initState() {
+    super.initState();
+    // Load clients from the service
+    _loadClients();
+
+    // Listen for changes from the service
+    _clientService.addListener(_onClientDataChanged);
+  }
+
+  // Load clients from the service
+  Future<void> _loadClients() async {
+    try {
+      // Initialize the service if needed
+      await _clientService.init();
+
+      setState(() {
+        _clients = _clientService.clients;
+      });
+
+      // If no clients, add a sample one
+      if (_clients.isEmpty) {
+        _addSampleClient();
+      }
+    } catch (e) {
+      debugPrint('Error loading clients: $e');
+      // Initialize with empty list if there's an error
+      setState(() {
+        _clients = [];
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading clients: $e'),
+          duration: const Duration(seconds: 2),
+          action: SnackBarAction(
+            label: 'Clear Data',
+            onPressed: () {
+              _clientService.clearAllClients();
+              _addSampleClient();
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  // Add a sample client for first-time use
+  Future<void> _addSampleClient() async {
+    // Create a sample client - only name is required
+    final client = Client(
+      name: 'Acuro',
+      clientId: 'CL001',
+      type: 'organization',
+      // Optional fields for a better sample
+      addressLine1: '123 Main St',
+      email: 'contact@acuro.com',
+      invoiceCount: 2,
+      currency: 'USD',
+      amount: 4500.00,
+      outstandingAmount: 1000.00,
+      hasOutstanding: true,
+    );
+
+    // Add to service
+    await _clientService.addClient(client);
+  }
+
+  // Callback when client data changes
+  void _onClientDataChanged() {
+    if (mounted) {
+      setState(() {
+        _clients = _clientService.clients;
+      });
+    }
+  }
 
   // Filtered clients based on search query
-  List<Map<String, dynamic>> get _filteredClients {
+  List<Client> get _filteredClients {
     if (_searchQuery.isEmpty) {
       return _clients;
     }
 
     final query = _searchQuery.toLowerCase();
     return _clients.where((client) {
-      return client['clientName'].toLowerCase().contains(query) ||
-          client['clientId'].toLowerCase().contains(query);
+      return client.name.toLowerCase().contains(query) ||
+          client.clientId.toLowerCase().contains(query);
     }).toList();
   }
 
@@ -161,7 +142,12 @@ class _ClientListScreenState extends State<ClientListScreen> {
 
   // Handle the add button press
   void _handleAddTapped() {
-    debugPrint('Show action options sheet');
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (context) => const AddClientScreen()))
+        .then((_) {
+          // Refresh clients when returning from add screen
+          _loadClients();
+        });
   }
 
   // Handle search input changes
@@ -174,6 +160,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _clientService.removeListener(_onClientDataChanged);
     super.dispose();
   }
 
@@ -236,10 +223,13 @@ class _ClientListScreenState extends State<ClientListScreen> {
                           ),
                         ),
                         const SizedBox(width: 16), // 16px spacing
-                        SvgPicture.asset(
-                          'assets/icons/add-black.svg',
-                          width: 24,
-                          height: 24,
+                        GestureDetector(
+                          onTap: _handleAddTapped,
+                          child: SvgPicture.asset(
+                            'assets/icons/add-black.svg',
+                            width: 24,
+                            height: 24,
+                          ),
                         ),
                       ],
                     ),
@@ -300,7 +290,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
         child: Padding(
           padding: EdgeInsets.only(top: 32.0),
           child: Text(
-            'No matching clients found',
+            'No clients found. Add your first client!',
             style: TextStyle(
               fontSize: 16,
               color: Color(0xFF8D9694),
@@ -319,15 +309,15 @@ class _ClientListScreenState extends State<ClientListScreen> {
           final client = filteredClients[clientIndex];
 
           return ClientCard(
-            clientName: client['clientName'],
-            clientId: client['clientId'],
-            invoiceCount: client['invoiceCount'],
-            currency: client['currency'],
-            amount: client['amount'],
-            outstandingAmount: client['outstandingAmount'] ?? 0.00,
-            hasOutstanding: client['hasOutstanding'],
-            dueAmount: client['dueAmount'] ?? 0.00,
-            hasDue: client['hasDue'] ?? false,
+            clientName: client.name,
+            clientId: client.clientId,
+            invoiceCount: client.invoiceCount,
+            currency: client.currency,
+            amount: client.amount,
+            outstandingAmount: client.outstandingAmount,
+            hasOutstanding: client.hasOutstanding,
+            dueAmount: client.dueAmount,
+            hasDue: client.hasDue,
           );
         }
         // Return divider for odd indices
