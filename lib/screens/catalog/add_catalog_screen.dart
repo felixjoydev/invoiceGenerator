@@ -16,7 +16,6 @@ class AddCatalogScreen extends StatefulWidget {
 class _AddCatalogScreenState extends State<AddCatalogScreen> {
   // List to keep track of catalog items
   final List<CatalogItemInput> _catalogItems = [];
-  int _itemCount = 0;
 
   @override
   void initState() {
@@ -33,28 +32,42 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
   // Add a new catalog item input
   void _addNewItem() {
     setState(() {
-      _itemCount++;
       _catalogItems.add(
         CatalogItemInput(
           key: UniqueKey(),
-          itemNumber: _itemCount,
-          onDelete: () => _deleteItem(_itemCount),
+          onDelete: (index) => _deleteItem(index),
         ),
       );
+      // Update all items to show delete button if more than one item
+      _updateItems();
     });
   }
 
   // Delete a catalog item
-  void _deleteItem(int itemNumber) {
+  void _deleteItem(int index) {
     setState(() {
-      // Find the index of the item with this number
-      final index = _catalogItems.indexWhere(
-        (item) => item.itemNumber == itemNumber,
-      );
-      if (index != -1) {
+      if (index >= 0 && index < _catalogItems.length) {
         _catalogItems.removeAt(index);
+        // Update all items after deletion
+        _updateItems();
       }
     });
+  }
+
+  // Update all items (set correct index and delete button visibility)
+  void _updateItems() {
+    // Only show delete buttons if there is more than one item
+    final bool showDeleteButton = _catalogItems.length > 1;
+
+    for (var i = 0; i < _catalogItems.length; i++) {
+      _catalogItems[i] = CatalogItemInput(
+        key: _catalogItems[i].key,
+        itemNumber: i + 1, // 1-based indexing for display
+        showDeleteButton: showDeleteButton,
+        onDelete: (index) => _deleteItem(index),
+        index: i, // Pass current index
+      );
+    }
   }
 
   @override
@@ -107,16 +120,20 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: SingleChildScrollView(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // List of catalog item inputs
-                    ..._catalogItems,
+                    // Build List of catalog item inputs with spacing
+                    if (_catalogItems.isNotEmpty) ..._buildItemsWithSpacing(),
 
                     // 16px spacing before Add Item button
                     const SizedBox(height: 16),
 
-                    // Add Item button
-                    SecondaryButton.addItem(onPressed: _addNewItem),
+                    // Add Item button - centered
+                    Center(
+                      child: SecondaryButton.addItem(onPressed: _addNewItem),
+                    ),
+
+                    // 40px bottom spacing
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
@@ -126,17 +143,38 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
       ),
     );
   }
+
+  // Build catalog items with appropriate spacing between them
+  List<Widget> _buildItemsWithSpacing() {
+    final List<Widget> itemsWithSpacing = [];
+
+    for (var i = 0; i < _catalogItems.length; i++) {
+      // Add the item
+      itemsWithSpacing.add(_catalogItems[i]);
+
+      // Add spacing after each item except the last one
+      if (i < _catalogItems.length - 1) {
+        itemsWithSpacing.add(const SizedBox(height: 24));
+      }
+    }
+
+    return itemsWithSpacing;
+  }
 }
 
 /// A widget that combines an ItemDivider and three text inputs for catalog items
 class CatalogItemInput extends StatefulWidget {
   final int itemNumber;
-  final VoidCallback onDelete;
+  final bool showDeleteButton;
+  final Function(int) onDelete;
+  final int index;
 
   const CatalogItemInput({
     Key? key,
-    required this.itemNumber,
+    this.itemNumber = 1,
+    this.showDeleteButton = false,
     required this.onDelete,
+    this.index = 0,
   }) : super(key: key);
 
   @override
@@ -168,8 +206,14 @@ class _CatalogItemInputState extends State<CatalogItemInput> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Item Divider
-        ItemDivider(number: widget.itemNumber, onDelete: widget.onDelete),
+        // Item Divider with delete button only if showDeleteButton is true
+        ItemDivider(
+          number: widget.itemNumber,
+          onDelete:
+              widget.showDeleteButton
+                  ? () => widget.onDelete(widget.index)
+                  : () {},
+        ),
 
         // 8px spacing after ItemDivider
         const SizedBox(height: 8),
