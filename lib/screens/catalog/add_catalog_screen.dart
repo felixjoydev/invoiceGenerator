@@ -7,6 +7,8 @@ import 'package:invoicegenerator/widgets/display/ItemDivider.dart';
 import 'package:invoicegenerator/widgets/inputs/text_input.dart';
 import 'package:invoicegenerator/widgets/buttons/secondary_button.dart';
 import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
+import 'package:invoicegenerator/models/catalog_item.dart';
+import 'package:invoicegenerator/services/catalog_service.dart';
 
 class AddCatalogScreen extends StatefulWidget {
   const AddCatalogScreen({super.key});
@@ -18,6 +20,12 @@ class AddCatalogScreen extends StatefulWidget {
 class _AddCatalogScreenState extends State<AddCatalogScreen> {
   // List to keep track of catalog items
   final List<CatalogItemInput> _catalogItems = [];
+
+  // Service to manage catalog items
+  final _catalogService = CatalogService();
+
+  // Track if button should be enabled
+  bool _isButtonEnabled = false;
 
   @override
   void initState() {
@@ -38,6 +46,7 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
         CatalogItemInput(
           key: UniqueKey(),
           onDelete: (index) => _deleteItem(index),
+          onFieldChanged: _validateForm,
         ),
       );
       // Update all items to show delete button if more than one item
@@ -52,6 +61,8 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
         _catalogItems.removeAt(index);
         // Update all items after deletion
         _updateItems();
+        // Re-validate form after deletion
+        _validateForm();
       }
     });
   }
@@ -68,7 +79,64 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
         showDeleteButton: showDeleteButton,
         onDelete: (index) => _deleteItem(index),
         index: i, // Pass current index
+        onFieldChanged: _validateForm,
+        nameController: _catalogItems[i].nameController,
+        priceController: _catalogItems[i].priceController,
+        qtyController: _catalogItems[i].qtyController,
       );
+    }
+  }
+
+  // Validate form to enable/disable primary button
+  void _validateForm() {
+    bool isValid = false;
+
+    // Check if at least one item has all required fields filled
+    for (var item in _catalogItems) {
+      if (item.isValid()) {
+        isValid = true;
+        break;
+      }
+    }
+
+    setState(() {
+      _isButtonEnabled = isValid;
+    });
+  }
+
+  // Handle save to catalog
+  void _saveToCatalog() {
+    // Collect valid items
+    List<CatalogItem> validItems = [];
+
+    for (var item in _catalogItems) {
+      if (item.isValid()) {
+        // Convert input to CatalogItem
+        validItems.add(
+          CatalogItem(
+            title: item.nameController.text,
+            amount: item.priceController.text,
+            quantity: int.tryParse(item.qtyController.text) ?? 1,
+            // usageInfo defaults to 'USED IN 0 INVOICES' in the model
+          ),
+        );
+      }
+    }
+
+    // Add to service
+    if (validItems.isNotEmpty) {
+      _catalogService.addItems(validItems);
+
+      // Show success snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Item(s) added to catalog'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Navigate back
+      Navigator.of(context).pop();
     }
   }
 
@@ -91,8 +159,8 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
                       'assets/icons/back.svg',
                       width: 24,
                       height: 24,
-                      colorFilter: ColorFilter.mode(
-                        const Color(0xFF373C3A),
+                      colorFilter: const ColorFilter.mode(
+                        Color(0xFF373C3A),
                         BlendMode.srcIn,
                       ),
                     ),
@@ -149,9 +217,8 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
               padding: const EdgeInsets.all(16.0),
               child: PrimaryButton(
                 label: 'ADD TO CATALOG',
-                onPressed: () {
-                  // Add to catalog functionality will go here
-                },
+                onPressed: _saveToCatalog,
+                isEnabled: _isButtonEnabled,
               ),
             ),
           ),
@@ -183,26 +250,42 @@ class CatalogItemInput extends StatefulWidget {
   final int itemNumber;
   final bool showDeleteButton;
   final Function(int) onDelete;
+  final Function() onFieldChanged;
   final int index;
 
-  const CatalogItemInput({
+  // Using late final instead of making them part of the constructor initialization
+  late final TextEditingController nameController;
+  late final TextEditingController priceController;
+  late final TextEditingController qtyController;
+
+  CatalogItemInput({
     Key? key,
     this.itemNumber = 1,
     this.showDeleteButton = false,
     required this.onDelete,
+    required this.onFieldChanged,
     this.index = 0,
-  }) : super(key: key);
+    TextEditingController? nameController,
+    TextEditingController? priceController,
+    TextEditingController? qtyController,
+  }) : super(key: key) {
+    this.nameController = nameController ?? TextEditingController();
+    this.priceController = priceController ?? TextEditingController();
+    this.qtyController = qtyController ?? TextEditingController(text: "1");
+  }
+
+  // Check if this item is valid (has all required fields)
+  bool isValid() {
+    return nameController.text.isNotEmpty &&
+        priceController.text.isNotEmpty &&
+        qtyController.text.isNotEmpty;
+  }
 
   @override
   State<CatalogItemInput> createState() => _CatalogItemInputState();
 }
 
 class _CatalogItemInputState extends State<CatalogItemInput> {
-  // Controllers for the text inputs
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _priceController = TextEditingController();
-  final TextEditingController _qtyController = TextEditingController();
-
   // Focus nodes for managing keyboard navigation
   final FocusNode _nameFocus = FocusNode();
   final FocusNode _priceFocus = FocusNode();
@@ -211,15 +294,24 @@ class _CatalogItemInputState extends State<CatalogItemInput> {
   @override
   void initState() {
     super.initState();
-    // Pre-fill QTY with "1"
-    _qtyController.text = "1";
+
+    // Add listeners to controllers to validate on change
+    widget.nameController.addListener(_onFieldChanged);
+    widget.priceController.addListener(_onFieldChanged);
+    widget.qtyController.addListener(_onFieldChanged);
+
+    // Ensure QTY has a default value
+    if (widget.qtyController.text.isEmpty) {
+      widget.qtyController.text = "1";
+    }
+  }
+
+  void _onFieldChanged() {
+    widget.onFieldChanged();
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _priceController.dispose();
-    _qtyController.dispose();
     _nameFocus.dispose();
     _priceFocus.dispose();
     _qtyFocus.dispose();
@@ -244,7 +336,7 @@ class _CatalogItemInputState extends State<CatalogItemInput> {
         GenericInputField(
           label: 'ITEM NAME',
           hintText: 'Enter item name',
-          controller: _nameController,
+          controller: widget.nameController,
           focusNode: _nameFocus,
           textInputAction: TextInputAction.next,
           onSubmitted: (_) {
@@ -256,7 +348,7 @@ class _CatalogItemInputState extends State<CatalogItemInput> {
         GenericInputField(
           label: 'PRICE (USD)',
           hintText: 'Enter price',
-          controller: _priceController,
+          controller: widget.priceController,
           focusNode: _priceFocus,
           textInputAction: TextInputAction.next,
           onSubmitted: (_) {
@@ -272,7 +364,7 @@ class _CatalogItemInputState extends State<CatalogItemInput> {
         GenericInputField(
           label: 'QTY',
           hintText: '',
-          controller: _qtyController,
+          controller: widget.qtyController,
           focusNode: _qtyFocus,
           textInputAction: TextInputAction.next,
           keyboardType: TextInputType.number,

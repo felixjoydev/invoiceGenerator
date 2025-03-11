@@ -1,0 +1,155 @@
+---
+description: Help for Front-end to Back-end implementation
+globs: 
+alwaysApply: false
+---
+# Feature Implementation Strategy
+
+This document outlines the comprehensive approach for implementing features in our Invoice Generator app using a frontend-first methodology before integrating with Supabase.
+
+## Data Model Requirements
+
+### Core Model Structure
+- Create detailed data models that mirror all UI form fields
+- Include all properties visible in listings and detail views
+- Add relationship IDs to connect related models (clientId in invoices, etc.)
+- Use appropriate data types for each field (String, double, DateTime, etc.)
+- Include unique identifiers that will match Supabase primary keys
+
+### Validation & Business Logic
+- Implement validation rules for all user inputs
+- Add helper methods for data transformation and formatting
+- Include calculated properties (totals, subtotals, etc.)
+- Create utility functions for common operations on the model
+- Add data sanitization methods for user inputs
+
+### Serialization
+- Implement methods to convert models to/from JSON
+- Include all fields that will be stored in Supabase
+- Handle date/time formatting consistently
+- Manage nested objects and relationships appropriately
+- Prepare for future backend schema alignment
+
+## State Management Approach
+
+### Provider Implementation
+- Create a dedicated provider for each major feature
+- Implement a local in-memory collection to store items
+- Add methods for all CRUD operations (Create, Read, Update, Delete)
+- Include sorting, filtering, and search functionality
+- Ensure the provider is accessible across the relevant screens
+
+### State Operations
+- Implement adding new items with generated temporary IDs
+- Create update methods that maintain state consistency
+- Add deletion with proper state cleanup
+- Include methods to fetch items by ID or other attributes
+- Implement filtering capabilities (by status, date range, etc.)
+
+### UI Synchronization
+- Ensure state changes trigger appropriate UI rebuilds
+- Implement optimistic updates for better UX
+- Add artificial delays to simulate network operations
+- Create loading states for async operations
+- Implement proper error handling and user feedback
+
+## UI-State Connection
+
+### Form Binding
+- Connect all form inputs to model properties
+- Implement two-way data binding where appropriate
+- Add input validation with error message display
+- Create form submission handlers that update the state
+- Preserve form state during navigation
+
+### List Displays
+- Bind list views to the provider's collection
+- Implement immediate UI updates when items change
+- Add empty state handling when no items exist
+- Create sorted/filtered views based on user selection
+- Implement pagination if dealing with large datasets
+
+### Status & Feedback
+- Show loading indicators during operations
+- Display success messages after completed actions
+- Implement error messaging for failed operations
+- Add confirmation dialogs for destructive actions
+- Create status indicators for different item states
+
+## Backend Preparation
+
+### Architecture Design
+- Separate data access logic from UI and business logic
+- Create service classes that can be updated for Supabase
+- Use repository pattern to abstract data sources
+- Implement consistent async/await pattern for all data operations
+- Structure code to minimize changes when switching to Supabase
+
+### Future-Proofing
+- Design with authentication in mind (userId fields, etc.)
+- Prepare for real-time updates from Supabase
+- Consider offline capabilities and cache handling
+- Plan for conflict resolution in concurrent edits
+- Structure for eventual server-side validation
+
+### Error Handling
+- Implement comprehensive error catching
+- Create error types that map to potential API errors
+- Add retry logic where appropriate
+- Include fallback behavior for failed operations
+- Design user-friendly error messaging
+
+## Complete User Flow
+
+### Navigation Management
+- Implement proper screen transitions after actions
+- Return to appropriate screens after form submission
+- Preserve state during navigation
+- Handle back button behavior consistently
+- Create logical workflow between related screens
+
+### Form Processing
+- Validate all inputs before submission
+- Show field-specific error messages
+- Disable submission until form is valid
+- Preserve partially completed forms when possible
+- Implement auto-save for lengthy forms
+
+### Feedback & Confirmation
+- Add confirmation for destructive actions
+- Show success messages after completed operations
+- Implement progress indicators for multi-step processes
+- Create toast messages or snackbars for important notifications
+- Provide clear next steps after completing actions
+
+### Edge Cases
+- Handle empty states appropriately
+- Implement error recovery mechanisms
+- Add timeout handling for simulated network operations
+- Create fallbacks for missing or invalid data
+- Design for various device sizes and orientations
+
+## Testing Considerations
+
+### Functional Testing
+- Test all CRUD operations thoroughly
+- Verify form validation works correctly
+- Ensure state updates properly reflect in UI
+- Test edge cases (empty lists, invalid inputs, etc.)
+- Verify navigation flows work as expected
+
+### UI Testing
+- Test responsiveness on different screen sizes
+- Verify all interactive elements are properly sized
+- Ensure loading states display correctly
+- Test error message displays
+- Verify empty states and data-populated states
+
+### Persistence Testing
+- Verify state maintains during navigation
+- Test app restart behavior (if implementing local storage)
+- Ensure proper cleanup of temporary data when needed
+- Test filtering and sorting persistence
+- Verify form state preservation works correctly
+
+By following this comprehensive strategy, we'll create features that function completely on the frontend now while being structured for seamless Supabase integration later.
