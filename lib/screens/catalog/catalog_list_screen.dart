@@ -9,6 +9,7 @@ import 'package:invoicegenerator/screens/invoices/invoice_list_screen.dart';
 import 'package:invoicegenerator/screens/home/home_screen.dart';
 import 'package:invoicegenerator/screens/clients/client_list_screen.dart';
 import 'package:invoicegenerator/utils/route_transitions.dart';
+import 'package:invoicegenerator/screens/catalog/add_catalog_screen.dart';
 
 class CatalogListScreen extends StatefulWidget {
   const CatalogListScreen({super.key});
@@ -119,7 +120,10 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
 
   // Handle the add button press
   void _handleAddTapped() {
-    debugPrint('Show action options sheet');
+    // Navigate to add catalog screen
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const AddCatalogScreen()));
   }
 
   // Handle search input changes
@@ -194,10 +198,13 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
                           ),
                         ),
                         const SizedBox(width: 16), // 16px spacing
-                        SvgPicture.asset(
-                          'assets/icons/add-black.svg',
-                          width: 24,
-                          height: 24,
+                        GestureDetector(
+                          onTap: _handleAddTapped,
+                          child: SvgPicture.asset(
+                            'assets/icons/add-black.svg',
+                            width: 24,
+                            height: 24,
+                          ),
                         ),
                       ],
                     ),
