@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/widgets/navigation/top_nav.dart';
 import 'package:invoicegenerator/theme/app_theme.dart';
-import 'package:invoicegenerator/utils/route_transitions.dart';
-import 'package:invoicegenerator/screens/catalog/catalog_list_screen.dart';
 
 class AddCatalogScreen extends StatefulWidget {
   const AddCatalogScreen({super.key});
