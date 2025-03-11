@@ -8,19 +8,23 @@ class CatalogCard extends StatelessWidget {
   final VoidCallback? onLongPress;
 
   const CatalogCard({
-    Key? key,
+    super.key,
     required this.title,
     required this.usageInfo,
     required this.currency,
     required this.amount,
     this.onLongPress,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
+        onTap: () {
+          // Dismiss keyboard when tapping on the card
+          FocusScope.of(context).unfocus();
+        },
         onLongPress: onLongPress,
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
@@ -92,6 +96,8 @@ class CatalogCard extends StatelessWidget {
 
 // Example usage
 class CatalogCardExample extends StatelessWidget {
+  const CatalogCardExample({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

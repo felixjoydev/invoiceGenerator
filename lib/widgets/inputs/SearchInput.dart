@@ -10,13 +10,13 @@ class SearchInput extends StatefulWidget {
   final String hintText;
 
   const SearchInput({
-    Key? key,
+    super.key,
     this.controller,
     this.onChanged,
     this.onSubmitted,
     this.focusNode,
     this.hintText = 'Search',
-  }) : super(key: key);
+  });
 
   @override
   State<SearchInput> createState() => _SearchInputState();
@@ -156,14 +156,14 @@ class FunctionalSearchInput extends StatefulWidget {
   final bool autofocus;
 
   const FunctionalSearchInput({
-    Key? key,
+    super.key,
     required this.controller,
     this.hintText = 'Search',
     this.onChanged,
     this.onSubmitted,
     this.focusNode,
     this.autofocus = false,
-  }) : super(key: key);
+  });
 
   @override
   State<FunctionalSearchInput> createState() => _FunctionalSearchInputState();
@@ -289,7 +289,7 @@ class _FunctionalSearchInputState extends State<FunctionalSearchInput> {
 
 // Example usage in a screen (keeping this for reference)
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({Key? key}) : super(key: key);
+  const SearchScreen({super.key});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();

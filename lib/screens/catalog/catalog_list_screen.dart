@@ -17,6 +17,7 @@ import 'package:invoicegenerator/models/catalog_item.dart';
 import 'package:invoicegenerator/widgets/display/BlurredBackground.dart';
 import 'package:invoicegenerator/widgets/cards/HighlightedCatalogCard.dart';
 import 'package:invoicegenerator/widgets/display/PressWidget.dart';
+import 'package:invoicegenerator/bottom_sheets/catalog/catalog_sort.dart';
 
 class CatalogListScreen extends StatefulWidget {
   const CatalogListScreen({super.key});
@@ -28,6 +29,8 @@ class CatalogListScreen extends StatefulWidget {
 class _CatalogListScreenState extends State<CatalogListScreen> {
   // Search controller
   final TextEditingController _searchController = TextEditingController();
+  // Search focus node
+  final FocusNode _searchFocusNode = FocusNode();
 
   // Search query
   String _searchQuery = '';
@@ -41,19 +44,52 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
   // Currently selected item (for long press)
   CatalogItem? _selectedItem;
 
+  // Current sort option
+  int? _currentSortOption;
+
   // Selected card position
   GlobalKey _lastSelectedKey = GlobalKey();
   Offset _selectedItemPosition = Offset.zero;
   Size _selectedItemSize = Size.zero;
   bool _showPressWidgetAbove = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Note: intentionally left empty
+  }
+
   // Get filtered catalog items based on search query
   List<CatalogItem> get _filteredCatalogItems {
-    if (_searchQuery.isEmpty) {
-      return _catalogService.getAllItems();
+    // Get filtered items based on search query
+    List<CatalogItem> items =
+        _searchQuery.isEmpty
+            ? List<CatalogItem>.from(_catalogService.getAllItems())
+            : List<CatalogItem>.from(_catalogService.searchItems(_searchQuery));
+
+    // Apply sorting based on the current sort option
+    if (_currentSortOption != null) {
+      switch (_currentSortOption) {
+        case 0: // Amount (Low to High)
+          items.sort((a, b) => a.amount.compareTo(b.amount));
+          break;
+        case 1: // Amount (High to Low)
+          items.sort((a, b) => b.amount.compareTo(a.amount));
+          break;
+        case 2: // Item Name (Ascending)
+          items.sort(
+            (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+          );
+          break;
+        case 3: // Item Name (Descending)
+          items.sort(
+            (a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()),
+          );
+          break;
+      }
     }
 
-    return _catalogService.searchItems(_searchQuery);
+    return items;
   }
 
   // Handle bottom navigation item selection
@@ -75,18 +111,42 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
 
   // Handle the add button press
   void _handleAddTapped() {
+    // Clear focus before navigating
+    if (_searchFocusNode.hasFocus) {
+      _searchFocusNode.unfocus();
+    }
+
+    // Get current items count to compare after returning
+    final int currentItemsCount = _catalogService.getAllItems().length;
+
     // Navigate to add catalog screen
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (context) => const AddCatalogScreen()))
         .then((_) {
-          // Refresh the screen when returning from add catalog screen
-          setState(() {
-            // Mark the first few items as animating (they are new)
-            final items = _catalogService.getAllItems();
-            if (items.isNotEmpty) {
-              _animatingItems.add(items[0].title);
+          // Make sure focus isn't set when returning
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _searchFocusNode.hasFocus) {
+              _searchFocusNode.unfocus();
             }
           });
+
+          // Get updated items list
+          final items = _catalogService.getAllItems();
+
+          // Only animate if new items were added
+          if (items.length > currentItemsCount) {
+            setState(() {
+              // Only animate new items (those at the beginning of the list)
+              for (int i = 0; i < items.length - currentItemsCount; i++) {
+                if (i < items.length) {
+                  _animatingItems.add(items[i].title);
+                }
+              }
+            });
+          } else {
+            // If no new items, just refresh the screen
+            setState(() {});
+          }
         });
   }
 
@@ -146,11 +206,10 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
       _selectedItemSize = renderBox.size;
 
       // Calculate press widget position
-      final screenHeight = MediaQuery.of(context).size.height;
       final bottomNavHeight = 80.0;
       final pressWidgetHeight = 112.0;
       final bottomSpace =
-          screenHeight -
+          MediaQuery.of(context).size.height -
           _selectedItemPosition.dy -
           _selectedItemSize.height -
           bottomNavHeight;
@@ -206,24 +265,137 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
     });
   }
 
+  // Handle the sort button press
+  void _handleSortTapped() {
+    // Create an overlay entry
+    OverlayState overlayState = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+
+    // Create animation controllers
+    AnimationController overlayAnimController = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: Navigator.of(context),
+    );
+
+    AnimationController sheetAnimController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: Navigator.of(context),
+    );
+
+    // Create animations
+    Animation<double> overlayOpacity = Tween<double>(
+      begin: 0.0,
+      end: 0.5,
+    ).animate(
+      CurvedAnimation(parent: overlayAnimController, curve: Curves.easeOut),
+    );
+
+    Animation<double> sheetSlide = Tween<double>(
+      begin: 1.0, // Start from bottom
+      end: 0.0, // End at correct position
+    ).animate(
+      CurvedAnimation(parent: sheetAnimController, curve: Curves.easeOutCubic),
+    );
+
+    // Function to close the bottom sheet
+    void closeSheet() {
+      // Run both animations in parallel to eliminate delay
+      sheetAnimController.reverse();
+      overlayAnimController.reverse().then((_) {
+        // Only remove overlay and dispose controllers after both animations complete
+        overlayEntry.remove();
+        overlayAnimController.dispose();
+        sheetAnimController.dispose();
+      });
+    }
+
+    // Handle the selected sort option
+    void handleSortSelection(int? sortOption) {
+      // Close the sheet first
+      closeSheet();
+
+      // Then handle the sort option
+      setState(() {
+        _currentSortOption = sortOption;
+      });
+    }
+
+    // Create the overlay entry
+    overlayEntry = OverlayEntry(
+      builder: (context) {
+        final sheetHeight =
+            MediaQuery.of(context).size.height * 0.5; // Approximate height
+
+        return Stack(
+          children: [
+            // Animated overlay background
+            AnimatedBuilder(
+              animation: overlayOpacity,
+              builder: (context, _) {
+                return Positioned.fill(
+                  child: GestureDetector(
+                    onTap: closeSheet,
+                    child: Container(
+                      color: Color(
+                        0xFFA3A3A3,
+                      ).withOpacity(overlayOpacity.value),
+                    ),
+                  ),
+                );
+              },
+            ),
+
+            // Animated bottom sheet
+            AnimatedBuilder(
+              animation: sheetSlide,
+              builder: (context, _) {
+                return Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: -sheetHeight * sheetSlide.value,
+                  child: GestureDetector(
+                    onTap: () {}, // Prevent taps from passing through
+                    child: Material(
+                      color: Colors.transparent,
+                      child: CatalogSortSheet(
+                        onSortSelected: handleSortSelection,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    // Insert the overlay and start animations
+    overlayState.insert(overlayEntry);
+    overlayAnimController.forward();
+    sheetAnimController.forward();
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        // Dismiss keyboard when tapping outside of text fields
-        FocusScope.of(context).unfocus();
-      },
-      child: Scaffold(
-        // Prevent bottom navigation from being pushed up by keyboard
-        resizeToAvoidBottomInset: false,
-        backgroundColor: AppTheme.background,
-        body: Stack(
+    return Scaffold(
+      // Prevent bottom navigation from being pushed up by keyboard
+      resizeToAvoidBottomInset: false,
+      backgroundColor: AppTheme.background,
+      // Add GestureDetector at root to handle taps outside input
+      body: GestureDetector(
+        // When tapping anywhere, unfocus active text fields
+        onTap: () => FocusScope.of(context).unfocus(),
+        // Make sure the gesture detector doesn't block input widgets
+        behavior: HitTestBehavior.translucent,
+        child: Stack(
           children: [
             Column(
               children: [
@@ -263,14 +435,35 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
                         // Sort and Add icons on the right with 16px spacing
                         Row(
                           children: [
-                            SvgPicture.asset(
-                              'assets/icons/sort.svg',
-                              width: 24,
-                              height: 24,
-                              colorFilter: const ColorFilter.mode(
-                                Color(0xFF373C3A),
-                                BlendMode.srcIn,
-                              ),
+                            Stack(
+                              children: [
+                                GestureDetector(
+                                  onTap: _handleSortTapped,
+                                  child: SvgPicture.asset(
+                                    'assets/icons/sort.svg',
+                                    width: 24,
+                                    height: 24,
+                                    colorFilter: const ColorFilter.mode(
+                                      Color(0xFF373C3A),
+                                      BlendMode.srcIn,
+                                    ),
+                                  ),
+                                ),
+                                // Sort indicator square
+                                if (_currentSortOption != null)
+                                  Positioned(
+                                    right: 0,
+                                    top: 0,
+                                    child: Container(
+                                      width: 4,
+                                      height: 4,
+                                      decoration: BoxDecoration(
+                                        color: Color(0xFFF05022),
+                                        shape: BoxShape.rectangle,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                             const SizedBox(width: 16), // 16px spacing
                             GestureDetector(
@@ -296,6 +489,7 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: SearchInput(
                     controller: _searchController,
+                    focusNode: _searchFocusNode,
                     hintText: 'Search catalog',
                     onChanged: _handleSearchInputChanged,
                   ),
