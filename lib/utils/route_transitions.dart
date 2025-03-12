@@ -116,10 +116,10 @@ class ContentSlideTransition extends StatefulWidget {
   final Widget child;
 
   const ContentSlideTransition({
-    Key? key,
+    super.key,
     required this.slideFromRight,
     required this.child,
-  }) : super(key: key);
+  });
 
   @override
   State<ContentSlideTransition> createState() => _ContentSlideTransitionState();

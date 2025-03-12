@@ -32,6 +32,9 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
   // Search focus node
   final FocusNode _searchFocusNode = FocusNode();
 
+  // Scroll controller for scrolling to top when sort is applied
+  final ScrollController _scrollController = ScrollController();
+
   // Search query
   String _searchQuery = '';
 
@@ -56,7 +59,31 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
   @override
   void initState() {
     super.initState();
-    // Note: intentionally left empty
+    // Initialize catalog service
+    _loadCatalogItems();
+
+    // Listen for changes from the service
+    _catalogService.addListener(_onCatalogDataChanged);
+  }
+
+  // Load catalog items from the service
+  Future<void> _loadCatalogItems() async {
+    try {
+      // Initialize the service
+      await _catalogService.init();
+
+      // Update state with items
+      setState(() {});
+    } catch (e) {
+      debugPrint('Error loading catalog items: $e');
+    }
+  }
+
+  // Handler for catalog data changes
+  void _onCatalogDataChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   // Get filtered catalog items based on search query
@@ -214,7 +241,7 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
           _selectedItemSize.height -
           bottomNavHeight;
 
-      _showPressWidgetAbove = bottomSpace < pressWidgetHeight + 8;
+      _showPressWidgetAbove = bottomSpace < pressWidgetHeight + 80;
     }
 
     setState(() {
@@ -318,6 +345,15 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
       setState(() {
         _currentSortOption = sortOption;
       });
+
+      // Scroll to top when sort is applied
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     }
 
     // Create the overlay entry
@@ -359,6 +395,7 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
                       color: Colors.transparent,
                       child: CatalogSortSheet(
                         onSortSelected: handleSortSelection,
+                        initialSortOption: _currentSortOption,
                       ),
                     ),
                   ),
@@ -380,6 +417,8 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _catalogService.removeListener(_onCatalogDataChanged);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -511,7 +550,10 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
                             is ClientListScreen,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: SingleChildScrollView(child: _buildCatalogCards()),
+                      child: SingleChildScrollView(
+                        controller: _scrollController,
+                        child: _buildCatalogCards(),
+                      ),
                     ),
                   ),
                 ),
@@ -556,7 +598,7 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
                         _showPressWidgetAbove
                             ? _selectedItemPosition.dy -
                                 112.0 -
-                                8.0 // Above the card with 8px spacing
+                                0.0 // Above the card with 8px spacing
                             : _selectedItemPosition.dy +
                                 _selectedItemSize.height +
                                 8.0, // Below the card with 8px spacing

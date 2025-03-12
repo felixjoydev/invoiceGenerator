@@ -27,11 +27,21 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
   // Track if button should be enabled
   bool _isButtonEnabled = false;
 
+  // Add scroll controller
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
     // Add the first item by default
     _addNewItem();
+  }
+
+  @override
+  void dispose() {
+    // Dispose the scroll controller
+    _scrollController.dispose();
+    super.dispose();
   }
 
   // Handle back button press
@@ -51,6 +61,17 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
       );
       // Update all items to show delete button if more than one item
       _updateItems();
+    });
+
+    // Scroll to make the newly added item visible after the UI is updated
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
@@ -189,6 +210,7 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: SingleChildScrollView(
+                controller: _scrollController,
                 child: Column(
                   children: [
                     // Build List of catalog item inputs with spacing
@@ -259,7 +281,7 @@ class CatalogItemInput extends StatefulWidget {
   late final TextEditingController qtyController;
 
   CatalogItemInput({
-    Key? key,
+    super.key,
     this.itemNumber = 1,
     this.showDeleteButton = false,
     required this.onDelete,
@@ -268,7 +290,7 @@ class CatalogItemInput extends StatefulWidget {
     TextEditingController? nameController,
     TextEditingController? priceController,
     TextEditingController? qtyController,
-  }) : super(key: key) {
+  }) {
     this.nameController = nameController ?? TextEditingController();
     this.priceController = priceController ?? TextEditingController();
     this.qtyController = qtyController ?? TextEditingController(text: "1");

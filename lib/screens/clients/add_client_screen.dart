@@ -37,6 +37,18 @@ class _AddClientScreenState extends State<AddClientScreen> {
   final TextEditingController _websiteController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
 
+  // Focus nodes for keyboard navigation between fields
+  final FocusNode _organizationNameFocus = FocusNode();
+  final FocusNode _taxIdFocus = FocusNode();
+  final FocusNode _addressLine1Focus = FocusNode();
+  final FocusNode _addressLine2Focus = FocusNode();
+  final FocusNode _cityFocus = FocusNode();
+  final FocusNode _zipFocus = FocusNode();
+  final FocusNode _phoneFocus = FocusNode();
+  final FocusNode _emailFocus = FocusNode();
+  final FocusNode _websiteFocus = FocusNode();
+  final FocusNode _notesFocus = FocusNode();
+
   // Selected country
   String? _selectedCountry;
 
@@ -65,6 +77,28 @@ class _AddClientScreenState extends State<AddClientScreen> {
     _addressLine1Controller.addListener(_validateForm);
     _emailController.addListener(_validateForm);
 
+    // Set up focus node listeners for keyboard navigation
+    _taxIdFocus.addListener(() {
+      if (!_taxIdFocus.hasFocus) {
+        // When tax ID loses focus (done pressed), move to next section's first field
+        FocusScope.of(context).unfocus();
+      }
+    });
+
+    _zipFocus.addListener(() {
+      if (!_zipFocus.hasFocus) {
+        // When ZIP loses focus (done pressed), move to next section's first field
+        FocusScope.of(context).unfocus();
+      }
+    });
+
+    _websiteFocus.addListener(() {
+      if (!_websiteFocus.hasFocus) {
+        // When website loses focus (done pressed), move to notes
+        FocusScope.of(context).unfocus();
+      }
+    });
+
     // Initial validation
     _validateForm();
   }
@@ -83,6 +117,19 @@ class _AddClientScreenState extends State<AddClientScreen> {
     _emailController.dispose();
     _websiteController.dispose();
     _notesController.dispose();
+
+    // Dispose all focus nodes
+    _organizationNameFocus.dispose();
+    _taxIdFocus.dispose();
+    _addressLine1Focus.dispose();
+    _addressLine2Focus.dispose();
+    _cityFocus.dispose();
+    _zipFocus.dispose();
+    _phoneFocus.dispose();
+    _emailFocus.dispose();
+    _websiteFocus.dispose();
+    _notesFocus.dispose();
+
     super.dispose();
   }
 
@@ -317,282 +364,325 @@ class _AddClientScreenState extends State<AddClientScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: Column(
-        children: [
-          // Custom top navigation with back button on left and "Add Client" title
-          SafeArea(
-            bottom: false,
-            child: NavContainer(
-              child: Row(
-                children: [
-                  // Back button
-                  GestureDetector(
-                    onTap: _handleBackPressed,
-                    child: SvgPicture.asset(
-                      'assets/icons/back.svg',
-                      width: 24,
-                      height: 24,
-                      colorFilter: const ColorFilter.mode(
-                        Color(0xFF373C3A),
-                        BlendMode.srcIn,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8), // 8px spacing
-                  const Text(
-                    'Add Client',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF373C3A),
-                      fontFamily: 'HelveticaNowDisplay',
-                      letterSpacing: -0.8,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // 8px spacing after TopNav
-          const SizedBox(height: 8),
-
-          // Tab control for Organization/Person selection
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: CustomTabBar(
-              tabs: const ['Organization', 'Person'],
-              initialTabIndex: _selectedTabIndex,
-              onTabChanged: _handleTabChanged,
-            ),
-          ),
-
-          // Content area with form fields
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      // Wrap the body in a GestureDetector to dismiss keyboard when tapping outside
+      body: GestureDetector(
+        onTap: () {
+          // Dismiss keyboard when tapping outside input fields
+          FocusScope.of(context).unfocus();
+        },
+        child: Column(
+          children: [
+            // Custom top navigation with back button on left and "Add Client" title
+            SafeArea(
+              bottom: false,
+              child: NavContainer(
+                child: Row(
                   children: [
-                    // 32px spacing after tabs
-                    const SizedBox(height: 32),
-
-                    // Basic Information section
-                    const SmallHeading(title: "Basic Information"),
-
-                    // 24px spacing after heading
-                    const SizedBox(height: 24),
-
-                    // Basic info fields
-                    GenericInputField(
-                      label:
-                          _selectedTabIndex == 0
-                              ? 'ORGANIZATION NAME'
-                              : 'PERSON NAME',
-                      hintText:
-                          _selectedTabIndex == 0
-                              ? 'Enter organization name'
-                              : 'Enter person name',
-                      controller: _organizationNameController,
-                    ),
-
-                    GenericInputField(
-                      label: 'CLIENT ID',
-                      hintText: 'Enter client ID', // Pre-filled, disabled
-                      controller: _clientIdController,
-                      // Make it read-only
-                      onChanged: null,
-                    ),
-
-                    GenericInputField(
-                      label: 'TAX ID',
-                      hintText: 'Enter tax ID',
-                      controller: _taxIdController,
-                    ),
-
-                    // 32px spacing before Address section
-                    const SizedBox(height: 32),
-
-                    // Address section
-                    const SmallHeading(title: "Address"),
-
-                    // 24px spacing after heading
-                    const SizedBox(height: 24),
-
-                    // Address fields
+                    // Back button
                     GestureDetector(
-                      onTap: () {
-                        // Will open bottom sheet later for country selection
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Country selector will open a bottom sheet',
-                            ),
-                            duration: Duration(seconds: 1),
-                          ),
-                        );
-                      },
-                      child: GenericSelectorField(
-                        label: 'COUNTRY',
-                        hintText: 'Select country',
-                        value: _selectedCountry,
-                      ),
-                    ),
-
-                    GenericInputField(
-                      label: 'ADDRESS LINE 1',
-                      hintText: 'Enter address line 1',
-                      controller: _addressLine1Controller,
-                    ),
-
-                    GenericInputField(
-                      label: 'ADDRESS LINE 2',
-                      hintText: 'Enter address line 2',
-                      controller: _addressLine2Controller,
-                    ),
-
-                    GenericInputField(
-                      label: 'CITY',
-                      hintText: 'Enter city',
-                      controller: _cityController,
-                    ),
-
-                    GenericInputField(
-                      label: 'ZIP',
-                      hintText: 'Enter ZIP',
-                      controller: _zipController,
-                      onChanged: _handleZipChange,
-                      onBlur: () => _validateZip(_zipController.text),
-                      errorText: _zipErrorMessage,
-                      errorStyle: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 12,
-                      ),
-                      errorAlignment: Alignment.centerRight,
-                    ),
-
-                    // 32px spacing before Contact section
-                    const SizedBox(height: 32),
-
-                    // Contact section
-                    const SmallHeading(title: "Contact Information"),
-
-                    // 24px spacing after heading
-                    const SizedBox(height: 24),
-
-                    // Contact fields
-                    PhoneInputField(
-                      controller: _phoneController,
-                      onChanged: (value) {
-                        // Clear error if any when typing
-                        if (_phoneErrorMessage != null) {
-                          setState(() {
-                            _phoneErrorMessage = null;
-                          });
-                        }
-                      },
-                      onBlur: () => _validatePhone(_phoneController.text),
-                      errorText: _phoneErrorMessage,
-                      errorStyle: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 12,
-                      ),
-                      errorAlignment: Alignment.centerRight,
-                    ),
-
-                    GenericInputField(
-                      label: 'EMAIL',
-                      hintText: 'Enter email',
-                      controller: _emailController,
-                      onChanged: (value) {
-                        // Clear error if any when typing
-                        if (_emailErrorMessage != null) {
-                          _validateEmail(value);
-                        }
-                      },
-                      onBlur: () => _validateEmail(_emailController.text),
-                      errorText: _emailErrorMessage,
-                      errorStyle: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 12,
-                      ),
-                      errorAlignment: Alignment.centerRight,
-                    ),
-
-                    GenericInputField(
-                      label: 'WEBSITE',
-                      hintText: 'Enter website',
-                      controller: _websiteController,
-                      onChanged: (value) {
-                        // Clear error if any when typing
-                        if (_websiteErrorMessage != null) {
-                          _validateWebsite(value);
-                        }
-                      },
-                      onBlur: () => _validateWebsite(_websiteController.text),
-                      errorText: _websiteErrorMessage,
-                      errorStyle: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 12,
-                      ),
-                      errorAlignment: Alignment.centerRight,
-                    ),
-
-                    // 32px spacing before Notes section
-                    const SizedBox(height: 32),
-
-                    // Notes section
-                    const SmallHeading(title: "Notes"),
-
-                    // 24px spacing after heading
-                    const SizedBox(height: 24),
-
-                    // Notes field
-                    TextField(
-                      controller: _notesController,
-                      decoration: const InputDecoration(
-                        hintText:
-                            'Add any custom notes to include on invoices for this client',
-                        hintStyle: TextStyle(
-                          fontFamily: 'Helvetica Now Display',
-                          fontSize: 16,
-                          color: Color(0xFF8D9694),
+                      onTap: _handleBackPressed,
+                      child: SvgPicture.asset(
+                        'assets/icons/back.svg',
+                        width: 24,
+                        height: 24,
+                        colorFilter: const ColorFilter.mode(
+                          Color(0xFF373C3A),
+                          BlendMode.srcIn,
                         ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
                       ),
-                      style: const TextStyle(
-                        fontFamily: 'Helvetica Now Display',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF373C3A),
-                      ),
-                      minLines: 3,
-                      maxLines: 5,
                     ),
-
-                    // 40px spacing after notes
-                    const SizedBox(height: 40),
+                    const SizedBox(width: 8), // 8px spacing
+                    const Text(
+                      'Add Client',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF373C3A),
+                        fontFamily: 'HelveticaNowDisplay',
+                        letterSpacing: -0.8,
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
-          ),
 
-          // Primary Button at bottom
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: PrimaryButton(
-                label: 'ADD CLIENT',
-                onPressed: _saveClient,
-                isEnabled: _isButtonEnabled,
+            // 8px spacing after TopNav
+            const SizedBox(height: 8),
+
+            // Tab control for Organization/Person selection
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: CustomTabBar(
+                tabs: const ['Organization', 'Person'],
+                initialTabIndex: _selectedTabIndex,
+                onTabChanged: _handleTabChanged,
               ),
             ),
-          ),
-        ],
+
+            // Content area with form fields
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 32px spacing after tabs
+                      const SizedBox(height: 32),
+
+                      // Basic Information section
+                      const SmallHeading(title: "Basic Information"),
+
+                      // 24px spacing after heading
+                      const SizedBox(height: 4),
+
+                      // Basic info fields
+                      GenericInputField(
+                        label:
+                            _selectedTabIndex == 0
+                                ? 'ORGANIZATION NAME'
+                                : 'PERSON NAME',
+                        hintText:
+                            _selectedTabIndex == 0
+                                ? 'Enter organization name'
+                                : 'Enter person name',
+                        controller: _organizationNameController,
+                        focusNode: _organizationNameFocus,
+                        textInputAction: TextInputAction.next,
+                        onSubmitted: (_) {
+                          _taxIdFocus.requestFocus();
+                        },
+                      ),
+
+                      GenericInputField(
+                        label: 'CLIENT ID',
+                        hintText: 'Auto-generated', // Pre-filled, disabled
+                        controller: _clientIdController,
+                        // Make it read-only by setting onChanged to null
+                        onChanged: null,
+                      ),
+
+                      GenericInputField(
+                        label: 'TAX ID',
+                        hintText: 'Enter tax ID',
+                        controller: _taxIdController,
+                        focusNode: _taxIdFocus,
+                        textInputAction:
+                            TextInputAction.done, // Last field in this section
+                      ),
+
+                      // 32px spacing before Address section
+                      const SizedBox(height: 32),
+
+                      // Address section
+                      const SmallHeading(title: "Address"),
+
+                      // 24px spacing after heading
+                      const SizedBox(height: 4),
+
+                      // Address fields
+                      GestureDetector(
+                        onTap: () {
+                          // Will open bottom sheet later for country selection
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Country selector will open a bottom sheet',
+                              ),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        },
+                        child: GenericSelectorField(
+                          label: 'COUNTRY',
+                          hintText: 'Select country',
+                          value: _selectedCountry,
+                        ),
+                      ),
+
+                      GenericInputField(
+                        label: 'ADDRESS LINE 1',
+                        hintText: 'Enter address line 1',
+                        controller: _addressLine1Controller,
+                        focusNode: _addressLine1Focus,
+                        textInputAction: TextInputAction.next,
+                        onSubmitted: (_) {
+                          _addressLine2Focus.requestFocus();
+                        },
+                      ),
+
+                      GenericInputField(
+                        label: 'ADDRESS LINE 2',
+                        hintText: 'Enter address line 2',
+                        controller: _addressLine2Controller,
+                        focusNode: _addressLine2Focus,
+                        textInputAction: TextInputAction.next,
+                        onSubmitted: (_) {
+                          _cityFocus.requestFocus();
+                        },
+                      ),
+
+                      GenericInputField(
+                        label: 'CITY',
+                        hintText: 'Enter city',
+                        controller: _cityController,
+                        focusNode: _cityFocus,
+                        textInputAction: TextInputAction.next,
+                        onSubmitted: (_) {
+                          _zipFocus.requestFocus();
+                        },
+                      ),
+
+                      GenericInputField(
+                        label: 'ZIP',
+                        hintText: 'Enter ZIP',
+                        controller: _zipController,
+                        focusNode: _zipFocus,
+                        textInputAction:
+                            TextInputAction.done, // Last field in this section
+                        onChanged: _handleZipChange,
+                        onBlur: () => _validateZip(_zipController.text),
+                        errorText: _zipErrorMessage,
+                        errorStyle: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 12,
+                        ),
+                        errorAlignment: Alignment.centerRight,
+                      ),
+
+                      // 32px spacing before Contact section
+                      const SizedBox(height: 32),
+
+                      // Contact section
+                      const SmallHeading(title: "Contact Information"),
+
+                      // 24px spacing after heading
+                      const SizedBox(height: 4),
+
+                      // Contact fields
+                      PhoneInputField(
+                        controller: _phoneController,
+                        textInputAction: TextInputAction.next,
+                        onChanged: (value) {
+                          // Clear error if any when typing
+                          if (_phoneErrorMessage != null) {
+                            setState(() {
+                              _phoneErrorMessage = null;
+                            });
+                          }
+                        },
+                        onBlur: () => _validatePhone(_phoneController.text),
+                        errorText: _phoneErrorMessage,
+                        errorStyle: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 12,
+                        ),
+                        errorAlignment: Alignment.centerRight,
+                      ),
+
+                      GenericInputField(
+                        label: 'EMAIL',
+                        hintText: 'Enter email',
+                        controller: _emailController,
+                        focusNode: _emailFocus,
+                        textInputAction: TextInputAction.next,
+                        onSubmitted: (_) {
+                          _websiteFocus.requestFocus();
+                        },
+                        onChanged: (value) {
+                          // Clear error if any when typing
+                          if (_emailErrorMessage != null) {
+                            _validateEmail(value);
+                          }
+                        },
+                        onBlur: () => _validateEmail(_emailController.text),
+                        errorText: _emailErrorMessage,
+                        errorStyle: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 12,
+                        ),
+                        errorAlignment: Alignment.centerRight,
+                      ),
+
+                      GenericInputField(
+                        label: 'WEBSITE',
+                        hintText: 'Enter website',
+                        controller: _websiteController,
+                        focusNode: _websiteFocus,
+                        textInputAction:
+                            TextInputAction.done, // Last field in this section
+                        onChanged: (value) {
+                          // Clear error if any when typing
+                          if (_websiteErrorMessage != null) {
+                            _validateWebsite(value);
+                          }
+                        },
+                        onBlur: () => _validateWebsite(_websiteController.text),
+                        errorText: _websiteErrorMessage,
+                        errorStyle: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 12,
+                        ),
+                        errorAlignment: Alignment.centerRight,
+                      ),
+
+                      // 32px spacing before Notes section
+                      const SizedBox(height: 32),
+
+                      // Notes section
+                      const SmallHeading(title: "Notes"),
+
+                      // 24px spacing after heading
+                      const SizedBox(height: 12),
+
+                      // Notes field
+                      TextField(
+                        controller: _notesController,
+                        focusNode: _notesFocus,
+                        decoration: const InputDecoration(
+                          hintText:
+                              'Add any custom notes to include on invoices for this client',
+                          hintStyle: TextStyle(
+                            fontFamily: 'Helvetica Now Display',
+                            fontSize: 16,
+                            color: Color(0xFF8D9694),
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        style: const TextStyle(
+                          fontFamily: 'Helvetica Now Display',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF373C3A),
+                        ),
+                        minLines: 3,
+                        maxLines: 5,
+                      ),
+
+                      // 40px spacing after notes
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Primary Button at bottom
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: PrimaryButton(
+                  label: 'ADD CLIENT',
+                  onPressed: _saveClient,
+                  isEnabled: _isButtonEnabled,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

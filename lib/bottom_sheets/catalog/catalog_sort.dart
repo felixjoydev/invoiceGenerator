@@ -4,8 +4,13 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 class CatalogSortSheet extends StatefulWidget {
   final Function(int?)? onSortSelected;
+  final int? initialSortOption;
 
-  const CatalogSortSheet({super.key, this.onSortSelected});
+  const CatalogSortSheet({
+    super.key,
+    this.onSortSelected,
+    this.initialSortOption,
+  });
 
   @override
   State<CatalogSortSheet> createState() => _CatalogSortSheetState();
@@ -13,6 +18,13 @@ class CatalogSortSheet extends StatefulWidget {
 
 class _CatalogSortSheetState extends State<CatalogSortSheet> {
   int? _selectedOption;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize with the current sort option passed from parent
+    _selectedOption = widget.initialSortOption;
+  }
 
   void _clearSelection() {
     setState(() {

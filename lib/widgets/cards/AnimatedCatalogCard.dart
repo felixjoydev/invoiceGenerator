@@ -39,9 +39,9 @@ class _AnimatedCatalogCardState extends State<AnimatedCatalogCard>
       end: 1.0,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
-    // Setup slide animation
+    // Remove slide animation - items will simply appear in place
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0.0, 1.0),
+      begin: const Offset(0.0, 0.0), // Changed from (0.0, 1.0) to (0.0, 0.0)
       end: const Offset(0.0, 0.0),
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 

@@ -91,10 +91,15 @@ class ClientService with ChangeNotifier {
     }
   }
 
-  // Add a new client
+  // Add a client to the list
   Future<void> addClient(Client client) async {
-    _clients.add(client);
+    // Add to beginning of list for newest clients to appear at top
+    _clients.insert(0, client);
+
+    // Save to storage
     await _saveClients();
+
+    // Notify listeners that data has changed
     notifyListeners();
   }
 

@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class ClientCard extends StatelessWidget {
   final String clientName;
   final String clientId;
   final int invoiceCount;
-  final String currency;
-  final double amount;
-  final double outstandingAmount;
-  final double dueAmount;
+  final String? currency;
+  final double? amount;
+  final double? outstandingAmount;
+  final double? dueAmount;
   final bool hasOutstanding;
   final bool hasDue;
+  final VoidCallback? onLongPress;
 
   const ClientCard({
-    Key? key,
+    super.key,
     this.clientName = "Acuro",
     this.clientId = "001",
     this.invoiceCount = 2,
@@ -22,125 +24,142 @@ class ClientCard extends StatelessWidget {
     this.dueAmount = 0.00,
     this.hasOutstanding = true,
     this.hasDue = false,
-  }) : super(key: key);
+    this.onLongPress,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      height: 44,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Left side - Client info
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                clientName,
-                style: TextStyle(
-                  fontFamily: 'Helvetica Now Display',
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Color(0xFF3A3A3A),
+    return GestureDetector(
+      onLongPress: () {
+        // Provide haptic feedback immediately
+        HapticFeedback.mediumImpact();
+        // Then call the callback
+        if (onLongPress != null) {
+          onLongPress!();
+        }
+      },
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: double.infinity,
+        height: 60,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        color: Colors.transparent,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Left side - Client info
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  clientName,
+                  style: const TextStyle(
+                    fontFamily: 'Helvetica Now Display',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Color(0xFF3A3A3A),
+                  ),
                 ),
-              ),
-              SizedBox(height: 4),
-              Row(
-                children: [
-                  Text(
-                    clientId.toUpperCase(),
-                    style: TextStyle(
-                      fontFamily: 'Victor Mono',
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                      color: Color(0xFF778681),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text(
+                      clientId.toUpperCase(),
+                      style: const TextStyle(
+                        fontFamily: 'Victor Mono',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: Color(0xFF778681),
+                      ),
                     ),
-                  ),
-                  SizedBox(width: 4),
-                  Container(
-                    width: 4,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFF778681),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          offset: Offset(0, 4),
-                          blurRadius: 4,
-                        ),
-                      ],
+                    const SizedBox(width: 4),
+                    Container(
+                      width: 4,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF778681),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            offset: const Offset(0, 4),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  SizedBox(width: 4),
-                  Text(
-                    "$invoiceCount invoices".toUpperCase(),
-                    style: TextStyle(
-                      fontFamily: 'Victor Mono',
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                      color: Color(0xFF778681),
+                    const SizedBox(width: 4),
+                    Text(
+                      "$invoiceCount invoices".toUpperCase(),
+                      style: const TextStyle(
+                        fontFamily: 'Victor Mono',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: Color(0xFF778681),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                  ],
+                ),
+              ],
+            ),
 
-          // Right side - Financial info
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
+            // Right side - Financial info
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (currency != null && amount != null)
+                  Row(
+                    children: [
+                      Text(
+                        currency!.toUpperCase(),
+                        style: const TextStyle(
+                          fontFamily: 'Victor Mono',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: Color(0xFF8D9694),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        amount!.toStringAsFixed(2),
+                        style: const TextStyle(
+                          fontFamily: 'Helvetica Now Display',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Color(0xFF3A3A3A),
+                        ),
+                      ),
+                    ],
+                  ),
+                const SizedBox(height: 4),
+                if (hasOutstanding &&
+                    currency != null &&
+                    outstandingAmount != null)
                   Text(
-                    currency.toUpperCase(),
-                    style: TextStyle(
+                    "$currency ${outstandingAmount!.toStringAsFixed(0)} OUTSTANDING",
+                    style: const TextStyle(
                       fontFamily: 'Victor Mono',
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: Color(0xFF8D9694),
+                      fontSize: 12,
+                      color: Color(0xFFD68814),
                     ),
                   ),
-                  SizedBox(width: 4),
+                if (hasDue && currency != null && dueAmount != null)
                   Text(
-                    amount.toStringAsFixed(2),
-                    style: TextStyle(
-                      fontFamily: 'Helvetica Now Display',
+                    "$currency ${dueAmount!.toStringAsFixed(0)} DUE",
+                    style: const TextStyle(
+                      fontFamily: 'Victor Mono',
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Color(0xFF3A3A3A),
+                      fontSize: 12,
+                      color: Color(0xFFD61443),
                     ),
                   ),
-                ],
-              ),
-              SizedBox(height: 4),
-              if (hasOutstanding)
-                Text(
-                  "$currency ${outstandingAmount.toStringAsFixed(0)} OUTSTANDING",
-                  style: TextStyle(
-                    fontFamily: 'Victor Mono',
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    color: Color(0xFFD68814),
-                  ),
-                ),
-              if (hasDue)
-                Text(
-                  "$currency ${dueAmount.toStringAsFixed(0)} DUE",
-                  style: TextStyle(
-                    fontFamily: 'Victor Mono',
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    color: Color(0xFFD61443),
-                  ),
-                ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -148,6 +167,8 @@ class ClientCard extends StatelessWidget {
 
 // Example usage
 class ClientCardExample extends StatelessWidget {
+  const ClientCardExample({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

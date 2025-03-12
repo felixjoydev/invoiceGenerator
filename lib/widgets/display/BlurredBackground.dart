@@ -1,34 +1,24 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
+/// Blurred overlay background when an item is selected
+/// Used for long-press interactions
 class BlurredBackground extends StatelessWidget {
   final VoidCallback onTap;
 
-  const BlurredBackground({Key? key, required this.onTap}) : super(key: key);
+  const BlurredBackground({super.key, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        color: const Color(0xFF373C3A).withOpacity(0.5),
         width: double.infinity,
         height: double.infinity,
-        color: const Color.fromRGBO(218, 228, 225, 0.4),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: Alignment.center,
-                radius: 1.2,
-                colors: [
-                  Colors.white.withOpacity(0.0),
-                  Colors.white.withOpacity(0.2),
-                ],
-                stops: const [0.6, 1.0],
-              ),
-            ),
-          ),
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Container(color: Colors.transparent),
         ),
       ),
     );

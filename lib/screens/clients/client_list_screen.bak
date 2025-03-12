@@ -19,47 +19,70 @@ import 'package:invoicegenerator/widgets/cards/HighlightedClientCard.dart';
 import 'package:invoicegenerator/widgets/display/PressWidget.dart';
 import 'package:invoicegenerator/bottom_sheets/clients/client_sort.dart';
 
-class ClientListScreen extends StatefulWidget {
-  const ClientListScreen({super.key});
+/// A slide-only transition with absolutely no fade effects
+class NoFadeSlideTransition extends StatefulWidget {
+  final bool slideFromRight;
+  final Widget child;
+
+  const NoFadeSlideTransition({
+    super.key,
+    required this.slideFromRight,
+    required this.child,
+  });
 
   @override
-  State<ClientListScreen> createState() => _ClientListScreenState();
+  State<NoFadeSlideTransition> createState() => _NoFadeSlideTransitionState();
 }
 
-class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
-  // Search controller
-  final TextEditingController _searchController = TextEditingController();
-  // Search focus node
-  final FocusNode _searchFocusNode = FocusNode();
+class _NoFadeSlideTransitionState extends State<NoFadeSlideTransition>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Offset> _slideAnimation;
 
-  // Scroll controller for scrolling to top when sort is applied
-  final ScrollController _scrollController = ScrollController();
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
 
-  // Search query
-  String _searchQuery = '';
+    final beginOffset =
+        widget.slideFromRight
+            ? const Offset(1.0, 0.0) // From right
+            : const Offset(-1.0, 0.0); // From left
 
-  // Client service
-  final _clientService = ClientService();
+    _slideAnimation = Tween(
+      begin: beginOffset,
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
-  // List of clients
-  List<Client> _clients = [];
+    // Start the animation
+    _controller.forward();
+  }
 
-  // Currently selected item (for long press)
-  Client? _selectedClient;
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
-  // Current sort option
-  int? _currentSortOption;
+  @override
+  Widget build(BuildContext context) {
+    // Only use SlideTransition with NO opacity or fade animations
+    return SlideTransition(position: _slideAnimation, child: widget.child);
+  }
+}
 
+class ClientListScreen extends StatefulWidget {
   // Selected card position
+  GlobalKey _lastSelectedKey = GlobalKey();
   Offset _selectedItemPosition = Offset.zero;
   Size _selectedItemSize = Size.zero;
   bool _showPressWidgetAbove = false;
 
   // Store each item's position for immediate access without render box
   final Map<String, Rect> _clientPositions = {};
-
-  // Track newly added clients that should be animated
-  final Set<String> _newlyAddedClientIds = {};
 
   @override
   void initState() {
@@ -72,6 +95,50 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
 
     // Reset any selected client when screen initializes
     _selectedClient = null;
+
+    // Add a post-frame callback to calculate all item positions after first layout
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _precalculateAllClientPositions();
+    });
+  }
+
+  // Pre-calculate positions of all client cards for immediate use
+  void _precalculateAllClientPositions() {
+    if (!mounted) return;
+
+    final clients = _filteredClients;
+    _clientPositions.clear();
+
+    // Get screen dimensions for fallback positioning
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    // Calculate constants for positioning
+    final topNavHeight = 70.0; // Approximate height of top navigation
+    final searchHeight = 60.0; // Approximate height of search input
+    final itemHeight = 60.0; // Height of client card
+    final itemSpacing = 33.0; // Spacing between items (including divider)
+    final horizontalPadding = 16.0;
+
+    // Calculate each item's position
+    for (int i = 0; i < clients.length; i++) {
+      final client = clients[i];
+
+      // Calculate Y position based on index
+      final yPosition =
+          topNavHeight + searchHeight + 32.0 + (i * (itemHeight + itemSpacing));
+
+      // Store the client's position and size
+      _clientPositions[client.clientId] = Rect.fromLTWH(
+        horizontalPadding,
+        yPosition,
+        screenWidth - (horizontalPadding * 2),
+        itemHeight,
+      );
+    }
+
+    debugPrint(
+      'Precalculated positions for ${_clientPositions.length} clients',
+    );
   }
 
   @override
@@ -84,6 +151,11 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
         _selectedClient = null;
       });
     }
+
+    // Schedule a recalculation of positions in case the layout changed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _precalculateAllClientPositions();
+    });
   }
 
   @override
@@ -91,7 +163,6 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
     _searchController.dispose();
     _searchFocusNode.dispose();
     _clientService.removeListener(_onClientDataChanged);
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -153,20 +224,37 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
     await _clientService.addClient(client);
   }
 
-  // Update _onClientDataChanged to no longer detect new clients for animation
+  // Callback when client data changes
   void _onClientDataChanged() {
     if (mounted) {
       setState(() {
-        _clients = _clientService.clients;
+        final List<Client> newClients = _clientService.clients;
+
+        // Check if there are new clients
+        if (newClients.length > _clients.length) {
+          // Find the new client(s) by comparing
+          for (final client in newClients) {
+            bool isNewClient =
+                !_clients.any(
+                  (existingClient) =>
+                      existingClient.clientId == client.clientId,
+                );
+
+            if (isNewClient) {
+              // Add to animating items
+              _animatingItems.add(client.clientId);
+            }
+          }
+        }
+
+        _clients = newClients;
+      });
+
+      // Recalculate positions after client data changes
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _precalculateAllClientPositions();
       });
     }
-  }
-
-  // Handle when animation completes for a client card
-  void _handleAnimationComplete(String clientId) {
-    setState(() {
-      _newlyAddedClientIds.remove(clientId);
-    });
   }
 
   // Filtered and sorted clients based on search query and sort option
@@ -202,15 +290,15 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
           break;
         case 3: // Amount (Low to High)
           result.sort((a, b) {
-            double aAmount = a.amount;
-            double bAmount = b.amount;
+            double aAmount = a.amount ?? 0;
+            double bAmount = b.amount ?? 0;
             return aAmount.compareTo(bAmount);
           });
           break;
         case 4: // Amount (High to Low)
           result.sort((a, b) {
-            double aAmount = a.amount;
-            double bAmount = b.amount;
+            double aAmount = a.amount ?? 0;
+            double bAmount = b.amount ?? 0;
             return bAmount.compareTo(aAmount);
           });
           break;
@@ -253,19 +341,6 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
       _searchFocusNode.unfocus();
     }
 
-    // Clear any selected client
-    if (_selectedClient != null) {
-      setState(() {
-        _selectedClient = null;
-      });
-    }
-
-    // Get current client count to compare after returning
-    final int currentClientCount = _clients.length;
-    final Set<String> currentClientIds = Set<String>.from(
-      _clients.map((c) => c.clientId),
-    );
-
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (context) => const AddClientScreen()))
         .then((_) {
@@ -281,30 +356,10 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
             });
           }
 
-          // Get updated clients
-          final updatedClients = _clientService.clients;
-
-          // Only animate if new clients were added
-          if (updatedClients.length > currentClientCount) {
-            setState(() {
-              _clients = updatedClients;
-
-              // Add animation markers INSIDE setState for better timing
-              for (final client in updatedClients) {
-                if (!currentClientIds.contains(client.clientId)) {
-                  _newlyAddedClientIds.add(client.clientId);
-                  debugPrint(
-                    'New client to animate: ${client.name} (${client.clientId})',
-                  );
-                }
-              }
-            });
-          } else {
-            // If no new clients, just refresh the screen
-            setState(() {
-              _clients = updatedClients;
-            });
-          }
+          // Recalculate positions when returning
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _precalculateAllClientPositions();
+          });
         });
   }
 
@@ -312,6 +367,18 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
   void _handleSearchInputChanged(String value) {
     setState(() {
       _searchQuery = value;
+    });
+
+    // Recalculate positions after search filter changes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _precalculateAllClientPositions();
+    });
+  }
+
+  // Handle when an animated card's animation completes
+  void _handleAnimationComplete(String clientId) {
+    setState(() {
+      _animatingItems.remove(clientId);
     });
   }
 
@@ -354,6 +421,8 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
 
     // Provide haptic feedback immediately
     HapticFeedback.mediumImpact();
+
+    _lastSelectedKey = itemKey;
 
     // Get the client's position - first try from render box, then fallback
     final Rect clientRect;
@@ -486,14 +555,10 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
         _currentSortOption = sortOption;
       });
 
-      // Scroll to top when sort is applied
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
+      // Recalculate positions after sorting
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _precalculateAllClientPositions();
+      });
     }
 
     // Create the overlay entry
@@ -536,7 +601,6 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
                       color: Colors.transparent,
                       child: ClientSortSheet(
                         onSortSelected: handleSortSelection,
-                        initialSortOption: _currentSortOption,
                       ),
                     ),
                   ),
@@ -670,9 +734,9 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
                 // 24px spacing after Search Input
                 const SizedBox(height: 24),
 
-                // Main content area - restore slide animation for screen transitions
+                // Main content area with client cards - PURE SLIDE ANIMATION ONLY
                 Expanded(
-                  child: ContentSlideTransition(
+                  child: NoFadeSlideTransition(
                     // Direction determination happens in the route - slide from right when coming from
                     // home or invoice screens, slide from left when coming from catalog
                     slideFromRight:
@@ -682,10 +746,7 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
                             is InvoiceListScreen,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: SingleChildScrollView(
-                        controller: _scrollController,
-                        child: _buildClientCards(),
-                      ),
+                      child: SingleChildScrollView(child: _buildClientCards()),
                     ),
                   ),
                 ),
@@ -773,22 +834,13 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
           final clientIndex = index ~/ 2;
           final client = filteredClients[clientIndex];
           final itemKey = GlobalKey();
-          final isNewlyAdded = _newlyAddedClientIds.contains(client.clientId);
 
-          // Use AnimatedClientCard for newly added clients
-          if (isNewlyAdded) {
+          // Check if this client is being animated
+          if (_animatingItems.contains(client.clientId)) {
             return KeyedSubtree(
               key: itemKey,
               child: AnimatedClientCard(
-                clientName: client.name,
-                clientId: client.clientId,
-                invoiceCount: client.invoiceCount,
-                currency: client.currency,
-                amount: client.amount,
-                outstandingAmount: client.outstandingAmount,
-                hasOutstanding: client.hasOutstanding,
-                dueAmount: client.dueAmount,
-                hasDue: client.hasDue,
+                client: client,
                 onAnimationComplete:
                     () => _handleAnimationComplete(client.clientId),
                 onLongPress: () => _handleLongPress(client, itemKey),
@@ -796,7 +848,6 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
             );
           }
 
-          // Use regular ClientCard for existing clients
           return KeyedSubtree(
             key: itemKey,
             child: ClientCard(
@@ -807,8 +858,8 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
               amount: client.amount,
               outstandingAmount: client.outstandingAmount,
               hasOutstanding: client.hasOutstanding,
-              hasDue: client.hasDue,
               dueAmount: client.dueAmount,
+              hasDue: client.hasDue,
               onLongPress: () => _handleLongPress(client, itemKey),
             ),
           );
