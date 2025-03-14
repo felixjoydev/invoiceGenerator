@@ -1,4 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:invoicegenerator/widgets/navigation/top_nav.dart';
+import 'package:invoicegenerator/theme/app_theme.dart';
+import 'package:invoicegenerator/widgets/display/SmallHeading.dart';
+import 'package:invoicegenerator/widgets/inputs/text_input.dart';
+import 'package:invoicegenerator/widgets/inputs/dropdown_input.dart';
+import 'package:invoicegenerator/widgets/inputs/date_input.dart';
+import 'package:invoicegenerator/widgets/buttons/secondary_button.dart';
+import 'package:invoicegenerator/widgets/inputs/toggle.dart';
+import 'package:invoicegenerator/bottom_sheets/invoices/invoice_item.dart';
+import 'package:invoicegenerator/bottom_sheets/invoices/select_client.dart';
+import 'package:invoicegenerator/bottom_sheets/invoices/editItem.dart';
+import 'package:invoicegenerator/models/catalog_item.dart';
+import 'package:invoicegenerator/models/client.dart';
+import 'package:invoicegenerator/bottom_sheets/invoices/issue_date_picker.dart';
+import 'package:invoicegenerator/bottom_sheets/invoices/due_date_picker.dart';
 
 class InvoiceCreateScreen extends StatefulWidget {
   const InvoiceCreateScreen({super.key});
@@ -8,8 +24,961 @@ class InvoiceCreateScreen extends StatefulWidget {
 }
 
 class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
+  // Text controllers for the input fields
+  final TextEditingController _invoiceIdController = TextEditingController(
+    text: 'INV001', // Pre-filled
+  );
+  final TextEditingController _issueDateController = TextEditingController();
+  final TextEditingController _dueDateController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
+  final TextEditingController _taxPercentController = TextEditingController(
+    text: '0.00',
+  );
+
+  // Selected customer
+  String? _selectedCustomer;
+  String? _selectedCustomerId;
+
+  // List to store invoice items (empty for first-time users)
+  final List<CatalogItem> _invoiceItems = [];
+
+  // Tax toggle
+  bool _isTaxEnabled = false;
+
+  // Tax text field focus node to handle selection behavior
+  final FocusNode _taxFocusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Set today's date as default for issue date and due date
+    final now = DateTime.now();
+    final formattedDate =
+        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+    _issueDateController.text = formattedDate;
+    _dueDateController.text = formattedDate;
+
+    // Setup focus listener to select all text when tax field gets focus
+    _taxFocusNode.addListener(() {
+      if (_taxFocusNode.hasFocus) {
+        // Select all text when field gets focus
+        _taxPercentController.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: _taxPercentController.text.length,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _invoiceIdController.dispose();
+    _issueDateController.dispose();
+    _dueDateController.dispose();
+    _notesController.dispose();
+    _taxPercentController.dispose();
+    _taxFocusNode.dispose();
+    super.dispose();
+  }
+
+  // Handle back button press
+  void _handleBackPressed() {
+    Navigator.of(context).pop();
+  }
+
+  // Handle date field tap to show date picker
+  void _showDatePicker(TextEditingController controller) {
+    // Parse date from controller if available
+    DateTime? initialDate;
+    if (controller.text.isNotEmpty) {
+      try {
+        // Parse DD/MM/YYYY format
+        final parts = controller.text.split('/');
+        if (parts.length == 3) {
+          final day = int.parse(parts[0]);
+          final month = int.parse(parts[1]);
+          final year = int.parse(parts[2]);
+          initialDate = DateTime(year, month, day);
+        }
+      } catch (e) {
+        // If parsing fails, use current date
+        initialDate = DateTime.now();
+      }
+    } else {
+      // If no date set, use current date
+      initialDate = DateTime.now();
+    }
+
+    if (controller == _issueDateController) {
+      // For ISSUE DATE, use the IssueDatePickerSheet
+      showIssueDatePicker(
+        context,
+        initialDate: initialDate,
+        onDateSelected: (DateTime? selectedDate) {
+          if (selectedDate != null) {
+            // Format date as DD/MM/YYYY
+            final day = selectedDate.day.toString().padLeft(2, '0');
+            final month = selectedDate.month.toString().padLeft(2, '0');
+            final year = selectedDate.year.toString();
+            controller.text = '$day/$month/$year';
+
+            // Update state to reflect the change
+            setState(() {});
+          }
+        },
+      );
+    } else if (controller == _dueDateController) {
+      // For DUE DATE, use the DueDatePickerSheet
+      showDueDatePicker(
+        context,
+        initialDate: initialDate,
+        onDateSelected: (DateTime? selectedDate) {
+          if (selectedDate != null) {
+            // Format date as DD/MM/YYYY
+            final day = selectedDate.day.toString().padLeft(2, '0');
+            final month = selectedDate.month.toString().padLeft(2, '0');
+            final year = selectedDate.year.toString();
+            controller.text = '$day/$month/$year';
+
+            // Update state to reflect the change
+            setState(() {});
+          }
+        },
+      );
+    } else {
+      // For other date fields, keep current behavior
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Date picker will open a bottom sheet'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  // Handle add item button press
+  void _handleAddItemPressed() {
+    // Open the InvoiceItemSheet bottom sheet
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return InvoiceItemSheet(
+          onAddNewItemPressed: _handleAddNewItem,
+          onItemsSelected: _handleItemsSelected,
+          preSelectedItems: _invoiceItems,
+        );
+      },
+    );
+  }
+
+  // Handle selected items from the InvoiceItemSheet
+  void _handleItemsSelected(List<CatalogItem> selectedItems) {
+    // Update the invoice items list
+    setState(() {
+      // Extract previously added items and newly added items
+      List<CatalogItem> previousItems = [];
+      List<CatalogItem> newItems = [];
+
+      // Create a map of existing items for quick lookup
+      Map<String, CatalogItem> existingItemsMap = {};
+      for (var item in _invoiceItems) {
+        existingItemsMap[item.title] = item;
+      }
+
+      // Categorize selected items as previous or new
+      for (var item in selectedItems) {
+        if (existingItemsMap.containsKey(item.title)) {
+          previousItems.add(item);
+        } else {
+          newItems.add(item);
+        }
+      }
+
+      // Clear the existing list and add items with new ones first
+      _invoiceItems.clear();
+      _invoiceItems.addAll([...newItems, ...previousItems]);
+    });
+  }
+
+  // Handle add new item button press from the InvoiceItemSheet
+  void _handleAddNewItem() {
+    // This will be called when the "ADD NEW ITEM" button in the InvoiceItemSheet is pressed
+    // Here you would typically show a form to create a new item
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Add New Item form will be shown here'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // Handle tax toggle change
+  void _handleTaxToggleChanged(bool value) {
+    setState(() {
+      _isTaxEnabled = value;
+      // Reset tax percent to 0.00 when disabled
+      if (!value) {
+        _taxPercentController.text = '0.00';
+      }
+    });
+  }
+
+  // Calculate subtotal from invoice items
+  double get _subtotal {
+    double total = 0;
+    for (var item in _invoiceItems) {
+      // Parse the amount (remove currency symbol if present)
+      String amountStr = item.amount.replaceAll(RegExp(r'[^\d.]'), '');
+      double amount = double.tryParse(amountStr) ?? 0;
+      total += amount * item.quantity;
+    }
+    return total;
+  }
+
+  // Calculate tax amount
+  double get _taxAmount {
+    if (!_isTaxEnabled) return 0;
+
+    double taxPercentage = double.tryParse(_taxPercentController.text) ?? 0;
+    return _subtotal * (taxPercentage / 100);
+  }
+
+  // Calculate total amount
+  double get _total {
+    return _subtotal + _taxAmount;
+  }
+
+  // Format currency amount
+  String _formatAmount(double amount) {
+    return amount.toStringAsFixed(2);
+  }
+
+  // Handle customer selection
+  void _handleCustomerSelected(Client client) {
+    setState(() {
+      _selectedCustomer = client.name;
+      _selectedCustomerId = client.clientId;
+    });
+  }
+
+  // Show customer selector bottom sheet
+  void _showCustomerSelector() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return SelectClientSheet(
+          onClientSelected: _handleCustomerSelected,
+          preSelectedClientId: _selectedCustomerId,
+          onAddNewClientPressed: () {
+            // Navigate to add client screen
+            Navigator.of(context).pushNamed('/add_client').then((_) {
+              // When returning from add client screen, open selector again
+              _showCustomerSelector();
+            });
+          },
+        );
+      },
+    );
+  }
+
+  // Handle edit item
+  void _handleEditItem(CatalogItem item, int index) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return EditItemSheet(
+          item: item,
+          onSave: (updatedItem) {
+            setState(() {
+              // Update the item at the specific index
+              _invoiceItems[index] = updatedItem;
+            });
+          },
+          onDelete: () {
+            setState(() {
+              // Remove the item from the list
+              _invoiceItems.removeAt(index);
+            });
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return const Scaffold();
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      // Wrap the body in a GestureDetector to dismiss keyboard when tapping outside
+      body: GestureDetector(
+        onTap: () {
+          // Dismiss keyboard when tapping outside input fields
+          FocusScope.of(context).unfocus();
+        },
+        child: Column(
+          children: [
+            // Custom top navigation with back button on left and "Create Invoice" title
+            SafeArea(
+              bottom: false,
+              child: NavContainer(
+                child: Row(
+                  children: [
+                    // Back button
+                    GestureDetector(
+                      onTap: _handleBackPressed,
+                      child: SvgPicture.asset(
+                        'assets/icons/back.svg',
+                        width: 24,
+                        height: 24,
+                        colorFilter: const ColorFilter.mode(
+                          Color(0xFF373C3A),
+                          BlendMode.srcIn,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8), // 8px spacing
+                    const Text(
+                      'Create Invoice',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF373C3A),
+                        fontFamily: 'HelveticaNowDisplay',
+                        letterSpacing: -0.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // 8px spacing after TopNav
+            const SizedBox(height: 8),
+
+            // Content area with form fields
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 32px spacing after topnav
+                      const SizedBox(height: 8),
+
+                      // Invoice Information section
+                      const SmallHeading(title: "Invoice Information"),
+
+                      // 4px spacing after heading (like in add_client_screen)
+                      const SizedBox(height: 4),
+
+                      // Customer selector
+                      GestureDetector(
+                        onTap: _showCustomerSelector,
+                        child: GenericSelectorField(
+                          label: 'SELECT CUSTOMER',
+                          hintText: 'Select customer',
+                          value: _selectedCustomer,
+                        ),
+                      ),
+
+                      // Invoice ID field (pre-filled, disabled)
+                      GenericInputField(
+                        label: 'INVOICE ID',
+                        hintText: 'Auto-generated',
+                        controller: _invoiceIdController,
+                        // Make it read-only
+                        readOnly: true,
+                      ),
+
+                      // Issue Date field using DateInput widget
+                      DateInput(
+                        label: 'ISSUE DATE',
+                        hintText: 'DD/MM/YYYY',
+                        controller: _issueDateController,
+                        onTap: () => _showDatePicker(_issueDateController),
+                        onChanged: (value) {
+                          // Update the controller value
+                          setState(() {
+                            _issueDateController.text = value;
+                          });
+                        },
+                      ),
+
+                      // Due Date field using DateInput widget
+                      DateInput(
+                        label: 'DUE DATE',
+                        hintText: 'DD/MM/YYYY',
+                        controller: _dueDateController,
+                        onTap: () => _showDatePicker(_dueDateController),
+                        onChanged: (value) {
+                          // Update the controller value
+                          setState(() {
+                            _dueDateController.text = value;
+                          });
+                        },
+                      ),
+
+                      // 32px spacing before Item Details section
+                      const SizedBox(height: 32),
+
+                      // Item Details section
+                      const SmallHeading(title: "Item Details"),
+
+                      // 4px spacing after heading
+                      const SizedBox(height: 4),
+
+                      // Table Header Row
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16.0, bottom: 16.0),
+                        child: Row(
+                          children: [
+                            // ITEM NAME column (aligned left, starting from edge)
+                            const Expanded(
+                              flex: 3,
+                              child: Text(
+                                'ITEM NAME',
+                                style: TextStyle(
+                                  fontFamily: 'Victor Mono',
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                  color: Color(0xFF768581),
+                                ),
+                              ),
+                            ),
+
+                            // QTY column (aligned left in its space)
+                            const SizedBox(
+                              width: 60,
+                              child: Text(
+                                'QTY',
+                                style: TextStyle(
+                                  fontFamily: 'Victor Mono',
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                  color: Color(0xFF768581),
+                                ),
+                              ),
+                            ),
+
+                            // PRICE column (aligned left in its space)
+                            const SizedBox(
+                              width: 100,
+                              child: Text(
+                                'PRICE (USD)',
+                                style: TextStyle(
+                                  fontFamily: 'Victor Mono',
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                  color: Color(0xFF768581),
+                                ),
+                              ),
+                            ),
+
+                            // Space for chevron icon
+                            const SizedBox(width: 16),
+                          ],
+                        ),
+                      ),
+
+                      // Divider after header row
+                      const Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Color(0xFFCAD5D2),
+                      ),
+
+                      // Show selected items or empty state
+                      if (_invoiceItems.isEmpty)
+                        // Empty state for first-time users
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16.0),
+                          child: Center(
+                            child: SecondaryButton.addNewItem(
+                              onPressed: _handleAddItemPressed,
+                            ),
+                          ),
+                        )
+                      else
+                        // Display selected invoice items with reordering capability
+                        Column(
+                          children: [
+                            const SizedBox(height: 16),
+
+                            // ReorderableListView for invoice items
+                            ReorderableList(
+                              shrinkWrap: true,
+                              physics: NeverScrollableScrollPhysics(),
+                              itemCount: _invoiceItems.length,
+                              onReorder: (oldIndex, newIndex) {
+                                setState(() {
+                                  if (oldIndex < newIndex) {
+                                    newIndex -= 1;
+                                  }
+                                  final item = _invoiceItems.removeAt(oldIndex);
+                                  _invoiceItems.insert(newIndex, item);
+                                });
+                              },
+                              itemBuilder: (context, index) {
+                                return Column(
+                                  key: ValueKey(
+                                    _invoiceItems[index].title +
+                                        index.toString(),
+                                  ),
+                                  children: [
+                                    _buildInvoiceItemRow(
+                                      _invoiceItems[index],
+                                      index,
+                                    ),
+                                    if (index < _invoiceItems.length - 1)
+                                      const DashedDivider(),
+                                  ],
+                                );
+                              },
+                            ),
+
+                            const SizedBox(height: 16),
+                            // Regular divider above the Add Item button
+                            const Divider(
+                              height: 1,
+                              thickness: 1,
+                              color: Color(0xFFCAD5D2),
+                            ),
+                            const SizedBox(height: 16),
+                            // Add Item button
+                            Align(
+                              alignment: Alignment.center,
+                              child: SecondaryButton.addNewItem(
+                                onPressed: _handleAddItemPressed,
+                              ),
+                            ),
+                          ],
+                        ),
+                      const SizedBox(height: 16),
+                      // Divider at the bottom of the items section
+                      const Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Color(0xFFCAD5D2),
+                      ),
+
+                      // Keep 16px spacing after the secondary button
+                      const SizedBox(height: 16),
+
+                      // SUBTOTAL row
+                      Row(
+                        children: [
+                          // SUBTOTAL label (left)
+                          const Expanded(
+                            child: Text(
+                              'SUBTOTAL',
+                              style: TextStyle(
+                                fontFamily: 'Victor Mono',
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF8D9694),
+                              ),
+                            ),
+                          ),
+
+                          // SUBTOTAL amount (right) - aligned with price column
+                          SizedBox(
+                            width:
+                                116, // 100 for price column + 16 for chevron icon space
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                // Add USD before subtotal amount
+                                const Text(
+                                  'USD',
+                                  style: TextStyle(
+                                    fontFamily: 'Victor Mono',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF8D9694),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _formatAmount(_subtotal),
+                                  style: const TextStyle(
+                                    fontFamily: 'Helvetica Now Display',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF373C3A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // 16px spacing between rows
+                      const SizedBox(height: 16),
+
+                      // TAX row
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // TAX label with toggle closer to it (left)
+                          Expanded(
+                            child: Row(
+                              children: [
+                                const Text(
+                                  'TAX',
+                                  style: TextStyle(
+                                    fontFamily: 'Victor Mono',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF8D9694),
+                                  ),
+                                ),
+                                // Space between label and toggle
+                                const SizedBox(width: 8),
+                                // Custom tax toggle/checkbox
+                                CustomCheckbox(
+                                  isChecked: _isTaxEnabled,
+                                  onChanged: _handleTaxToggleChanged,
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Tax percentage value - aligned with price column
+                          SizedBox(
+                            width:
+                                116, // 100 for price column + 16 for chevron icon space
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                // Tax percentage input with attached % symbol
+                                Expanded(
+                                  child: Stack(
+                                    alignment: Alignment.centerLeft,
+                                    children: [
+                                      // The text field takes most of the space
+                                      TextField(
+                                        controller: _taxPercentController,
+                                        focusNode: _taxFocusNode,
+                                        enabled: _isTaxEnabled,
+                                        textAlign: TextAlign.left,
+                                        keyboardType: TextInputType.number,
+                                        decoration: const InputDecoration(
+                                          border: InputBorder.none,
+                                          contentPadding: EdgeInsets.zero,
+                                        ),
+                                        style: TextStyle(
+                                          fontFamily: 'Helvetica Now Display',
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                          color:
+                                              _isTaxEnabled
+                                                  ? const Color(0xFF373C3A)
+                                                  : const Color(0xFF8D9694),
+                                        ),
+                                      ),
+
+                                      // Position the percentage symbol directly next to the text
+                                      // We calculate estimated width of text to place % symbol
+                                      Positioned(
+                                        left:
+                                            _taxPercentController.text.length *
+                                            8.0, // Estimate width based on text length
+                                        child: Text(
+                                          '%',
+                                          style: TextStyle(
+                                            fontFamily: 'Helvetica Now Display',
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                            color:
+                                                _isTaxEnabled
+                                                    ? const Color(0xFF373C3A)
+                                                    : const Color(0xFF8D9694),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // 16px spacing after tax row
+                      const SizedBox(height: 16),
+
+                      // Divider after tax row
+                      const Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Color(0xFFCAD5D2),
+                      ),
+
+                      // 16px spacing after divider
+                      const SizedBox(height: 16),
+
+                      // TOTAL row
+                      Row(
+                        children: [
+                          // TOTAL label (left)
+                          const Expanded(
+                            child: Text(
+                              'TOTAL',
+                              style: TextStyle(
+                                fontFamily: 'Victor Mono',
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF8D9694),
+                              ),
+                            ),
+                          ),
+
+                          // TOTAL amount with currency - aligned with price column
+                          SizedBox(
+                            width:
+                                116, // 100 for price column + 16 for chevron icon space
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                const Text(
+                                  'USD',
+                                  style: TextStyle(
+                                    fontFamily: 'Victor Mono',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF8D9694),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _formatAmount(_total),
+                                  style: const TextStyle(
+                                    fontFamily: 'Helvetica Now Display',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF373C3A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // 16px spacing after total row
+                      const SizedBox(height: 16),
+
+                      // Final divider
+                      const Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Color(0xFFCAD5D2),
+                      ),
+
+                      // 32px spacing before Notes section
+                      const SizedBox(height: 32),
+
+                      // Notes section
+                      const SmallHeading(title: "Notes"),
+
+                      // 12px spacing after heading
+                      const SizedBox(height: 12),
+
+                      // Notes field
+                      TextField(
+                        controller: _notesController,
+                        decoration: const InputDecoration(
+                          hintText:
+                              'Add any custom notes to include on this invoice',
+                          hintStyle: TextStyle(
+                            fontFamily: 'Helvetica Now Display',
+                            fontSize: 16,
+                            color: Color(0xFF8D9694),
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        style: const TextStyle(
+                          fontFamily: 'Helvetica Now Display',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF373C3A),
+                        ),
+                        minLines: 2,
+                        maxLines: null, // Allow unlimited lines
+                      ),
+
+                      // 32px spacing before Template Selection section
+                      const SizedBox(height: 32),
+
+                      // Template Selection section
+                      const SmallHeading(title: "Template Selection"),
+
+                      // Add more spacing at the bottom for better visual appearance
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Build a row for an invoice item
+  Widget _buildInvoiceItemRow(CatalogItem item, int index) {
+    return ReorderableDragStartListener(
+      index: index,
+      key: ValueKey(item.title + index.toString()),
+      child: GestureDetector(
+        onTap: () => _handleEditItem(item, index),
+        behavior: HitTestBehavior.opaque, // Make entire row area clickable
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 1.0),
+          child: Row(
+            children: [
+              // Dragger icon with a visual cue that it's draggable
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 4.0,
+                  horizontal: 2.0,
+                ),
+                child: SvgPicture.asset(
+                  'assets/icons/dragger.svg',
+                  width: 20,
+                  height: 20,
+                  colorFilter: const ColorFilter.mode(
+                    Color(0xFF768581),
+                    BlendMode.srcIn,
+                  ),
+                ),
+              ),
+
+              // 4px spacing after dragger icon
+              const SizedBox(width: 4),
+
+              // Item name (left aligned)
+              Expanded(
+                flex: 3,
+                child: Text(
+                  item.title,
+                  style: const TextStyle(
+                    fontFamily: 'Helvetica Now Display',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF373C3A),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+
+              // Quantity (left aligned in its space)
+              SizedBox(
+                width: 60,
+                child: Text(
+                  item.quantity.toString(),
+                  style: const TextStyle(
+                    fontFamily: 'Helvetica Now Display',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF373C3A),
+                  ),
+                ),
+              ),
+
+              // Price (left aligned in its space)
+              SizedBox(
+                width: 100,
+                child: Row(
+                  children: [
+                    Text(
+                      item.currency ?? 'USD',
+                      style: const TextStyle(
+                        fontFamily: 'Victor Mono',
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF8D9694),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      item.amount,
+                      style: const TextStyle(
+                        fontFamily: 'Helvetica Now Display',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF373C3A),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Chevron right icon
+              SvgPicture.asset(
+                'assets/icons/chevron-right.svg',
+                width: 16,
+                height: 16,
+                colorFilter: const ColorFilter.mode(
+                  Color(0xFF373C3A),
+                  BlendMode.srcIn,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Custom dashed divider for invoice items
+class DashedDivider extends StatelessWidget {
+  const DashedDivider({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 32,
+      alignment: Alignment.center,
+      child: SizedBox(
+        height: 1,
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final width = constraints.constrainWidth();
+            const dashWidth = 6.0;
+            const dashSpace = 4.0;
+            final dashCount = (width / (dashWidth + dashSpace)).floor();
+
+            return Flex(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              direction: Axis.horizontal,
+              children: List.generate(dashCount, (_) {
+                return SizedBox(
+                  width: dashWidth,
+                  height: 1,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(color: Color(0xFFCAD5D2)),
+                  ),
+                );
+              }),
+            );
+          },
+        ),
+      ),
+    );
   }
 }

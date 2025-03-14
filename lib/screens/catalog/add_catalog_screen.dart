@@ -298,9 +298,8 @@ class CatalogItemInput extends StatefulWidget {
 
   // Check if this item is valid (has all required fields)
   bool isValid() {
-    return nameController.text.isNotEmpty &&
-        priceController.text.isNotEmpty &&
-        qtyController.text.isNotEmpty;
+    return nameController.text.isNotEmpty && priceController.text.isNotEmpty;
+    // QTY check removed since it's hidden with a default value of "1"
   }
 
   @override
@@ -372,26 +371,15 @@ class _CatalogItemInputState extends State<CatalogItemInput> {
           hintText: 'Enter price',
           controller: widget.priceController,
           focusNode: _priceFocus,
-          textInputAction: TextInputAction.next,
-          onSubmitted: (_) {
-            _qtyFocus.requestFocus();
-          },
+          textInputAction: TextInputAction.done,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
           ],
         ),
 
-        // Quantity input (pre-filled with "1", numbers only)
-        GenericInputField(
-          label: 'QTY',
-          hintText: '',
-          controller: widget.qtyController,
-          focusNode: _qtyFocus,
-          textInputAction: TextInputAction.next,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        ),
+        // QTY field hidden - default value of "1" is still maintained in the controller
+        // The field is not rendered, but the functionality is preserved
       ],
     );
   }

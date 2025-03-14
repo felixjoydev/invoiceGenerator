@@ -6,11 +6,11 @@ class CustomCheckbox extends StatefulWidget {
   final bool isDisabled;
 
   const CustomCheckbox({
-    Key? key,
+    super.key,
     this.isChecked = false,
     this.onChanged,
     this.isDisabled = false,
-  }) : super(key: key);
+  });
 
   @override
   State<CustomCheckbox> createState() => _CustomCheckboxState();
@@ -144,7 +144,7 @@ class _CustomCheckboxState extends State<CustomCheckbox>
 
 // Example usage with StatefulWidget
 class CheckboxExample extends StatefulWidget {
-  const CheckboxExample({Key? key}) : super(key: key);
+  const CheckboxExample({super.key});
 
   @override
   State<CheckboxExample> createState() => _CheckboxExampleState();

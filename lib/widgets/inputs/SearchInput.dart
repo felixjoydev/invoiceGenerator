@@ -77,71 +77,74 @@ class _SearchInputState extends State<SearchInput> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SvgPicture.asset(
-              'assets/icons/search.svg',
-              width: 24,
-              height: 24,
-              colorFilter: ColorFilter.mode(
-                const Color.fromRGBO(118, 133, 129, 1),
-                BlendMode.srcIn,
-              ),
-            ),
-            const SizedBox(width: 8), // 8px spacing
-            Expanded(
-              child: TextField(
-                controller: _controller,
-                focusNode: _focusNode,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF373C3A),
-                  fontFamily: 'Helvetica Now Display',
+    return Container(
+      height: 56, // Set a fixed height for the entire search input component
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SvgPicture.asset(
+                'assets/icons/search.svg',
+                width: 24,
+                height: 24,
+                colorFilter: ColorFilter.mode(
+                  const Color.fromRGBO(118, 133, 129, 1),
+                  BlendMode.srcIn,
                 ),
-                decoration: InputDecoration(
-                  hintText: widget.hintText,
-                  hintStyle: const TextStyle(
+              ),
+              const SizedBox(width: 8), // 8px spacing
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  style: const TextStyle(
                     fontSize: 16,
-                    color: Color.fromRGBO(118, 133, 129, 1),
+                    color: Color(0xFF373C3A),
                     fontFamily: 'Helvetica Now Display',
                   ),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
+                  decoration: InputDecoration(
+                    hintText: widget.hintText,
+                    hintStyle: const TextStyle(
+                      fontSize: 16,
+                      color: Color.fromRGBO(118, 133, 129, 1),
+                      fontFamily: 'Helvetica Now Display',
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  onChanged: widget.onChanged,
+                  onSubmitted: widget.onSubmitted,
                 ),
-                onChanged: widget.onChanged,
-                onSubmitted: widget.onSubmitted,
               ),
-            ),
-            // Clear button - only visible when there's text
-            if (_hasText)
-              GestureDetector(
-                onTap: _clearSearch,
-                child: SvgPicture.asset(
-                  'assets/icons/close-box.svg',
-                  width: 16,
-                  height: 16,
-                  colorFilter: ColorFilter.mode(
-                    const Color(0xFF8D9694),
-                    BlendMode.srcIn,
+              // Clear button - only visible when there's text
+              if (_hasText)
+                GestureDetector(
+                  onTap: _clearSearch,
+                  child: SvgPicture.asset(
+                    'assets/icons/close-box.svg',
+                    width: 16,
+                    height: 16,
+                    colorFilter: ColorFilter.mode(
+                      const Color(0xFF8D9694),
+                      BlendMode.srcIn,
+                    ),
                   ),
                 ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        CustomPaint(
-          painter: DashedLinePainter(
-            color:
-                _hasFocus ? const Color(0xFF373C3A) : const Color(0xFFCAD5D2),
+            ],
           ),
-          size: Size(MediaQuery.of(context).size.width, 1),
-        ),
-      ],
+          const SizedBox(height: 4),
+          CustomPaint(
+            painter: DashedLinePainter(
+              color:
+                  _hasFocus ? const Color(0xFF373C3A) : const Color(0xFFCAD5D2),
+            ),
+            size: Size(MediaQuery.of(context).size.width, 1),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -218,71 +221,75 @@ class _FunctionalSearchInputState extends State<FunctionalSearchInput> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            SvgPicture.asset(
-              'assets/icons/search.svg',
-              width: 24,
-              height: 24,
-              colorFilter: ColorFilter.mode(
-                const Color.fromRGBO(118, 133, 129, 1),
-                BlendMode.srcIn,
-              ),
-            ),
-            const SizedBox(width: 8), // 8px spacing
-            Expanded(
-              child: TextField(
-                controller: widget.controller,
-                focusNode: _focusNode,
-                autofocus: widget.autofocus,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Color.fromRGBO(118, 133, 129, 1),
-                  fontFamily: 'Helvetica Now Display',
+    return Container(
+      height:
+          72, // Set a fixed height (slightly taller to account for the different spacing)
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SvgPicture.asset(
+                'assets/icons/search.svg',
+                width: 24,
+                height: 24,
+                colorFilter: ColorFilter.mode(
+                  const Color.fromRGBO(118, 133, 129, 1),
+                  BlendMode.srcIn,
                 ),
-                decoration: InputDecoration(
-                  hintText: widget.hintText,
-                  hintStyle: const TextStyle(
+              ),
+              const SizedBox(width: 8), // 8px spacing
+              Expanded(
+                child: TextField(
+                  controller: widget.controller,
+                  focusNode: _focusNode,
+                  autofocus: widget.autofocus,
+                  style: const TextStyle(
                     fontSize: 16,
                     color: Color.fromRGBO(118, 133, 129, 1),
                     fontFamily: 'Helvetica Now Display',
                   ),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
+                  decoration: InputDecoration(
+                    hintText: widget.hintText,
+                    hintStyle: const TextStyle(
+                      fontSize: 16,
+                      color: Color.fromRGBO(118, 133, 129, 1),
+                      fontFamily: 'Helvetica Now Display',
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  onChanged: widget.onChanged,
+                  onSubmitted: widget.onSubmitted,
                 ),
-                onChanged: widget.onChanged,
-                onSubmitted: widget.onSubmitted,
               ),
-            ),
-            // Clear button - only visible when there's text
-            if (_hasText)
-              GestureDetector(
-                onTap: _clearSearch,
-                child: SvgPicture.asset(
-                  'assets/icons/close-box.svg',
-                  width: 24,
-                  height: 24,
-                  colorFilter: ColorFilter.mode(
-                    const Color(0xFF8D9694),
-                    BlendMode.srcIn,
+              // Clear button - only visible when there's text
+              if (_hasText)
+                GestureDetector(
+                  onTap: _clearSearch,
+                  child: SvgPicture.asset(
+                    'assets/icons/close-box.svg',
+                    width: 24,
+                    height: 24,
+                    colorFilter: ColorFilter.mode(
+                      const Color(0xFF8D9694),
+                      BlendMode.srcIn,
+                    ),
                   ),
                 ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        CustomPaint(
-          painter: DashedLinePainter(
-            color:
-                _hasFocus ? const Color(0xFF373C3A) : const Color(0xFFCAD5D2),
+            ],
           ),
-          size: Size(MediaQuery.of(context).size.width, 1),
-        ),
-      ],
+          const SizedBox(height: 16),
+          CustomPaint(
+            painter: DashedLinePainter(
+              color:
+                  _hasFocus ? const Color(0xFF373C3A) : const Color(0xFFCAD5D2),
+            ),
+            size: Size(MediaQuery.of(context).size.width, 1),
+          ),
+        ],
+      ),
     );
   }
 }

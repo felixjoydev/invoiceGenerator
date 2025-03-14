@@ -12,6 +12,7 @@ import 'package:invoicegenerator/widgets/cards/PaidCard.dart' as Paid;
 import 'package:invoicegenerator/screens/clients/client_list_screen.dart';
 import 'package:invoicegenerator/screens/home/home_screen.dart';
 import 'package:invoicegenerator/screens/catalog/catalog_list_screen.dart';
+import 'package:invoicegenerator/screens/invoices/invoice_create_screen.dart';
 import 'package:invoicegenerator/utils/route_transitions.dart';
 
 class InvoiceListScreen extends StatefulWidget {
@@ -249,7 +250,10 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
   // Handle the add button press
   void _handleAddTapped() {
-    debugPrint('Show action options sheet');
+    // Navigate to the InvoiceCreateScreen
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const InvoiceCreateScreen()),
+    );
   }
 
   // Handle search input changes
@@ -324,10 +328,13 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                           ),
                         ),
                         const SizedBox(width: 16), // 16px spacing
-                        SvgPicture.asset(
-                          'assets/icons/add-black.svg',
-                          width: 24,
-                          height: 24,
+                        GestureDetector(
+                          onTap: _handleAddTapped,
+                          child: SvgPicture.asset(
+                            'assets/icons/add-black.svg',
+                            width: 24,
+                            height: 24,
+                          ),
                         ),
                       ],
                     ),

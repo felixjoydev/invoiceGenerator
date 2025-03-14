@@ -134,6 +134,7 @@ class GenericInputField extends StatefulWidget {
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
   final Function(String)? onSubmitted;
+  final bool readOnly;
 
   const GenericInputField({
     super.key,
@@ -150,6 +151,7 @@ class GenericInputField extends StatefulWidget {
     this.keyboardType,
     this.inputFormatters,
     this.onSubmitted,
+    this.readOnly = false,
   });
 
   @override
@@ -232,6 +234,7 @@ class _GenericInputFieldState extends State<GenericInputField> {
                           textAlign: TextAlign.right,
                           keyboardType: widget.keyboardType,
                           inputFormatters: widget.inputFormatters,
+                          readOnly: widget.readOnly,
                           decoration: InputDecoration(
                             hintText: widget.hintText,
                             hintStyle: TextStyle(
