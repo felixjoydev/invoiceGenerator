@@ -3,7 +3,6 @@ import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
 import 'package:invoicegenerator/widgets/buttons/secondary_button.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/widgets/inputs/SearchInput.dart';
-import 'package:invoicegenerator/widgets/actions/ClientAdd.dart';
 import 'package:invoicegenerator/services/client_service.dart';
 import 'package:invoicegenerator/models/client.dart';
 import 'package:invoicegenerator/widgets/display/app_icon.dart';
@@ -33,8 +32,7 @@ class _SelectClientSheetState extends State<SelectClientSheet> {
   List<Client> _clients = [];
   List<Client> _filteredClients = [];
   Client? _selectedClient;
-  Map<String, bool> _selectionState = {};
-  String _searchQuery = '';
+  final Map<String, bool> _selectionState = {};
   bool _isLoading = true;
 
   @override
@@ -111,7 +109,6 @@ class _SelectClientSheetState extends State<SelectClientSheet> {
 
   void _handleSearch(String query) {
     setState(() {
-      _searchQuery = query;
       if (query.isEmpty) {
         _filteredClients = List.from(_clients);
       } else {
@@ -176,7 +173,7 @@ class _SelectClientSheetState extends State<SelectClientSheet> {
           Navigator.of(context).pop();
         }
       },
-      child: Container(
+      child: SizedBox(
         height: maxHeight,
         child: Column(
           mainAxisSize: MainAxisSize.max,
@@ -345,15 +342,15 @@ class SelectableClientAdd extends StatelessWidget {
   final bool isSelected;
 
   const SelectableClientAdd({
-    Key? key,
+    super.key,
     required this.clientName,
     required this.clientId,
     this.isSelected = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: 362,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -403,14 +400,14 @@ class SelectableClientAdd extends StatelessWidget {
 
 /// Selected checkbox (orange with light gray checkmark)
 class SelectedCheckbox extends StatelessWidget {
-  const SelectedCheckbox({Key? key}) : super(key: key);
+  const SelectedCheckbox({super.key});
 
   @override
   Widget build(BuildContext context) {
     final Color orangeColor = Color(0xFFF05022);
     final Color lightGrayColor = Color(0xFFDAE4E1);
 
-    return Container(
+    return SizedBox(
       width: 24,
       height: 24,
       child: Stack(
@@ -473,13 +470,13 @@ class SelectedCheckbox extends StatelessWidget {
 
 /// Unselected checkbox (just the outline)
 class UnselectedCheckbox extends StatelessWidget {
-  const UnselectedCheckbox({Key? key}) : super(key: key);
+  const UnselectedCheckbox({super.key});
 
   @override
   Widget build(BuildContext context) {
     final Color outlineColor = Color(0xFFCAD5D2);
 
-    return Container(
+    return SizedBox(
       width: 24,
       height: 24,
       child: Stack(

@@ -6,7 +6,7 @@ class RevenueChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       height: 124,
       child: Row(
         children: [

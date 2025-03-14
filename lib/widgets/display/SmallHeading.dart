@@ -4,9 +4,9 @@ class SmallHeading extends StatelessWidget {
   final String title;
   
   const SmallHeading({
-    Key? key,
+    super.key,
     required this.title,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +35,8 @@ class SmallHeading extends StatelessWidget {
 
 // Usage example
 class ExampleScreen extends StatelessWidget {
+  const ExampleScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

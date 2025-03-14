@@ -4,13 +4,13 @@ import 'package:invoicegenerator/widgets/inputs/utils/dashed_line_painter.dart';
 
 /// An improved version of the CurrencySelector using the AppIcon widget
 class CurrencySelectorImproved extends StatelessWidget {
-  const CurrencySelectorImproved({Key? key}) : super(key: key);
+  const CurrencySelectorImproved({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
+        SizedBox(
           width: double.infinity,
           height: 56,
           child: Row(

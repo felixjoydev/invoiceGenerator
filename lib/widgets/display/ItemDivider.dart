@@ -6,11 +6,11 @@ class ItemDivider extends StatelessWidget {
   final bool showDeleteButton;
 
   const ItemDivider({
-    Key? key,
+    super.key,
     required this.number,
     required this.onDelete,
     this.showDeleteButton = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +102,7 @@ class DeleteIconPainter extends CustomPainter {
 
 // Example usage
 class ItemDividerExample extends StatelessWidget {
-  const ItemDividerExample({Key? key}) : super(key: key);
+  const ItemDividerExample({super.key});
 
   @override
   Widget build(BuildContext context) {

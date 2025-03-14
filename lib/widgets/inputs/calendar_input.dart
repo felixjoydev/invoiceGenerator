@@ -4,8 +4,7 @@ class CalendarInput extends StatefulWidget {
   final Function(DateTime)? onDateSelected;
   final DateTime? initialDate;
 
-  const CalendarInput({Key? key, this.onDateSelected, this.initialDate})
-    : super(key: key);
+  const CalendarInput({super.key, this.onDateSelected, this.initialDate});
 
   @override
   State<CalendarInput> createState() => _CalendarInputState();
@@ -105,7 +104,7 @@ class _CalendarInputState extends State<CalendarInput> {
   Widget _buildWeekdayHeader() {
     final weekdays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-    return Container(
+    return SizedBox(
       height: 40,
       child: Row(
         children:
@@ -130,11 +129,6 @@ class _CalendarInputState extends State<CalendarInput> {
 
   Widget _buildCalendarDays() {
     final DateTime firstDayOfMonth = _currentMonth;
-    final DateTime lastDayOfMonth = DateTime(
-      _currentMonth.year,
-      _currentMonth.month + 1,
-      0,
-    );
 
     // Calculate the first day of the calendar grid (may be from previous month)
     final int firstWeekday =
@@ -165,7 +159,7 @@ class _CalendarInputState extends State<CalendarInput> {
   }
 
   Widget _buildWeek(List<DateTime> days) {
-    return Container(
+    return SizedBox(
       height: 40,
       child: Row(children: days.map((day) => _buildDayCell(day)).toList()),
     );

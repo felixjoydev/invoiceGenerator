@@ -786,7 +786,7 @@ class ClientListScreen extends StatefulWidget {
                         _showPressWidgetAbove
                             ? _selectedItemPosition.dy -
                                 112.0 -
-                                0.0 // Above the card with 8px spacing
+                                8.0 // Above the card with 8px spacing
                             : _selectedItemPosition.dy +
                                 _selectedItemSize.height +
                                 8.0, // Below the card with 8px spacing

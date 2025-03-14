@@ -12,7 +12,7 @@ class ItemAdd extends StatefulWidget {
   final bool isAlreadyAdded;
 
   const ItemAdd({
-    Key? key,
+    super.key,
     this.title = 'Website Design',
     this.amount = '4500.00',
     this.currency = 'USD',
@@ -21,7 +21,7 @@ class ItemAdd extends StatefulWidget {
     this.isSelected = false,
     this.initialQuantity = 0,
     this.isAlreadyAdded = false,
-  }) : super(key: key);
+  });
 
   @override
   State<ItemAdd> createState() => _ItemAddState();

@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:invoicegenerator/widgets/buttons/secondary_button.dart';
 
 class UploadLogoSection extends StatelessWidget {
-  const UploadLogoSection({Key? key}) : super(key: key);
+  const UploadLogoSection({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
+          SizedBox(
             width: double.infinity,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -86,11 +86,11 @@ class CustomUploadIcon extends StatelessWidget {
   final Color color;
 
   const CustomUploadIcon({
-    Key? key,
+    super.key,
     required this.width,
     required this.height,
     required this.color,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

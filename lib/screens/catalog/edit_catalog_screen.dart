@@ -8,7 +8,7 @@ import 'package:invoicegenerator/theme/app_theme.dart';
 class EditCatalogScreen extends StatefulWidget {
   final CatalogItem item;
 
-  const EditCatalogScreen({Key? key, required this.item}) : super(key: key);
+  const EditCatalogScreen({super.key, required this.item});
 
   @override
   State<EditCatalogScreen> createState() => _EditCatalogScreenState();

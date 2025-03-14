@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/widgets/inputs/utils/dashed_line_painter.dart';
 
 class DateInput extends StatefulWidget {
@@ -144,7 +143,7 @@ class _DateInputState extends State<DateInput> {
                             ),
                             const SizedBox(width: 5),
                             // Calendar icon
-                            Container(
+                            SizedBox(
                               width: 24,
                               height: 24,
                               child: CustomPaint(

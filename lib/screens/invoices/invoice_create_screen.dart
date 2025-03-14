@@ -15,6 +15,7 @@ import 'package:invoicegenerator/models/catalog_item.dart';
 import 'package:invoicegenerator/models/client.dart';
 import 'package:invoicegenerator/bottom_sheets/invoices/issue_date_picker.dart';
 import 'package:invoicegenerator/bottom_sheets/invoices/due_date_picker.dart';
+import 'package:flutter/services.dart';
 
 class InvoiceCreateScreen extends StatefulWidget {
   const InvoiceCreateScreen({super.key});
@@ -176,30 +177,11 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
 
   // Handle selected items from the InvoiceItemSheet
   void _handleItemsSelected(List<CatalogItem> selectedItems) {
-    // Update the invoice items list
     setState(() {
-      // Extract previously added items and newly added items
-      List<CatalogItem> previousItems = [];
-      List<CatalogItem> newItems = [];
-
-      // Create a map of existing items for quick lookup
-      Map<String, CatalogItem> existingItemsMap = {};
-      for (var item in _invoiceItems) {
-        existingItemsMap[item.title] = item;
-      }
-
-      // Categorize selected items as previous or new
-      for (var item in selectedItems) {
-        if (existingItemsMap.containsKey(item.title)) {
-          previousItems.add(item);
-        } else {
-          newItems.add(item);
-        }
-      }
-
-      // Clear the existing list and add items with new ones first
-      _invoiceItems.clear();
-      _invoiceItems.addAll([...newItems, ...previousItems]);
+      // Always add all selected items at the beginning of the invoice list
+      // This allows for multiple instances of the same catalog item
+      // and ensures new items are always at the top
+      _invoiceItems.insertAll(0, selectedItems);
     });
   }
 
@@ -517,6 +499,9 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                               shrinkWrap: true,
                               physics: NeverScrollableScrollPhysics(),
                               itemCount: _invoiceItems.length,
+                              onReorderStart: (index) {
+                                HapticFeedback.mediumImpact(); // Provide tactile feedback on drag start
+                              },
                               onReorder: (oldIndex, newIndex) {
                                 setState(() {
                                   if (oldIndex < newIndex) {
@@ -561,7 +546,13 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                             ),
                           ],
                         ),
-                      const SizedBox(height: 16),
+                      // Adjust spacing based on whether there are items or not
+                      if (_invoiceItems.isEmpty)
+                        // No additional spacing needed since the padding from Padding widget already adds 16px
+                        const SizedBox.shrink()
+                      else
+                        const SizedBox(height: 16),
+
                       // Divider at the bottom of the items section
                       const Divider(
                         height: 1,
@@ -569,131 +560,114 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                         color: Color(0xFFCAD5D2),
                       ),
 
-                      // Keep 16px spacing after the secondary button
+                      // Keep 16px spacing after the divider
                       const SizedBox(height: 16),
 
-                      // SUBTOTAL row
-                      Row(
-                        children: [
-                          // SUBTOTAL label (left)
-                          const Expanded(
-                            child: Text(
-                              'SUBTOTAL',
-                              style: TextStyle(
-                                fontFamily: 'Victor Mono',
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF8D9694),
+                      // Only show subtotal, tax, and total sections if there are items
+                      if (_invoiceItems.isNotEmpty) ...[
+                        // SUBTOTAL row
+                        Row(
+                          children: [
+                            // SUBTOTAL label (left)
+                            const Expanded(
+                              child: Text(
+                                'SUBTOTAL',
+                                style: TextStyle(
+                                  fontFamily: 'Victor Mono',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF8D9694),
+                                ),
                               ),
                             ),
-                          ),
 
-                          // SUBTOTAL amount (right) - aligned with price column
-                          SizedBox(
-                            width:
-                                116, // 100 for price column + 16 for chevron icon space
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                // Add USD before subtotal amount
-                                const Text(
-                                  'USD',
-                                  style: TextStyle(
-                                    fontFamily: 'Victor Mono',
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF8D9694),
+                            // SUBTOTAL amount (right) - aligned with price column
+                            SizedBox(
+                              width:
+                                  116, // 100 for price column + 16 for chevron icon space
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Add USD before subtotal amount
+                                  const Text(
+                                    'USD',
+                                    style: TextStyle(
+                                      fontFamily: 'Victor Mono',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF8D9694),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _formatAmount(_subtotal),
-                                  style: const TextStyle(
-                                    fontFamily: 'Helvetica Now Display',
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF373C3A),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _formatAmount(_subtotal),
+                                    style: const TextStyle(
+                                      fontFamily: 'Helvetica Now Display',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF373C3A),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
 
-                      // 16px spacing between rows
-                      const SizedBox(height: 16),
+                        // 16px spacing between rows
+                        const SizedBox(height: 16),
 
-                      // TAX row
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // TAX label with toggle closer to it (left)
-                          Expanded(
-                            child: Row(
-                              children: [
-                                const Text(
-                                  'TAX',
-                                  style: TextStyle(
-                                    fontFamily: 'Victor Mono',
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF8D9694),
+                        // TAX row
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // TAX label with toggle closer to it (left)
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  const Text(
+                                    'TAX',
+                                    style: TextStyle(
+                                      fontFamily: 'Victor Mono',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF8D9694),
+                                    ),
                                   ),
-                                ),
-                                // Space between label and toggle
-                                const SizedBox(width: 8),
-                                // Custom tax toggle/checkbox
-                                CustomCheckbox(
-                                  isChecked: _isTaxEnabled,
-                                  onChanged: _handleTaxToggleChanged,
-                                ),
-                              ],
+                                  // Space between label and toggle
+                                  const SizedBox(width: 8),
+                                  // Custom tax toggle/checkbox
+                                  CustomCheckbox(
+                                    isChecked: _isTaxEnabled,
+                                    onChanged: _handleTaxToggleChanged,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
 
-                          // Tax percentage value - aligned with price column
-                          SizedBox(
-                            width:
-                                116, // 100 for price column + 16 for chevron icon space
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                // Tax percentage input with attached % symbol
-                                Expanded(
-                                  child: Stack(
-                                    alignment: Alignment.centerLeft,
-                                    children: [
-                                      // The text field takes most of the space
-                                      TextField(
-                                        controller: _taxPercentController,
-                                        focusNode: _taxFocusNode,
-                                        enabled: _isTaxEnabled,
-                                        textAlign: TextAlign.left,
-                                        keyboardType: TextInputType.number,
-                                        decoration: const InputDecoration(
-                                          border: InputBorder.none,
-                                          contentPadding: EdgeInsets.zero,
-                                        ),
-                                        style: TextStyle(
-                                          fontFamily: 'Helvetica Now Display',
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                          color:
-                                              _isTaxEnabled
-                                                  ? const Color(0xFF373C3A)
-                                                  : const Color(0xFF8D9694),
-                                        ),
-                                      ),
-
-                                      // Position the percentage symbol directly next to the text
-                                      // We calculate estimated width of text to place % symbol
-                                      Positioned(
-                                        left:
-                                            _taxPercentController.text.length *
-                                            8.0, // Estimate width based on text length
-                                        child: Text(
-                                          '%',
+                            // Tax percentage value - aligned with price column
+                            SizedBox(
+                              width:
+                                  116, // 100 for price column + 16 for chevron icon space
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Tax percentage input with attached % symbol
+                                  Expanded(
+                                    child: Stack(
+                                      alignment: Alignment.centerLeft,
+                                      children: [
+                                        // The text field takes most of the space
+                                        TextField(
+                                          controller: _taxPercentController,
+                                          focusNode: _taxFocusNode,
+                                          enabled: _isTaxEnabled,
+                                          textAlign: TextAlign.left,
+                                          keyboardType: TextInputType.number,
+                                          decoration: const InputDecoration(
+                                            border: InputBorder.none,
+                                            contentPadding: EdgeInsets.zero,
+                                          ),
                                           style: TextStyle(
                                             fontFamily: 'Helvetica Now Display',
                                             fontSize: 14,
@@ -704,86 +678,109 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                                                     : const Color(0xFF8D9694),
                                           ),
                                         ),
-                                      ),
-                                    ],
+
+                                        // Position the percentage symbol directly next to the text
+                                        // We calculate estimated width of text to place % symbol
+                                        Positioned(
+                                          left:
+                                              _taxPercentController
+                                                  .text
+                                                  .length *
+                                              8.0, // Estimate width based on text length
+                                          child: Text(
+                                            '%',
+                                            style: TextStyle(
+                                              fontFamily:
+                                                  'Helvetica Now Display',
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color:
+                                                  _isTaxEnabled
+                                                      ? const Color(0xFF373C3A)
+                                                      : const Color(0xFF8D9694),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      // 16px spacing after tax row
-                      const SizedBox(height: 16),
-
-                      // Divider after tax row
-                      const Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: Color(0xFFCAD5D2),
-                      ),
-
-                      // 16px spacing after divider
-                      const SizedBox(height: 16),
-
-                      // TOTAL row
-                      Row(
-                        children: [
-                          // TOTAL label (left)
-                          const Expanded(
-                            child: Text(
-                              'TOTAL',
-                              style: TextStyle(
-                                fontFamily: 'Victor Mono',
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF8D9694),
+                                ],
                               ),
                             ),
-                          ),
+                          ],
+                        ),
 
-                          // TOTAL amount with currency - aligned with price column
-                          SizedBox(
-                            width:
-                                116, // 100 for price column + 16 for chevron icon space
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                const Text(
-                                  'USD',
-                                  style: TextStyle(
-                                    fontFamily: 'Victor Mono',
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF8D9694),
-                                  ),
+                        // 16px spacing after tax row
+                        const SizedBox(height: 16),
+
+                        // Divider after tax row
+                        const Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: Color(0xFFCAD5D2),
+                        ),
+
+                        // 16px spacing after divider
+                        const SizedBox(height: 16),
+
+                        // TOTAL row
+                        Row(
+                          children: [
+                            // TOTAL label (left)
+                            const Expanded(
+                              child: Text(
+                                'TOTAL',
+                                style: TextStyle(
+                                  fontFamily: 'Victor Mono',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF8D9694),
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _formatAmount(_total),
-                                  style: const TextStyle(
-                                    fontFamily: 'Helvetica Now Display',
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF373C3A),
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
 
-                      // 16px spacing after total row
-                      const SizedBox(height: 16),
+                            // TOTAL amount with currency - aligned with price column
+                            SizedBox(
+                              width:
+                                  116, // 100 for price column + 16 for chevron icon space
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  const Text(
+                                    'USD',
+                                    style: TextStyle(
+                                      fontFamily: 'Victor Mono',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF8D9694),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _formatAmount(_total),
+                                    style: const TextStyle(
+                                      fontFamily: 'Helvetica Now Display',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF373C3A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
 
-                      // Final divider
-                      const Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: Color(0xFFCAD5D2),
-                      ),
+                        // 16px spacing after total row
+                        const SizedBox(height: 16),
+
+                        // Final divider
+                        const Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: Color(0xFFCAD5D2),
+                        ),
+                      ],
 
                       // 32px spacing before Notes section
                       const SizedBox(height: 32),
@@ -839,7 +836,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
 
   // Build a row for an invoice item
   Widget _buildInvoiceItemRow(CatalogItem item, int index) {
-    return ReorderableDragStartListener(
+    return ReorderableDelayedDragStartListener(
       index: index,
       key: ValueKey(item.title + index.toString()),
       child: GestureDetector(
@@ -905,7 +902,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                 child: Row(
                   children: [
                     Text(
-                      item.currency ?? 'USD',
+                      item.currency,
                       style: const TextStyle(
                         fontFamily: 'Victor Mono',
                         fontSize: 12,

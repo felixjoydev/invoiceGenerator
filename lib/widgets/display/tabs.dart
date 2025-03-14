@@ -7,12 +7,12 @@ class CustomTabBar extends StatefulWidget {
   final Duration animationDuration;
 
   const CustomTabBar({
-    Key? key,
+    super.key,
     required this.tabs,
     this.initialTabIndex = 0,
     required this.onTabChanged,
     this.animationDuration = const Duration(milliseconds: 200),
-  }) : super(key: key);
+  });
 
   @override
   State<CustomTabBar> createState() => _CustomTabBarState();

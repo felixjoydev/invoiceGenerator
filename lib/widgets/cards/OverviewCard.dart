@@ -10,7 +10,7 @@ import 'package:invoicegenerator/widgets/cards/OustandingCard.dart'
 import 'package:invoicegenerator/widgets/cards/PaidCard.dart' as paid;
 
 class OverviewCard extends StatefulWidget {
-  const OverviewCard({Key? key}) : super(key: key);
+  const OverviewCard({super.key});
 
   @override
   State<OverviewCard> createState() => _OverviewCardState();
@@ -47,7 +47,7 @@ class _OverviewCardState extends State<OverviewCard>
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

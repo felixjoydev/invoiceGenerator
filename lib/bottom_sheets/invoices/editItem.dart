@@ -27,7 +27,7 @@ class _EditItemSheetState extends State<EditItemSheet> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
   int _quantity = 1;
-  bool _isAtTop = true;
+  final bool _isAtTop = true;
 
   @override
   void initState() {
@@ -99,7 +99,7 @@ class _EditItemSheetState extends State<EditItemSheet> {
       },
       // Dismiss keyboard when tapping on sheet handle
       onTap: () => FocusScope.of(context).unfocus(),
-      child: Container(
+      child: SizedBox(
         height: maxHeight,
         child: Stack(
           children: [
@@ -264,7 +264,7 @@ class _EditItemSheetState extends State<EditItemSheet> {
                                       ),
                                     ),
                                     // Add dashed line
-                                    Container(
+                                    SizedBox(
                                       height: 1,
                                       child: LayoutBuilder(
                                         builder: (context, constraints) {

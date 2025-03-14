@@ -4,11 +4,11 @@ import 'package:invoicegenerator/widgets/charts/revenue_chart.dart';
 import 'package:invoicegenerator/theme/app_theme.dart';
 
 class RevenueCard extends StatelessWidget {
-  const RevenueCard({Key? key}) : super(key: key);
+  const RevenueCard({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

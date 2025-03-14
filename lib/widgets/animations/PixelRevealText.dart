@@ -9,7 +9,7 @@ class PixelRevealText extends StatefulWidget {
   final VoidCallback? onAnimationComplete;
 
   const PixelRevealText({
-    Key? key,
+    super.key,
     required this.text,
     this.style = const TextStyle(
       fontSize: 24,
@@ -19,7 +19,7 @@ class PixelRevealText extends StatefulWidget {
     this.duration = const Duration(milliseconds: 2000),
     this.autoStart = true,
     this.onAnimationComplete,
-  }) : super(key: key);
+  });
 
   @override
   State<PixelRevealText> createState() => _PixelRevealTextState();

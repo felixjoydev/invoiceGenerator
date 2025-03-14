@@ -10,14 +10,14 @@ class DueCard extends StatelessWidget {
   final Color daysColor;
 
   const DueCard({
-    Key? key,
+    super.key,
     this.companyName = 'Acuro',
     this.date = '05/03/2025',
     this.invoiceNumber = 'inv-001',
     this.amount = '\$423.00',
     this.daysText = 'PAID ON 10/03/2025',
     this.daysColor = const Color(0xFF13AF5B),
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

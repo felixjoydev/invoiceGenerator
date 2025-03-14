@@ -3,16 +3,16 @@ import 'package:invoicegenerator/widgets/display/app_icon.dart';
 
 /// An improved version of the UploadLogoSection using the AppIcon widget
 class UploadLogoSectionImproved extends StatelessWidget {
-  const UploadLogoSectionImproved({Key? key}) : super(key: key);
+  const UploadLogoSectionImproved({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
+          SizedBox(
             width: double.infinity,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -65,7 +65,7 @@ class UploadLogoSectionImproved extends StatelessWidget {
                     ),
                   ],
                 ),
-                Container(
+                SizedBox(
                   height: 24,
                   child: Row(
                     children: [

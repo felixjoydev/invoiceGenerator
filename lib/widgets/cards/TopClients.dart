@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:invoicegenerator/theme/app_theme.dart';
 
 class TopClients extends StatelessWidget {
-  const TopClients({Key? key}) : super(key: key);
+  const TopClients({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

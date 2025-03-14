@@ -7,6 +7,15 @@ import 'package:invoicegenerator/widgets/actions/ItemAdd.dart';
 import 'package:invoicegenerator/services/catalog_service.dart';
 import 'package:invoicegenerator/models/catalog_item.dart';
 
+// Helper class to track item selection info
+class SelectedItemInfo {
+  final CatalogItem item;
+  int quantity;
+  bool isSelected;
+
+  SelectedItemInfo(this.item, this.quantity, this.isSelected);
+}
+
 class InvoiceItemSheet extends StatefulWidget {
   final VoidCallback? onAddNewItemPressed;
   final Function(List<CatalogItem>)? onItemsSelected;
@@ -31,11 +40,11 @@ class _InvoiceItemSheetState extends State<InvoiceItemSheet> {
 
   List<CatalogItem> _catalogItems = [];
   List<CatalogItem> _filteredItems = [];
-  List<CatalogItem> _selectedItems = [];
-  List<CatalogItem> _newlySelectedItems = [];
-  Map<String, bool> _selectionState = {};
-  Map<String, int> _quantityState = {};
-  String _searchQuery = '';
+  List<CatalogItem> _newlySelectedItems = []; // Items to be returned to parent
+
+  // Track each item in the list with a unique identifier
+  Map<String, SelectedItemInfo> _selectedItemsMap = {};
+
   bool _isLoading = true;
 
   @override
@@ -43,10 +52,8 @@ class _InvoiceItemSheetState extends State<InvoiceItemSheet> {
     super.initState();
 
     // Initialize with empty selection states
-    _selectedItems = [];
     _newlySelectedItems = [];
-    _selectionState = {};
-    _quantityState = {};
+    _selectedItemsMap = {};
 
     _loadCatalogItems();
     _scrollController.addListener(_scrollListener);
@@ -102,7 +109,6 @@ class _InvoiceItemSheetState extends State<InvoiceItemSheet> {
 
   void _handleSearch(String query) {
     setState(() {
-      _searchQuery = query;
       if (query.isEmpty) {
         _filteredItems = List.from(_catalogItems);
       } else {
@@ -120,118 +126,176 @@ class _InvoiceItemSheetState extends State<InvoiceItemSheet> {
     });
   }
 
-  void _toggleItemSelection(CatalogItem item) {
+  // Toggle item selection and track it in our maps
+  void _toggleItemSelection(CatalogItem item, String itemKey) {
     setState(() {
-      // Update selection state
-      _selectionState[item.title] = !(_selectionState[item.title] ?? false);
+      // If the item is not in our map, add it as selected
+      if (!_selectedItemsMap.containsKey(itemKey)) {
+        // Create a new instance with quantity 1 initially
+        final selectedItem = item.copyWith(quantity: 1);
+        _selectedItemsMap[itemKey] = SelectedItemInfo(selectedItem, 1, true);
 
-      // Update selected items list and quantity
-      if (_selectionState[item.title] ?? false) {
-        // If selecting, ensure quantity is at least 1
-        _quantityState[item.title] = _quantityState[item.title] ?? 0;
-        if (_quantityState[item.title]! <= 0) {
-          _quantityState[item.title] = 1;
+        // Make sure we don't have an existing item with the same title
+        // since we want to maintain exactly one entry per selection in the UI
+        bool found = false;
+
+        // Check if we already have this item in the list
+        for (int i = 0; i < _newlySelectedItems.length; i++) {
+          if (_newlySelectedItems[i].title == item.title &&
+              _selectedItemsMap.values.any(
+                (info) =>
+                    info.item.title == item.title &&
+                    info.isSelected &&
+                    identical(info.item, _newlySelectedItems[i]),
+              )) {
+            found = true;
+            break;
+          }
         }
 
-        // Add to selected items or update if already present with the new quantity
-        int existingIndex = _selectedItems.indexWhere(
-          (selectedItem) => selectedItem.title == item.title,
-        );
-
-        if (existingIndex >= 0) {
-          // Update existing item with new quantity
-          _selectedItems[existingIndex] = item.copyWith(
-            quantity: _quantityState[item.title]!,
-          );
-        } else {
-          // Add new item with the proper quantity
-          _selectedItems.add(
-            item.copyWith(quantity: _quantityState[item.title]!),
-          );
-        }
-
-        // Add to newly selected items
-        int newlySelectedIndex = _newlySelectedItems.indexWhere(
-          (selectedItem) => selectedItem.title == item.title,
-        );
-
-        if (newlySelectedIndex < 0) {
-          _newlySelectedItems.add(
-            item.copyWith(quantity: _quantityState[item.title]!),
-          );
-        } else {
-          _newlySelectedItems[newlySelectedIndex] = item.copyWith(
-            quantity: _quantityState[item.title]!,
-          );
+        if (!found) {
+          // If not found, add a new entry
+          _newlySelectedItems.add(selectedItem);
         }
       } else {
-        // If deselecting, set quantity to 0 and remove from selected
-        _quantityState[item.title] = 0;
-        _selectedItems.removeWhere(
-          (selectedItem) => selectedItem.title == item.title,
-        );
+        // Item exists, toggle its selection state
+        final info = _selectedItemsMap[itemKey]!;
+        info.isSelected = !info.isSelected;
 
-        // Remove from newly selected items
-        _newlySelectedItems.removeWhere(
-          (selectedItem) => selectedItem.title == item.title,
-        );
+        if (info.isSelected) {
+          // If selecting, set quantity to 1
+          info.quantity = 1;
+
+          // Check if we already have an item with this title
+          bool found = false;
+          for (int i = 0; i < _newlySelectedItems.length; i++) {
+            if (_newlySelectedItems[i].title == item.title) {
+              found = true;
+              break;
+            }
+          }
+
+          if (!found) {
+            // Only add to the list if we don't already have it
+            _newlySelectedItems.add(item.copyWith(quantity: 1));
+          }
+        } else {
+          // If deselecting, set quantity to 0
+          info.quantity = 0;
+
+          // Look for this specific item key in our map of selected items
+          bool otherSelectionsExist = false;
+          for (var mapKey in _selectedItemsMap.keys) {
+            if (mapKey != itemKey &&
+                _selectedItemsMap[mapKey]!.item.title == item.title &&
+                _selectedItemsMap[mapKey]!.isSelected) {
+              otherSelectionsExist = true;
+              break;
+            }
+          }
+
+          // Only remove from _newlySelectedItems if there are no other
+          // selections of this item
+          if (!otherSelectionsExist) {
+            for (int i = 0; i < _newlySelectedItems.length; i++) {
+              if (_newlySelectedItems[i].title == item.title) {
+                _newlySelectedItems.removeAt(i);
+                break;
+              }
+            }
+          }
+        }
       }
     });
   }
 
-  void _handleQuantityChanged(CatalogItem item, int newQuantity) {
+  // Update the quantity of a selected item
+  void _handleQuantityChanged(
+    CatalogItem item,
+    String itemKey,
+    int newQuantity,
+  ) {
     setState(() {
-      _quantityState[item.title] = newQuantity;
+      if (_selectedItemsMap.containsKey(itemKey)) {
+        final info = _selectedItemsMap[itemKey]!;
 
-      // Update selection state based on quantity
-      bool isSelected = newQuantity > 0;
-      _selectionState[item.title] = isSelected;
+        if (newQuantity > 0) {
+          // Update quantity in our selection map
+          info.quantity = newQuantity;
+          info.isSelected = true;
 
-      // Update selected items
-      if (isSelected) {
-        // Add or update item in selected items
-        int existingIndex = _selectedItems.indexWhere(
-          (selectedItem) => selectedItem.title == item.title,
-        );
+          // Find the selected item in our list by title
+          int index = -1;
+          for (int i = 0; i < _newlySelectedItems.length; i++) {
+            if (_newlySelectedItems[i].title == item.title) {
+              index = i;
+              break;
+            }
+          }
 
-        if (existingIndex >= 0) {
-          // Update existing item with new quantity
-          _selectedItems[existingIndex] = item.copyWith(quantity: newQuantity);
+          if (index >= 0) {
+            // We only maintain one item per title in the list
+            // So we'll update its quantity
+            _newlySelectedItems[index] = item.copyWith(quantity: newQuantity);
+          } else {
+            // If this item isn't in the list yet, add it
+            _newlySelectedItems.add(item.copyWith(quantity: newQuantity));
+          }
         } else {
-          // Add new item with the proper quantity
-          _selectedItems.add(item.copyWith(quantity: newQuantity));
+          // If quantity becomes 0, deselect this item
+          info.quantity = 0;
+          info.isSelected = false;
+
+          // Check if any other items with the same title are still selected
+          bool anySelected = false;
+          for (var mapKey in _selectedItemsMap.keys) {
+            if (_selectedItemsMap[mapKey]!.item.title == item.title &&
+                _selectedItemsMap[mapKey]!.isSelected) {
+              anySelected = true;
+              break;
+            }
+          }
+
+          // If no other items with this title are selected, remove from the list
+          if (!anySelected) {
+            for (int i = 0; i < _newlySelectedItems.length; i++) {
+              if (_newlySelectedItems[i].title == item.title) {
+                _newlySelectedItems.removeAt(i);
+                break;
+              }
+            }
+          }
         }
-
-        // Add to newly selected items
-        int newlySelectedIndex = _newlySelectedItems.indexWhere(
-          (selectedItem) => selectedItem.title == item.title,
-        );
-
-        if (newlySelectedIndex < 0) {
-          _newlySelectedItems.add(item.copyWith(quantity: newQuantity));
-        } else {
-          _newlySelectedItems[newlySelectedIndex] = item.copyWith(
-            quantity: newQuantity,
-          );
-        }
-      } else {
-        // Remove from selected items if quantity is 0
-        _selectedItems.removeWhere(
-          (selectedItem) => selectedItem.title == item.title,
-        );
-
-        // Remove from newly selected items
-        _newlySelectedItems.removeWhere(
-          (selectedItem) => selectedItem.title == item.title,
-        );
       }
     });
   }
 
   // Close the sheet and pass selected items back to parent
   void _applySelection() {
-    if (widget.onItemsSelected != null) {
-      widget.onItemsSelected!(_selectedItems);
+    // Create copies of selected items to be added to the invoice
+    final List<CatalogItem> itemsToReturn = [];
+
+    // Process all selected items with quantity > 0
+    for (int i = 0; i < _newlySelectedItems.length; i++) {
+      final item = _newlySelectedItems[i];
+      if (item.quantity > 0) {
+        // Create a copy of the item with the correct quantity
+        // Each copy will be treated as a new item when added to the invoice
+        final selectedItem = CatalogItem(
+          title: item.title,
+          amount: item.amount,
+          quantity: item.quantity,
+          currency: item.currency,
+          usageInfo: item.usageInfo,
+          isNew: item.isNew,
+        );
+
+        itemsToReturn.add(selectedItem);
+      }
+    }
+
+    if (widget.onItemsSelected != null && itemsToReturn.isNotEmpty) {
+      widget.onItemsSelected!(itemsToReturn);
     }
     Navigator.pop(context);
   }
@@ -247,8 +311,17 @@ class _InvoiceItemSheetState extends State<InvoiceItemSheet> {
   Widget build(BuildContext context) {
     // Calculate maximum height (screen height - 80px)
     final double maxHeight = MediaQuery.of(context).size.height - 120;
-    final int selectedCount = _selectedItems.length;
-    final int newlySelectedCount = _newlySelectedItems.length;
+
+    // Count the number of unique item titles selected with quantity > 0
+    final selectedItems =
+        _newlySelectedItems.where((item) => item.quantity > 0).toList();
+
+    // Count by unique title
+    final Map<String, int> titleCount = {};
+    for (var item in selectedItems) {
+      titleCount[item.title] = (titleCount[item.title] ?? 0) + 1;
+    }
+    final int newlySelectedCount = titleCount.length;
 
     return GestureDetector(
       onVerticalDragEnd: (details) {
@@ -261,7 +334,7 @@ class _InvoiceItemSheetState extends State<InvoiceItemSheet> {
       },
       // Dismiss keyboard when tapping on sheet handle
       onTap: () => FocusScope.of(context).unfocus(),
-      child: Container(
+      child: SizedBox(
         height: maxHeight,
         child: Column(
           mainAxisSize: MainAxisSize.max,
@@ -372,7 +445,9 @@ class _InvoiceItemSheetState extends State<InvoiceItemSheet> {
                       ),
 
                       // Fixed Bottom Button Section
-                      if (_newlySelectedItems.isNotEmpty)
+                      if (_newlySelectedItems
+                          .where((item) => item.quantity > 0)
+                          .isNotEmpty)
                         Container(
                           width: double.infinity,
                           color: Color(0xFFDAE4E1),
@@ -411,21 +486,35 @@ class _InvoiceItemSheetState extends State<InvoiceItemSheet> {
         if (index.isEven) {
           final itemIndex = index ~/ 2;
           final item = _filteredItems[itemIndex];
-          final isSelected = _selectionState[item.title] ?? false;
-          final quantity = _quantityState[item.title] ?? 0;
+
+          // Create a unique identifier for this specific item instance
+          final itemKey = "${item.title}-${itemIndex}";
+
+          // Check if this specific item has been selected
+          bool isSelected = false;
+          int quantity = 0;
+
+          if (_selectedItemsMap.containsKey(itemKey)) {
+            final info = _selectedItemsMap[itemKey]!;
+            isSelected = info.isSelected;
+            quantity = info.quantity;
+          }
 
           return ItemAdd(
-            key: ValueKey(item.title),
+            key: ValueKey(itemKey),
             title: item.title,
             amount: item.amount,
-            currency: item.currency ?? 'USD',
+            currency: item.currency,
             isSelected: isSelected,
             initialQuantity: quantity,
             isAlreadyAdded:
-                false, // Always set to false so no items are disabled
-            onSelect: () => _toggleItemSelection(item),
-            onQuantityChanged:
-                (newQuantity) => _handleQuantityChanged(item, newQuantity),
+                false, // Always allow items to be added multiple times
+            onSelect: () {
+              _toggleItemSelection(item, itemKey);
+            },
+            onQuantityChanged: (newQuantity) {
+              _handleQuantityChanged(item, itemKey, newQuantity);
+            },
           );
         }
         // For odd indices, show a divider

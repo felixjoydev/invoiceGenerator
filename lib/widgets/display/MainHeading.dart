@@ -21,10 +21,10 @@ class MainHeading extends StatelessWidget {
 
   /// Creates a MainHeading with the specified text and icon type
   const MainHeading({
-    Key? key,
+    super.key,
     this.text = 'Company Details',
     this.iconType = HeadingIconType.company,
-  }) : super(key: key);
+  });
 
   /// Creates a MainHeading specifically for business details
   factory MainHeading.business({Key? key}) => MainHeading(

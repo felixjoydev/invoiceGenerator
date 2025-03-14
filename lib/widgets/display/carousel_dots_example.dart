@@ -7,10 +7,10 @@ class ChipIndicatorImproved extends StatelessWidget {
   final int currentIndex;
 
   const ChipIndicatorImproved({
-    Key? key,
+    super.key,
     required this.count,
     this.currentIndex = 0,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +36,7 @@ class ChipIndicatorImproved extends StatelessWidget {
 
 /// An example of how to use the improved chip indicator
 class ChipIndicatorExample extends StatelessWidget {
-  const ChipIndicatorExample({Key? key}) : super(key: key);
+  const ChipIndicatorExample({super.key});
 
   @override
   Widget build(BuildContext context) {

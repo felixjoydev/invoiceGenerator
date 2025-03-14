@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 class ClientAdd extends StatelessWidget {
-  const ClientAdd({Key? key}) : super(key: key);
+  const ClientAdd({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: 362,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -50,14 +50,14 @@ class ClientAdd extends StatelessWidget {
 }
 
 class CheckboxCustom extends StatelessWidget {
-  const CheckboxCustom({Key? key}) : super(key: key);
+  const CheckboxCustom({super.key});
 
   @override
   Widget build(BuildContext context) {
     final Color orangeColor = Color(0xFFF05022);
     final Color lightGrayColor = Color(0xFFDAE4E1);
 
-    return Container(
+    return SizedBox(
       width: 24,
       height: 24,
       child: Stack(
@@ -66,87 +66,51 @@ class CheckboxCustom extends StatelessWidget {
           Positioned(
             left: 5,
             top: 3,
-            child: Container(
-              width: 14,
-              height: 16,
-              color: orangeColor,
-            ),
+            child: Container(width: 14, height: 16, color: orangeColor),
           ),
           // Bottom rectangle
           Positioned(
             left: 5,
             top: 19,
-            child: Container(
-              width: 14,
-              height: 2,
-              color: orangeColor,
-            ),
+            child: Container(width: 14, height: 2, color: orangeColor),
           ),
           // Left rectangle
           Positioned(
             left: 3,
             top: 3,
-            child: Container(
-              width: 2,
-              height: 18,
-              color: orangeColor,
-            ),
+            child: Container(width: 2, height: 18, color: orangeColor),
           ),
           // Right rectangle
           Positioned(
             left: 19,
             top: 3,
-            child: Container(
-              width: 2,
-              height: 18,
-              color: orangeColor,
-            ),
+            child: Container(width: 2, height: 18, color: orangeColor),
           ),
           // Checkmark dots
           Positioned(
             left: 7,
             top: 12,
-            child: Container(
-              width: 2,
-              height: 2,
-              color: lightGrayColor,
-            ),
+            child: Container(width: 2, height: 2, color: lightGrayColor),
           ),
           Positioned(
             left: 9,
             top: 14,
-            child: Container(
-              width: 2,
-              height: 2,
-              color: lightGrayColor,
-            ),
+            child: Container(width: 2, height: 2, color: lightGrayColor),
           ),
           Positioned(
             left: 11,
             top: 12,
-            child: Container(
-              width: 2,
-              height: 2,
-              color: lightGrayColor,
-            ),
+            child: Container(width: 2, height: 2, color: lightGrayColor),
           ),
           Positioned(
             left: 13,
             top: 10,
-            child: Container(
-              width: 2,
-              height: 2,
-              color: lightGrayColor,
-            ),
+            child: Container(width: 2, height: 2, color: lightGrayColor),
           ),
           Positioned(
             left: 15,
             top: 8,
-            child: Container(
-              width: 2,
-              height: 2,
-              color: lightGrayColor,
-            ),
+            child: Container(width: 2, height: 2, color: lightGrayColor),
           ),
         ],
       ),

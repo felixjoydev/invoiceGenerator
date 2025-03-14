@@ -5,8 +5,7 @@ class ChipIndicator extends StatelessWidget {
   final int count;
   final int currentIndex;
 
-  const ChipIndicator({Key? key, required this.count, this.currentIndex = 0})
-    : super(key: key);
+  const ChipIndicator({super.key, required this.count, this.currentIndex = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +31,7 @@ class ChipIndicator extends StatelessWidget {
 
 // Keeping these classes for backwards compatibility, but they're no longer used
 class ChipDot extends StatelessWidget {
-  const ChipDot({Key? key}) : super(key: key);
+  const ChipDot({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -156,7 +155,7 @@ class ChipDotPainter extends CustomPainter {
 
 // Example usage
 class ChipIndicatorExample extends StatelessWidget {
-  const ChipIndicatorExample({Key? key}) : super(key: key);
+  const ChipIndicatorExample({super.key});
 
   @override
   Widget build(BuildContext context) {

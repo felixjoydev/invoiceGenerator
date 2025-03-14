@@ -20,12 +20,12 @@ class SecondaryButton extends StatelessWidget {
 
   /// Creates a secondary button with an icon and text
   const SecondaryButton({
-    Key? key,
+    super.key,
     required this.iconType,
     required this.text,
     this.color = const Color(0xFFF05022),
     this.onPressed,
-  }) : super(key: key);
+  });
 
   /// Creates an upload button (convenience constructor)
   factory SecondaryButton.upload({
@@ -133,10 +133,10 @@ class UploadButton extends StatelessWidget {
   final Color color;
 
   const UploadButton({
-    Key? key,
+    super.key,
     this.onPressed,
     this.color = const Color(0xFFF05022),
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -148,8 +148,7 @@ class CustomUploadIcon extends StatelessWidget {
   final double size;
   final Color color;
 
-  const CustomUploadIcon({Key? key, required this.size, required this.color})
-    : super(key: key);
+  const CustomUploadIcon({super.key, required this.size, required this.color});
 
   @override
   Widget build(BuildContext context) {

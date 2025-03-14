@@ -74,18 +74,13 @@ class _CustomCheckboxState extends State<CustomCheckbox>
 
   @override
   Widget build(BuildContext context) {
-    // Determine colors based on disabled state
+    // Determine border color based on disabled state
     final Color borderColor =
         widget.isDisabled ? const Color(0xFF768581) : const Color(0xFF373C3A);
 
-    final Color toggleColor = const Color(0xFFF05022);
-    final Color disabledToggleColor = const Color(0xFF768581);
-
-    // For disabled state, we want it to behave like a traditional toggle
-    // - If disabled and checked: gray box on right
-    // - If disabled and unchecked: gray box on left
-    // - If enabled and checked: orange box on right
-    // - If enabled and unchecked: orange box on left
+    // Colors based on toggle state (ON/OFF)
+    final Color onColor = const Color(0xFFF05022); // Orange for ON state
+    final Color offColor = const Color(0xFF768581); // Grey for OFF state
 
     return GestureDetector(
       onTap:
@@ -99,38 +94,27 @@ class _CustomCheckboxState extends State<CustomCheckbox>
       child: Container(
         width: 40,
         height: 24,
-        padding: const EdgeInsets.all(2), // Adding 4px padding on all sides
+        padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
           border: Border.all(color: borderColor, width: 2),
         ),
         child: AnimatedBuilder(
           animation: _slideAnimation,
           builder: (context, child) {
-            double position;
-            Color boxColor;
+            final double startPosition = 0.0;
+            final double endPosition = 16.0;
+            final double position =
+                startPosition +
+                (_slideAnimation.value * (endPosition - startPosition));
 
-            if (widget.isDisabled) {
-              // When disabled, the toggle should be on the left (0px from container padding)
-              position = 0.0;
-              boxColor = disabledToggleColor;
-            } else {
-              // When enabled:
-              // - If unchecked: position on the left (0px from container padding)
-              // - If checked: position on the right (16px from left padding)
-              final double startPosition = 0.0;
-              final double endPosition =
-                  16.0; // Available width inside padding (32-16)
-              position =
-                  startPosition +
-                  (_slideAnimation.value * (endPosition - startPosition));
-              boxColor = toggleColor;
-            }
+            // Color is based on isChecked state only - orange when ON, grey when OFF
+            final Color boxColor = widget.isChecked ? onColor : offColor;
 
             return Stack(
               alignment: Alignment.center,
               children: [
                 Positioned(
-                  left: position, // Position based on state
+                  left: position,
                   child: Container(width: 16, height: 16, color: boxColor),
                 ),
               ],
