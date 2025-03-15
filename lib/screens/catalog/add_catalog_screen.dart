@@ -27,6 +27,9 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
   // Track if button should be enabled
   bool _isButtonEnabled = false;
 
+  // Track if first item has content to show Add Item button
+  bool _showAddItemButton = false;
+
   // Add scroll controller
   final ScrollController _scrollController = ScrollController();
 
@@ -56,7 +59,10 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
         CatalogItemInput(
           key: UniqueKey(),
           onDelete: (index) => _deleteItem(index),
-          onFieldChanged: _validateForm,
+          onFieldChanged: () {
+            _validateForm();
+            _checkFirstItemContent();
+          },
         ),
       );
       // Update all items to show delete button if more than one item
@@ -84,8 +90,28 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
         _updateItems();
         // Re-validate form after deletion
         _validateForm();
+        // Check first item content after deletion
+        _checkFirstItemContent();
       }
     });
+  }
+
+  // Check if the first item has any content
+  void _checkFirstItemContent() {
+    if (_catalogItems.isNotEmpty) {
+      final firstItem = _catalogItems[0];
+      final hasContent =
+          firstItem.nameController.text.isNotEmpty ||
+          firstItem.priceController.text.isNotEmpty;
+
+      setState(() {
+        _showAddItemButton = hasContent;
+      });
+    } else {
+      setState(() {
+        _showAddItemButton = false;
+      });
+    }
   }
 
   // Update all items (set correct index and delete button visibility)
@@ -100,7 +126,10 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
         showDeleteButton: showDeleteButton,
         onDelete: (index) => _deleteItem(index),
         index: i, // Pass current index
-        onFieldChanged: _validateForm,
+        onFieldChanged: () {
+          _validateForm();
+          _checkFirstItemContent();
+        },
         nameController: _catalogItems[i].nameController,
         priceController: _catalogItems[i].priceController,
         qtyController: _catalogItems[i].qtyController,
@@ -219,10 +248,11 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
                     // 16px spacing before Add Item button
                     const SizedBox(height: 16),
 
-                    // Add Item button - centered
-                    Center(
-                      child: SecondaryButton.addItem(onPressed: _addNewItem),
-                    ),
+                    // Add Item button - centered, only shown when first item has content
+                    if (_showAddItemButton)
+                      Center(
+                        child: SecondaryButton.addItem(onPressed: _addNewItem),
+                      ),
 
                     // 40px bottom spacing
                     const SizedBox(height: 40),

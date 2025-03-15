@@ -6,6 +6,7 @@ import 'package:invoicegenerator/widgets/inputs/SearchInput.dart';
 import 'package:invoicegenerator/widgets/actions/ItemAdd.dart';
 import 'package:invoicegenerator/services/catalog_service.dart';
 import 'package:invoicegenerator/models/catalog_item.dart';
+import 'package:invoicegenerator/bottom_sheets/invoices/new_item.dart';
 
 // Helper class to track item selection info
 class SelectedItemInfo {
@@ -101,10 +102,16 @@ class _InvoiceItemSheetState extends State<InvoiceItemSheet> {
     // Close the current bottom sheet
     Navigator.pop(context);
 
-    // Call the passed callback if it exists
-    if (widget.onAddNewItemPressed != null) {
-      widget.onAddNewItemPressed!();
-    }
+    // Show the new item bottom sheet
+    showNewItemSheet(
+      context,
+      onItemsAdded: (items) {
+        // When items are added, select them in the invoice
+        if (widget.onItemsSelected != null) {
+          widget.onItemsSelected!(items);
+        }
+      },
+    );
   }
 
   void _handleSearch(String query) {
@@ -488,7 +495,7 @@ class _InvoiceItemSheetState extends State<InvoiceItemSheet> {
           final item = _filteredItems[itemIndex];
 
           // Create a unique identifier for this specific item instance
-          final itemKey = "${item.title}-${itemIndex}";
+          final itemKey = "${item.title}-$itemIndex";
 
           // Check if this specific item has been selected
           bool isSelected = false;

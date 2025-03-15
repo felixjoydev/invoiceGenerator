@@ -10,6 +10,7 @@ import 'package:invoicegenerator/screens/invoices/invoice_list_screen.dart';
 import 'package:invoicegenerator/screens/clients/client_list_screen.dart';
 import 'package:invoicegenerator/screens/catalog/catalog_list_screen.dart';
 import 'package:invoicegenerator/utils/route_transitions.dart';
+import 'package:invoicegenerator/screens/settings/settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -68,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
               onSettingsPressed: () {
-                debugPrint('Settings pressed');
+                SettingsScreen.show(context);
               },
             ),
           ),

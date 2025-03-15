@@ -6,6 +6,7 @@ import 'package:invoicegenerator/widgets/inputs/SearchInput.dart';
 import 'package:invoicegenerator/services/client_service.dart';
 import 'package:invoicegenerator/models/client.dart';
 import 'package:invoicegenerator/widgets/display/app_icon.dart';
+import 'package:invoicegenerator/bottom_sheets/invoices/new_client.dart';
 
 class SelectClientSheet extends StatefulWidget {
   final VoidCallback? onAddNewClientPressed;
@@ -101,10 +102,16 @@ class _SelectClientSheetState extends State<SelectClientSheet> {
     // Close the current bottom sheet
     Navigator.pop(context);
 
-    // Call the passed callback if it exists
-    if (widget.onAddNewClientPressed != null) {
-      widget.onAddNewClientPressed!();
-    }
+    // Show the new client bottom sheet instead of navigating
+    showNewClientSheet(
+      context,
+      onClientAdded: (client) {
+        // If a client was added and there's a callback, call it
+        if (widget.onClientSelected != null) {
+          widget.onClientSelected!(client);
+        }
+      },
+    );
   }
 
   void _handleSearch(String query) {

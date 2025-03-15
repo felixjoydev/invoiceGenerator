@@ -6,6 +6,7 @@ import 'package:invoicegenerator/widgets/display/information_box.dart';
 import 'package:invoicegenerator/widgets/display/welcome_header.dart';
 import 'package:invoicegenerator/widgets/cards/welcome_action.dart';
 import 'package:invoicegenerator/screens/home/home_screen.dart';
+import 'package:invoicegenerator/screens/settings/settings_screen.dart';
 import 'package:invoicegenerator/utils/route_transitions.dart';
 
 class FirstTimeHomeScreen extends StatefulWidget {
@@ -68,7 +69,7 @@ class _FirstTimeHomeScreenState extends State<FirstTimeHomeScreen> {
                 context.navigateWithSlide(const HomeScreen());
               },
               onSettingsPressed: () {
-                debugPrint('Settings pressed');
+                SettingsScreen.show(context);
               },
             ),
           ),

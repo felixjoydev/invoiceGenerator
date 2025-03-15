@@ -8,6 +8,7 @@ import 'package:invoicegenerator/theme/app_theme.dart';
 import 'package:invoicegenerator/widgets/utils/keyboard_dismiss_wrapper.dart';
 import 'package:invoicegenerator/screens/onboarding/company_address_screen.dart';
 import 'package:invoicegenerator/widgets/utils/slide_page_route.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CompanyBasicDetailsScreen extends StatefulWidget {
   const CompanyBasicDetailsScreen({super.key});
@@ -21,12 +22,48 @@ class _CompanyBasicDetailsScreenState extends State<CompanyBasicDetailsScreen> {
   bool _isTaxEnabled = true;
   final TextEditingController _businessNameController = TextEditingController();
   final TextEditingController _taxController = TextEditingController();
+  String _selectedCurrency = 'USD';
+  String? _logoPath;
 
   @override
   void dispose() {
     _businessNameController.dispose();
     _taxController.dispose();
     super.dispose();
+  }
+
+  // Save data to shared preferences temporarily
+  Future<void> _saveDataTemporarily() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      await prefs.setString('temp_business_name', _businessNameController.text);
+      if (_logoPath != null) {
+        await prefs.setString('temp_logo_path', _logoPath!);
+      }
+      await prefs.setString('temp_currency', _selectedCurrency);
+      await prefs.setBool('temp_enable_tax', _isTaxEnabled);
+
+      if (_isTaxEnabled && _taxController.text.isNotEmpty) {
+        await prefs.setString('temp_tax_rate', _taxController.text);
+      }
+    } catch (e) {
+      debugPrint('Error saving temporary company data: $e');
+    }
+  }
+
+  // Handle currency selection
+  void _handleCurrencySelected(String currency) {
+    setState(() {
+      _selectedCurrency = currency;
+    });
+  }
+
+  // Handle logo selection
+  void _handleLogoSelected(String path) {
+    setState(() {
+      _logoPath = path;
+    });
   }
 
   @override
@@ -68,7 +105,7 @@ class _CompanyBasicDetailsScreenState extends State<CompanyBasicDetailsScreen> {
                         const SizedBox(height: 24),
 
                         // Form Fields
-                        const UploadLogoSection(),
+                        UploadLogoSection(onLogoSelected: _handleLogoSelected),
 
                         const SizedBox(height: 0),
 
@@ -95,7 +132,10 @@ class _CompanyBasicDetailsScreenState extends State<CompanyBasicDetailsScreen> {
                               ),
                             );
                           },
-                          child: const CurrencySelector(),
+                          child: CurrencySelector(
+                            selectedCurrency: _selectedCurrency,
+                            onCurrencySelected: _handleCurrencySelected,
+                          ),
                         ),
 
                         const SizedBox(height: 0),
@@ -125,22 +165,29 @@ class _CompanyBasicDetailsScreenState extends State<CompanyBasicDetailsScreen> {
               padding: const EdgeInsets.all(16.0),
               child: PrimaryButton(
                 label: 'CONTINUE',
-                onPressed: () {
-                  // Handle form submission
-                  final businessName = _businessNameController.text;
-                  final tax = _isTaxEnabled ? _taxController.text : null;
+                onPressed: () async {
+                  // Validate form
+                  if (_businessNameController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please enter your business name'),
+                      ),
+                    );
+                    return;
+                  }
 
-                  print('Business Name: $businessName');
-                  print('Tax Enabled: $_isTaxEnabled');
-                  print('Tax Value: $tax');
+                  // Save data temporarily
+                  await _saveDataTemporarily();
 
                   // Navigate to next screen with a smooth slide-right transition
-                  Navigator.of(context).push(
-                    SlidePageRoute(
-                      page: const CompanyAddressScreen(),
-                      direction: SlideDirection.right,
-                    ),
-                  );
+                  if (mounted) {
+                    Navigator.of(context).push(
+                      SlidePageRoute(
+                        page: const CompanyAddressScreen(),
+                        direction: SlideDirection.right,
+                      ),
+                    );
+                  }
                 },
               ),
             ),

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:invoicegenerator/widgets/buttons/secondary_button.dart';
+import 'package:invoicegenerator/widgets/inputs/utils/dashed_line_painter.dart';
 
 class UploadLogoSection extends StatelessWidget {
-  const UploadLogoSection({super.key});
+  final Function(String path)? onLogoSelected;
+
+  const UploadLogoSection({super.key, this.onLogoSelected});
 
   @override
   Widget build(BuildContext context) {
@@ -66,14 +69,23 @@ class UploadLogoSection extends StatelessWidget {
                 ),
                 SecondaryButton.upload(
                   onPressed: () {
-                    // Handle logo upload
+                    // Mock logo upload for now
+                    if (onLogoSelected != null) {
+                      onLogoSelected!('path/to/logo.png');
+                    }
                   },
                 ),
               ],
             ),
           ),
           SizedBox(height: 16),
-          Container(height: 1, color: Color(0xFFCAD5D2)),
+          SizedBox(
+            height: 1,
+            child: CustomPaint(
+              painter: DashedLinePainter(),
+              size: Size(double.infinity, 1),
+            ),
+          ),
         ],
       ),
     );

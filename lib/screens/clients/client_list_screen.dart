@@ -18,6 +18,8 @@ import 'package:invoicegenerator/widgets/display/BlurredBackground.dart';
 import 'package:invoicegenerator/widgets/cards/HighlightedClientCard.dart';
 import 'package:invoicegenerator/widgets/display/PressWidget.dart';
 import 'package:invoicegenerator/bottom_sheets/clients/client_sort.dart';
+import 'package:invoicegenerator/bottom_sheets/invoices/new_client.dart'
+    as new_client_sheet;
 
 class ClientListScreen extends StatefulWidget {
   const ClientListScreen({super.key});
@@ -260,36 +262,24 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
       });
     }
 
-    // Get current client count to compare after returning
-    final int currentClientCount = _clients.length;
+    // Get current client IDs to compare after returning
     final Set<String> currentClientIds = Set<String>.from(
       _clients.map((c) => c.clientId),
     );
 
+    // Navigate to the AddClientScreen
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (context) => const AddClientScreen()))
         .then((_) {
-          // Make sure focus isn't set when returning
-          if (mounted && _searchFocusNode.hasFocus) {
-            _searchFocusNode.unfocus();
-          }
-
-          // Reset selected client when returning
-          if (mounted && _selectedClient != null) {
-            setState(() {
-              _selectedClient = null;
-            });
-          }
-
           // Get updated clients
           final updatedClients = _clientService.clients;
 
-          // Only animate if new clients were added
-          if (updatedClients.length > currentClientCount) {
+          // Check if new clients were added
+          if (updatedClients.length > _clients.length) {
             setState(() {
               _clients = updatedClients;
 
-              // Add animation markers INSIDE setState for better timing
+              // Add animation markers for new clients
               for (final client in updatedClients) {
                 if (!currentClientIds.contains(client.clientId)) {
                   _newlyAddedClientIds.add(client.clientId);

@@ -18,6 +18,7 @@ import 'package:invoicegenerator/widgets/display/BlurredBackground.dart';
 import 'package:invoicegenerator/widgets/cards/HighlightedCatalogCard.dart';
 import 'package:invoicegenerator/widgets/display/PressWidget.dart';
 import 'package:invoicegenerator/bottom_sheets/catalog/catalog_sort.dart';
+import 'package:invoicegenerator/bottom_sheets/invoices/new_item.dart';
 
 class CatalogListScreen extends StatefulWidget {
   const CatalogListScreen({super.key});
@@ -143,35 +144,29 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
       _searchFocusNode.unfocus();
     }
 
-    // Get current items count to compare after returning
-    final int currentItemsCount = _catalogService.getAllItems().length;
-
-    // Navigate to add catalog screen
+    // Navigate to the AddCatalogScreen
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (context) => const AddCatalogScreen()))
         .then((_) {
-          // Make sure focus isn't set when returning
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _searchFocusNode.hasFocus) {
-              _searchFocusNode.unfocus();
-            }
-          });
+          // When returning from the Add screen, check if new items were added
+          final catalogItems = _catalogService.getAllItems();
+          final currentItemsCount = catalogItems.length;
 
-          // Get updated items list
-          final items = _catalogService.getAllItems();
+          // Get previous count (this is approximate as we don't have the exact previous count)
+          final previousCount = _filteredCatalogItems.length;
 
-          // Only animate if new items were added
-          if (items.length > currentItemsCount) {
+          // If there appear to be new items
+          if (currentItemsCount > previousCount) {
             setState(() {
-              // Only animate new items (those at the beginning of the list)
-              for (int i = 0; i < items.length - currentItemsCount; i++) {
-                if (i < items.length) {
-                  _animatingItems.add(items[i].title);
+              // Only animate new items
+              for (int i = 0; i < currentItemsCount - previousCount; i++) {
+                if (i < catalogItems.length) {
+                  _animatingItems.add(catalogItems[i].title);
                 }
               }
             });
           } else {
-            // If no new items, just refresh the screen
+            // If no new items detected, just refresh the screen
             setState(() {});
           }
         });

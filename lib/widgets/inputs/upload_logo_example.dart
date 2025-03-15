@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:invoicegenerator/widgets/display/app_icon.dart';
+import 'package:invoicegenerator/widgets/inputs/utils/dashed_line_painter.dart';
 
 /// An improved version of the UploadLogoSection using the AppIcon widget
 class UploadLogoSectionImproved extends StatelessWidget {
@@ -92,7 +93,14 @@ class UploadLogoSectionImproved extends StatelessWidget {
             ),
           ),
           SizedBox(height: 16),
-          Container(height: 1, color: Color(0xFFCAD5D2)),
+          // Replace solid divider with dashed divider
+          Container(
+            height: 1,
+            child: CustomPaint(
+              painter: DashedLinePainter(),
+              size: Size(double.infinity, 1),
+            ),
+          ),
         ],
       ),
     );

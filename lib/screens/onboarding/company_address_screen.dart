@@ -9,6 +9,7 @@ import 'package:invoicegenerator/widgets/inputs/dropdown_input.dart';
 import 'package:invoicegenerator/widgets/inputs/text_input.dart';
 import 'package:invoicegenerator/widgets/utils/slide_page_route.dart';
 import 'package:invoicegenerator/screens/onboarding/company_contact_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CompanyAddressScreen extends StatefulWidget {
   const CompanyAddressScreen({super.key});
@@ -25,7 +26,7 @@ class _CompanyAddressScreenState extends State<CompanyAddressScreen> {
   final TextEditingController _zipController = TextEditingController();
 
   // Selected country (default to US)
-  final String _selectedCountry = 'US';
+  String _selectedCountry = 'US';
 
   // Validation state and message
   bool _isZipValid = true;
@@ -59,6 +60,38 @@ class _CompanyAddressScreenState extends State<CompanyAddressScreen> {
     'BR': r'^\d{5}-?\d{3}$', // Brazil: 12345-678 or 12345678
     'RU': r'^\d{6}$', // Russia: 123456
   };
+
+  // Save data to shared preferences temporarily
+  Future<void> _saveDataTemporarily() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      await prefs.setString('temp_country', _selectedCountry);
+      await prefs.setString('temp_address_line1', _addressLine1Controller.text);
+
+      if (_addressLine2Controller.text.isNotEmpty) {
+        await prefs.setString(
+          'temp_address_line2',
+          _addressLine2Controller.text,
+        );
+      }
+
+      await prefs.setString('temp_city', _cityController.text);
+
+      if (_zipController.text.isNotEmpty) {
+        await prefs.setString('temp_zip', _zipController.text);
+      }
+    } catch (e) {
+      debugPrint('Error saving temporary address data: $e');
+    }
+  }
+
+  // Handle country selection
+  void _handleCountrySelected(String country) {
+    setState(() {
+      _selectedCountry = country;
+    });
+  }
 
   // Store ZIP value without showing error
   void _handleZipChange(String value) {
@@ -173,6 +206,7 @@ class _CompanyAddressScreenState extends State<CompanyAddressScreen> {
                           child: GenericSelectorField(
                             label: 'COUNTRY',
                             hintText: 'Select country',
+                            value: _selectedCountry,
                           ),
                         ),
 
@@ -240,7 +274,7 @@ class _CompanyAddressScreenState extends State<CompanyAddressScreen> {
               padding: const EdgeInsets.all(16.0),
               child: PrimaryButton(
                 label: 'CONTINUE',
-                onPressed: () {
+                onPressed: () async {
                   // Validate ZIP only if it's not empty
                   if (_zipController.text.isNotEmpty) {
                     _validateZip(_zipController.text);
@@ -256,24 +290,39 @@ class _CompanyAddressScreenState extends State<CompanyAddressScreen> {
                     }
                   }
 
-                  // Save and process address data
-                  final addressLine1 = _addressLine1Controller.text;
-                  final addressLine2 = _addressLine2Controller.text;
-                  final city = _cityController.text;
-                  final zip = _zipController.text;
+                  // Validate required fields
+                  if (_addressLine1Controller.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please enter your address'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                    return;
+                  }
 
-                  print('Address Line 1: $addressLine1');
-                  print('Address Line 2: $addressLine2');
-                  print('City: $city');
-                  print('ZIP: $zip');
+                  if (_cityController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please enter your city'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                    return;
+                  }
+
+                  // Save data temporarily
+                  await _saveDataTemporarily();
 
                   // Navigate to next screen
-                  Navigator.of(context).push(
-                    SlidePageRoute(
-                      page: const CompanyContactScreen(),
-                      direction: SlideDirection.right,
-                    ),
-                  );
+                  if (mounted) {
+                    Navigator.of(context).push(
+                      SlidePageRoute(
+                        page: const CompanyContactScreen(),
+                        direction: SlideDirection.right,
+                      ),
+                    );
+                  }
                 },
               ),
             ),

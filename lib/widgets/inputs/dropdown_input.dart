@@ -4,11 +4,20 @@ import 'package:invoicegenerator/widgets/display/app_icon.dart';
 
 class CurrencySelector extends StatelessWidget {
   final String? value;
+  final String selectedCurrency;
+  final Function(String currency)? onCurrencySelected;
 
-  const CurrencySelector({super.key, this.value});
+  const CurrencySelector({
+    super.key,
+    this.value,
+    this.selectedCurrency = 'USD',
+    this.onCurrencySelected,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final displayValue = value ?? selectedCurrency;
+
     return Column(
       children: [
         SizedBox(
@@ -30,21 +39,13 @@ class CurrencySelector extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    value ?? 'Select currency',
-                    style:
-                        value != null
-                            ? const TextStyle(
-                              fontFamily: 'Helvetica Now Display',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF373C3A),
-                            )
-                            : const TextStyle(
-                              fontFamily: 'Helvetica Now Display',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF8D9694),
-                            ),
+                    displayValue,
+                    style: const TextStyle(
+                      fontFamily: 'Helvetica Now Display',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF373C3A),
+                    ),
                   ),
                   const SizedBox(width: 5),
                   AppIcon(
@@ -107,19 +108,27 @@ class ChevronPainter extends CustomPainter {
   }
 }
 
-/// A generic dropdown selector field based on the CurrencySelector pattern
-class GenericSelectorField extends StatelessWidget {
+/// A generic field that displays a value and indicates it can be tapped to select
+/// Used primarily for opening selection bottom sheets
+class GenericSelectorField extends StatefulWidget {
   final String label;
   final String hintText;
   final String? value;
+  final Function()? onTap;
 
   const GenericSelectorField({
     super.key,
     required this.label,
     required this.hintText,
-    this.value,
+    required this.value,
+    this.onTap,
   });
 
+  @override
+  State<GenericSelectorField> createState() => _GenericSelectorFieldState();
+}
+
+class _GenericSelectorFieldState extends State<GenericSelectorField> {
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -132,7 +141,7 @@ class GenericSelectorField extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
-                label,
+                widget.label,
                 style: const TextStyle(
                   fontFamily: 'Victor Mono',
                   fontWeight: FontWeight.bold,
@@ -140,38 +149,42 @@ class GenericSelectorField extends StatelessWidget {
                   color: Color(0xFF373C3A),
                 ),
               ),
-              Row(
-                children: [
-                  Text(
-                    value ?? hintText,
-                    style:
-                        value != null
-                            ? const TextStyle(
-                              fontFamily: 'Helvetica Now Display',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF373C3A),
-                            )
-                            : const TextStyle(
-                              fontFamily: 'Helvetica Now Display',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF8D9694),
-                            ),
-                  ),
-                  const SizedBox(width: 5),
-                  AppIcon(
-                    iconType: IconType.chevronRight,
-                    size: 24,
-                    color: const Color(0xFF373C3A),
-                  ),
-                ],
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        widget.value != null && widget.value!.isNotEmpty
+                            ? widget.value!
+                            : widget.hintText,
+                        textAlign: TextAlign.right,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: 'Helvetica Now Display',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color:
+                              widget.value != null && widget.value!.isNotEmpty
+                                  ? const Color(0xFF373C3A)
+                                  : const Color(0xFF8D9694),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.arrow_forward_ios,
+                      size: 16,
+                      color: Color(0xFF373C3A),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
         CustomPaint(
-          painter: DashedLinePainter(),
+          painter: DashedLinePainter(color: const Color(0xFFCAD5D2)),
           size: Size(MediaQuery.of(context).size.width, 1),
         ),
       ],

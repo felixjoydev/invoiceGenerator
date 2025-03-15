@@ -14,6 +14,11 @@ import 'package:invoicegenerator/screens/home/home_screen.dart';
 import 'package:invoicegenerator/screens/catalog/catalog_list_screen.dart';
 import 'package:invoicegenerator/screens/invoices/invoice_create_screen.dart';
 import 'package:invoicegenerator/utils/route_transitions.dart';
+import 'package:invoicegenerator/services/invoice_service.dart';
+import 'package:invoicegenerator/models/invoice.dart';
+import 'package:invoicegenerator/services/company_service.dart';
+import 'package:invoicegenerator/widgets/invoice/invoice_preview.dart';
+import 'package:intl/intl.dart';
 
 class InvoiceListScreen extends StatefulWidget {
   const InvoiceListScreen({super.key});
@@ -32,202 +37,80 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
   // Search query
   String _searchQuery = '';
 
-  // Original invoice card data for each tab
-  final List<Map<String, dynamic>> _overdueInvoices = [
-    {
-      'companyName': 'Acuro',
-      'date': '05/03/2025',
-      'invoiceNumber': 'inv-001',
-      'amount': '\$423.00',
-      'daysText': '12 days due',
-      'daysColor': const Color(0xFFD61443),
-    },
-    {
-      'companyName': 'Thalamus',
-      'date': '08/03/2025',
-      'invoiceNumber': 'inv-002',
-      'amount': '\$625.00',
-      'daysText': '15 days due',
-      'daysColor': const Color(0xFFD61443),
-    },
-    {
-      'companyName': 'Cortex',
-      'date': '12/03/2025',
-      'invoiceNumber': 'inv-003',
-      'amount': '\$220.00',
-      'daysText': '19 days due',
-      'daysColor': const Color(0xFFD61443),
-    },
-    {
-      'companyName': 'Medula',
-      'date': '15/03/2025',
-      'invoiceNumber': 'inv-004',
-      'amount': '\$750.00',
-      'daysText': '22 days due',
-      'daysColor': const Color(0xFFD61443),
-    },
-    {
-      'companyName': 'Cerebrum',
-      'date': '20/03/2025',
-      'invoiceNumber': 'inv-005',
-      'amount': '\$320.00',
-      'daysText': '27 days due',
-      'daysColor': const Color(0xFFD61443),
-    },
-  ];
+  // Services
+  final _invoiceService = InvoiceService();
+  final _companyService = CompanyService();
 
-  final List<Map<String, dynamic>> _outstandingInvoices = [
-    {
-      'companyName': 'Neurox',
-      'date': '05/04/2025',
-      'invoiceNumber': 'inv-006',
-      'amount': '\$550.00',
-      'daysText': 'DUE IN 5 DAYS',
-      'daysColor': const Color(0xFFD68814),
-    },
-    {
-      'companyName': 'Synaptix',
-      'date': '10/04/2025',
-      'invoiceNumber': 'inv-007',
-      'amount': '\$320.00',
-      'daysText': 'DUE IN 10 DAYS',
-      'daysColor': const Color(0xFFD68814),
-    },
-    {
-      'companyName': 'Axonify',
-      'date': '15/04/2025',
-      'invoiceNumber': 'inv-008',
-      'amount': '\$820.00',
-      'daysText': 'DUE IN 15 DAYS',
-      'daysColor': const Color(0xFFD68814),
-    },
-    {
-      'companyName': 'BrainTech',
-      'date': '20/04/2025',
-      'invoiceNumber': 'inv-009',
-      'amount': '\$450.00',
-      'daysText': 'DUE IN 20 DAYS',
-      'daysColor': const Color(0xFFD68814),
-    },
-  ];
+  // Loading state
+  bool _isLoading = true;
 
-  final List<Map<String, dynamic>> _paidInvoices = [
-    {
-      'companyName': 'Cognition',
-      'date': '01/02/2025',
-      'invoiceNumber': 'inv-010',
-      'amount': '\$320.00',
-      'daysText': 'PAID ON 10/02/2025',
-      'daysColor': const Color(0xFF13AF5B),
-    },
-    {
-      'companyName': 'NeuralWorks',
-      'date': '05/02/2025',
-      'invoiceNumber': 'inv-011',
-      'amount': '\$450.00',
-      'daysText': 'PAID ON 15/02/2025',
-      'daysColor': const Color(0xFF13AF5B),
-    },
-    {
-      'companyName': 'Synaptica',
-      'date': '10/02/2025',
-      'invoiceNumber': 'inv-012',
-      'amount': '\$550.00',
-      'daysText': 'PAID ON 20/02/2025',
-      'daysColor': const Color(0xFF13AF5B),
-    },
-    {
-      'companyName': 'Neurolink',
-      'date': '15/02/2025',
-      'invoiceNumber': 'inv-013',
-      'amount': '\$390.00',
-      'daysText': 'PAID ON 25/02/2025',
-      'daysColor': const Color(0xFF13AF5B),
-    },
-    {
-      'companyName': 'MindSphere',
-      'date': '20/02/2025',
-      'invoiceNumber': 'inv-014',
-      'amount': '\$620.00',
-      'daysText': 'PAID ON 01/03/2025',
-      'daysColor': const Color(0xFF13AF5B),
-    },
-    {
-      'companyName': 'CerebralTech',
-      'date': '25/02/2025',
-      'invoiceNumber': 'inv-015',
-      'amount': '\$480.00',
-      'daysText': 'PAID ON 05/03/2025',
-      'daysColor': const Color(0xFF13AF5B),
-    },
-    {
-      'companyName': 'BrainWave',
-      'date': '01/03/2025',
-      'invoiceNumber': 'inv-016',
-      'amount': '\$350.00',
-      'daysText': 'PAID ON 10/03/2025',
-      'daysColor': const Color(0xFF13AF5B),
-    },
-    {
-      'companyName': 'NeuralNet',
-      'date': '05/03/2025',
-      'invoiceNumber': 'inv-017',
-      'amount': '\$520.00',
-      'daysText': 'PAID ON 15/03/2025',
-      'daysColor': const Color(0xFF13AF5B),
-    },
-    {
-      'companyName': 'SynapseAI',
-      'date': '10/03/2025',
-      'invoiceNumber': 'inv-018',
-      'amount': '\$410.00',
-      'daysText': 'PAID ON 20/03/2025',
-      'daysColor': const Color(0xFF13AF5B),
-    },
-    {
-      'companyName': 'CognitiveTech',
-      'date': '15/03/2025',
-      'invoiceNumber': 'inv-019',
-      'amount': '\$580.00',
-      'daysText': 'PAID ON 25/03/2025',
-      'daysColor': const Color(0xFF13AF5B),
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadInvoices();
+  }
+
+  // Load invoices from the service
+  Future<void> _loadInvoices() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Initialize services
+    await _invoiceService.init();
+    await _companyService.init();
+
+    setState(() {
+      _isLoading = false;
+    });
+  }
 
   // Filtered lists based on search query
-  List<Map<String, dynamic>> get _filteredOverdueInvoices {
+  List<Invoice> get _filteredOverdueInvoices {
+    final overdueInvoices = _invoiceService.getInvoicesByStatus(
+      InvoiceStatus.overdue,
+    );
+
     if (_searchQuery.isEmpty) {
-      return _overdueInvoices;
+      return overdueInvoices;
     }
 
     final query = _searchQuery.toLowerCase();
-    return _overdueInvoices.where((invoice) {
-      return invoice['companyName'].toLowerCase().contains(query) ||
-          invoice['invoiceNumber'].toLowerCase().contains(query);
+    return overdueInvoices.where((invoice) {
+      return invoice.client.name.toLowerCase().contains(query) ||
+          invoice.invoiceId.toLowerCase().contains(query);
     }).toList();
   }
 
-  List<Map<String, dynamic>> get _filteredOutstandingInvoices {
+  List<Invoice> get _filteredOutstandingInvoices {
+    final outstandingInvoices = _invoiceService.getInvoicesByStatus(
+      InvoiceStatus.outstanding,
+    );
+
     if (_searchQuery.isEmpty) {
-      return _outstandingInvoices;
+      return outstandingInvoices;
     }
 
     final query = _searchQuery.toLowerCase();
-    return _outstandingInvoices.where((invoice) {
-      return invoice['companyName'].toLowerCase().contains(query) ||
-          invoice['invoiceNumber'].toLowerCase().contains(query);
+    return outstandingInvoices.where((invoice) {
+      return invoice.client.name.toLowerCase().contains(query) ||
+          invoice.invoiceId.toLowerCase().contains(query);
     }).toList();
   }
 
-  List<Map<String, dynamic>> get _filteredPaidInvoices {
+  List<Invoice> get _filteredPaidInvoices {
+    final paidInvoices = _invoiceService.getInvoicesByStatus(
+      InvoiceStatus.paid,
+    );
+
     if (_searchQuery.isEmpty) {
-      return _paidInvoices;
+      return paidInvoices;
     }
 
     final query = _searchQuery.toLowerCase();
-    return _paidInvoices.where((invoice) {
-      return invoice['companyName'].toLowerCase().contains(query) ||
-          invoice['invoiceNumber'].toLowerCase().contains(query);
+    return paidInvoices.where((invoice) {
+      return invoice.client.name.toLowerCase().contains(query) ||
+          invoice.invoiceId.toLowerCase().contains(query);
     }).toList();
   }
 
@@ -251,8 +134,34 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
   // Handle the add button press
   void _handleAddTapped() {
     // Navigate to the InvoiceCreateScreen
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(builder: (context) => const InvoiceCreateScreen()),
+        )
+        .then((_) {
+          // Refresh the list when returning from the create screen
+          _loadInvoices();
+        });
+  }
+
+  // Handle tapping on an invoice to view it
+  void _handleInvoiceTapped(Invoice invoice) async {
+    if (_companyService.companyInfo == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Company information not set')),
+      );
+      return;
+    }
+
+    // Navigate to the invoice preview
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const InvoiceCreateScreen()),
+      MaterialPageRoute(
+        builder:
+            (context) => InvoicePreview(
+              invoice: invoice,
+              companyInfo: _companyService.companyInfo!,
+            ),
+      ),
     );
   }
 
@@ -384,14 +293,17 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                     ModalRoute.of(context)?.settings.arguments is HomeScreen,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: SingleChildScrollView(
-                    child:
-                        _selectedTabIndex == 0
-                            ? _buildOverdueCards()
-                            : _selectedTabIndex == 1
-                            ? _buildOutstandingCards()
-                            : _buildPaidCards(),
-                  ),
+                  child:
+                      _isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : SingleChildScrollView(
+                            child:
+                                _selectedTabIndex == 0
+                                    ? _buildOverdueCards()
+                                    : _selectedTabIndex == 1
+                                    ? _buildOutstandingCards()
+                                    : _buildPaidCards(),
+                          ),
                 ),
               ),
             ),
@@ -417,7 +329,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         child: Padding(
           padding: EdgeInsets.only(top: 32.0),
           child: Text(
-            'No matching invoices found',
+            'No overdue invoices found',
             style: TextStyle(
               fontSize: 16,
               color: Color(0xFF8D9694),
@@ -434,14 +346,24 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         if (index.isEven) {
           final invoiceIndex = index ~/ 2;
           final invoice = filteredInvoices[invoiceIndex];
+          final dateFormat = DateFormat('MM/dd/yyyy');
 
-          return DueCard(
-            companyName: invoice['companyName'],
-            date: invoice['date'],
-            invoiceNumber: invoice['invoiceNumber'],
-            amount: invoice['amount'],
-            daysText: invoice['daysText'],
-            daysColor: invoice['daysColor'],
+          // Calculate days overdue
+          final now = DateTime.now();
+          final difference = now.difference(invoice.dueDate).inDays;
+          final daysText = '$difference days due';
+
+          return GestureDetector(
+            onTap: () => _handleInvoiceTapped(invoice),
+            child: DueCard(
+              companyName: invoice.client.name,
+              date: dateFormat.format(invoice.dueDate),
+              invoiceNumber: invoice.invoiceId,
+              amount:
+                  '${_getCurrencySymbol()}${invoice.total.toStringAsFixed(2)}',
+              daysText: daysText,
+              daysColor: const Color(0xFFD61443),
+            ),
           );
         }
         // Return divider for odd indices
@@ -467,7 +389,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         child: Padding(
           padding: EdgeInsets.only(top: 32.0),
           child: Text(
-            'No matching invoices found',
+            'No outstanding invoices found',
             style: TextStyle(
               fontSize: 16,
               color: Color(0xFF8D9694),
@@ -484,14 +406,24 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         if (index.isEven) {
           final invoiceIndex = index ~/ 2;
           final invoice = filteredInvoices[invoiceIndex];
+          final dateFormat = DateFormat('MM/dd/yyyy');
 
-          return Outstanding.DueCard(
-            companyName: invoice['companyName'],
-            date: invoice['date'],
-            invoiceNumber: invoice['invoiceNumber'],
-            amount: invoice['amount'],
-            daysText: invoice['daysText'],
-            daysColor: invoice['daysColor'],
+          // Calculate days until due
+          final now = DateTime.now();
+          final difference = invoice.dueDate.difference(now).inDays;
+          final daysText = 'DUE IN $difference DAYS';
+
+          return GestureDetector(
+            onTap: () => _handleInvoiceTapped(invoice),
+            child: Outstanding.DueCard(
+              companyName: invoice.client.name,
+              date: dateFormat.format(invoice.dueDate),
+              invoiceNumber: invoice.invoiceId,
+              amount:
+                  '${_getCurrencySymbol()}${invoice.total.toStringAsFixed(2)}',
+              daysText: daysText,
+              daysColor: const Color(0xFFD68814),
+            ),
           );
         }
         // Return divider for odd indices
@@ -517,7 +449,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         child: Padding(
           padding: EdgeInsets.only(top: 32.0),
           child: Text(
-            'No matching invoices found',
+            'No paid invoices found',
             style: TextStyle(
               fontSize: 16,
               color: Color(0xFF8D9694),
@@ -534,14 +466,19 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         if (index.isEven) {
           final invoiceIndex = index ~/ 2;
           final invoice = filteredInvoices[invoiceIndex];
+          final dateFormat = DateFormat('MM/dd/yyyy');
 
-          return Paid.DueCard(
-            companyName: invoice['companyName'],
-            date: invoice['date'],
-            invoiceNumber: invoice['invoiceNumber'],
-            amount: invoice['amount'],
-            daysText: invoice['daysText'],
-            daysColor: invoice['daysColor'],
+          return GestureDetector(
+            onTap: () => _handleInvoiceTapped(invoice),
+            child: Paid.DueCard(
+              companyName: invoice.client.name,
+              date: dateFormat.format(invoice.issueDate),
+              invoiceNumber: invoice.invoiceId,
+              amount:
+                  '${_getCurrencySymbol()}${invoice.total.toStringAsFixed(2)}',
+              daysText: 'PAID',
+              daysColor: const Color(0xFF13AF5B),
+            ),
           );
         }
         // Return divider for odd indices
@@ -556,5 +493,10 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         }
       })..add(const SizedBox(height: 16)), // Add bottom spacing
     );
+  }
+
+  // Helper to get currency symbol
+  String _getCurrencySymbol() {
+    return _companyService.companyInfo?.currency ?? 'USD';
   }
 }

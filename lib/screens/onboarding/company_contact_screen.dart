@@ -8,6 +8,9 @@ import 'package:invoicegenerator/theme/app_theme.dart';
 import 'package:invoicegenerator/widgets/utils/keyboard_dismiss_wrapper.dart';
 import 'package:invoicegenerator/widgets/utils/fade_page_route.dart';
 import 'package:invoicegenerator/screens/home/first_time_home_screen.dart';
+import 'package:invoicegenerator/services/company_service.dart';
+import 'package:invoicegenerator/models/company_info.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CompanyContactScreen extends StatefulWidget {
   const CompanyContactScreen({super.key});
@@ -29,6 +32,19 @@ class _CompanyContactScreenState extends State<CompanyContactScreen> {
 
   // Loading state
   bool _isLoading = false;
+
+  // Company service
+  final _companyService = CompanyService();
+
+  @override
+  void initState() {
+    super.initState();
+    _initCompanyService();
+  }
+
+  Future<void> _initCompanyService() async {
+    await _companyService.init();
+  }
 
   @override
   void dispose() {
@@ -91,6 +107,79 @@ class _CompanyContactScreenState extends State<CompanyContactScreen> {
               ? null
               : 'Please enter a valid website URL';
     });
+  }
+
+  // Save company data collected across all onboarding screens
+  Future<bool> _saveCompanyData() async {
+    try {
+      // Get previous company data from shared preferences
+      final prefs = await SharedPreferences.getInstance();
+
+      // Get basic company details
+      final businessName = prefs.getString('temp_business_name') ?? '';
+      final logoPath = prefs.getString('temp_logo_path');
+      final currency = prefs.getString('temp_currency') ?? 'USD';
+      final taxRateStr = prefs.getString('temp_tax_rate');
+      final double? taxRate =
+          taxRateStr != null ? double.tryParse(taxRateStr) : null;
+      final enableTax = prefs.getBool('temp_enable_tax') ?? false;
+
+      // Get address details
+      final country = prefs.getString('temp_country') ?? '';
+      final addressLine1 = prefs.getString('temp_address_line1') ?? '';
+      final addressLine2 = prefs.getString('temp_address_line2');
+      final city = prefs.getString('temp_city') ?? '';
+      final zip = prefs.getString('temp_zip');
+
+      // Get contact details from current screen
+      final phone =
+          _phoneController.text.isEmpty ? null : _phoneController.text;
+      final email =
+          _emailController.text.isEmpty ? null : _emailController.text;
+      final website =
+          _websiteController.text.isEmpty ? null : _websiteController.text;
+
+      // Create the company info object
+      final companyInfo = CompanyInfo(
+        businessName: businessName,
+        logoPath: logoPath,
+        currency: currency,
+        taxRate: taxRate,
+        enableTax: enableTax,
+        country: country,
+        addressLine1: addressLine1,
+        addressLine2: addressLine2,
+        city: city,
+        zip: zip,
+        phone: phone,
+        email: email,
+        website: website,
+        bankName: null,
+        accountHolder: null,
+        accountNumber: null,
+        ifscCode: null,
+      );
+
+      // Save company info
+      await _companyService.saveCompanyInfo(companyInfo);
+
+      // Clean up temporary data
+      await prefs.remove('temp_business_name');
+      await prefs.remove('temp_logo_path');
+      await prefs.remove('temp_currency');
+      await prefs.remove('temp_tax_rate');
+      await prefs.remove('temp_enable_tax');
+      await prefs.remove('temp_country');
+      await prefs.remove('temp_address_line1');
+      await prefs.remove('temp_address_line2');
+      await prefs.remove('temp_city');
+      await prefs.remove('temp_zip');
+
+      return true;
+    } catch (e) {
+      debugPrint('Error saving company data: $e');
+      return false;
+    }
   }
 
   @override
@@ -278,6 +367,25 @@ class _CompanyContactScreenState extends State<CompanyContactScreen> {
     setState(() {
       _isLoading = true;
     });
+
+    // Save the company data
+    final success = await _saveCompanyData();
+
+    if (!success) {
+      // Show error message
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to save company information'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
 
     // Simulate some processing time
     await Future.delayed(const Duration(milliseconds: 800));

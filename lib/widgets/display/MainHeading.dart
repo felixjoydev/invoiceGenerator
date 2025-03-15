@@ -19,11 +19,15 @@ class MainHeading extends StatelessWidget {
   /// The type of icon to display (or none)
   final HeadingIconType iconType;
 
+  /// Optional override for the icon path
+  final String? iconPathOverride;
+
   /// Creates a MainHeading with the specified text and icon type
   const MainHeading({
     super.key,
     this.text = 'Company Details',
     this.iconType = HeadingIconType.company,
+    this.iconPathOverride,
   });
 
   /// Creates a MainHeading specifically for business details
@@ -62,8 +66,13 @@ class MainHeading extends StatelessWidget {
   );
 
   /// Creates a MainHeading specifically for settings
-  factory MainHeading.settings({Key? key}) =>
-      MainHeading(key: key, text: 'Settings', iconType: HeadingIconType.logo);
+  factory MainHeading.settings({Key? key}) {
+    return MainHeading(
+      key: key,
+      text: 'Settings',
+      iconPathOverride: 'assets/icons/settings.svg',
+    );
+  }
 
   /// Creates a MainHeading without an icon
   factory MainHeading.noIcon({Key? key, required String text}) =>
@@ -71,6 +80,11 @@ class MainHeading extends StatelessWidget {
 
   /// Gets the SVG asset path for the icon
   String? _getIconPath() {
+    // Use override if available
+    if (iconPathOverride != null) {
+      return iconPathOverride;
+    }
+
     switch (iconType) {
       case HeadingIconType.company:
         return 'assets/icons/company.svg';

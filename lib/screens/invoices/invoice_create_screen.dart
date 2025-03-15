@@ -10,12 +10,22 @@ import 'package:invoicegenerator/widgets/buttons/secondary_button.dart';
 import 'package:invoicegenerator/widgets/inputs/toggle.dart';
 import 'package:invoicegenerator/bottom_sheets/invoices/invoice_item.dart';
 import 'package:invoicegenerator/bottom_sheets/invoices/select_client.dart';
+import 'package:invoicegenerator/bottom_sheets/invoices/new_client.dart'
+    as new_client_sheet;
+import 'package:invoicegenerator/bottom_sheets/invoices/new_item.dart';
 import 'package:invoicegenerator/bottom_sheets/invoices/editItem.dart';
 import 'package:invoicegenerator/models/catalog_item.dart';
 import 'package:invoicegenerator/models/client.dart';
 import 'package:invoicegenerator/bottom_sheets/invoices/issue_date_picker.dart';
 import 'package:invoicegenerator/bottom_sheets/invoices/due_date_picker.dart';
 import 'package:flutter/services.dart';
+import 'package:invoicegenerator/models/invoice.dart';
+import 'package:invoicegenerator/services/invoice_service.dart';
+import 'package:invoicegenerator/services/company_service.dart';
+import 'package:invoicegenerator/services/invoice_settings_service.dart';
+import 'package:invoicegenerator/widgets/invoice/invoice_preview.dart';
+import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
+import 'package:intl/intl.dart';
 
 class InvoiceCreateScreen extends StatefulWidget {
   const InvoiceCreateScreen({super.key});
@@ -49,6 +59,9 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
   // Tax text field focus node to handle selection behavior
   final FocusNode _taxFocusNode = FocusNode();
 
+  // Invoice settings service
+  final _invoiceSettingsService = InvoiceSettingsService();
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +73,9 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     _issueDateController.text = formattedDate;
     _dueDateController.text = formattedDate;
 
+    // Load invoice settings and initialize fields
+    _initializeInvoiceSettings();
+
     // Setup focus listener to select all text when tax field gets focus
     _taxFocusNode.addListener(() {
       if (_taxFocusNode.hasFocus) {
@@ -70,6 +86,33 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
         );
       }
     });
+  }
+
+  // Initialize invoice settings
+  Future<void> _initializeInvoiceSettings() async {
+    try {
+      await _invoiceSettingsService.init();
+
+      if (mounted) {
+        setState(() {
+          // Set custom notes if available
+          final savedNotes = _invoiceSettingsService.customNotes;
+          _notesController.text = savedNotes ?? '';
+
+          // Set invoice ID based on settings
+          if (_invoiceSettingsService.isAutoGenerate) {
+            // Use auto-generated ID
+            _invoiceIdController.text =
+                _invoiceSettingsService.generateNextInvoiceId();
+          } else {
+            // For manual mode, leave empty field for user to enter
+            _invoiceIdController.text = '';
+          }
+        });
+      }
+    } catch (e) {
+      print('Error initializing invoice settings: $e');
+    }
   }
 
   @override
@@ -187,13 +230,13 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
 
   // Handle add new item button press from the InvoiceItemSheet
   void _handleAddNewItem() {
-    // This will be called when the "ADD NEW ITEM" button in the InvoiceItemSheet is pressed
-    // Here you would typically show a form to create a new item
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Add New Item form will be shown here'),
-        duration: Duration(seconds: 2),
-      ),
+    // Show the new item bottom sheet
+    showNewItemSheet(
+      context,
+      onItemsAdded: (items) {
+        // When items are added, select them in the invoice
+        _handleItemsSelected(items);
+      },
     );
   }
 
@@ -257,11 +300,14 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
           onClientSelected: _handleCustomerSelected,
           preSelectedClientId: _selectedCustomerId,
           onAddNewClientPressed: () {
-            // Navigate to add client screen
-            Navigator.of(context).pushNamed('/add_client').then((_) {
-              // When returning from add client screen, open selector again
-              _showCustomerSelector();
-            });
+            // Show the new client bottom sheet directly
+            new_client_sheet.showNewClientSheet(
+              context,
+              onClientAdded: (client) {
+                // When client is added, select it in the invoice
+                _handleCustomerSelected(client);
+              },
+            );
           },
         );
       },
@@ -356,7 +402,10 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                       const SizedBox(height: 8),
 
                       // Invoice Information section
-                      const SmallHeading(title: "Invoice Information"),
+                      SizedBox(
+                        width: double.infinity,
+                        child: const SmallHeading(title: "Invoice Information"),
+                      ),
 
                       // 4px spacing after heading (like in add_client_screen)
                       const SizedBox(height: 4),
@@ -412,7 +461,10 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                       const SizedBox(height: 32),
 
                       // Item Details section
-                      const SmallHeading(title: "Item Details"),
+                      SizedBox(
+                        width: double.infinity,
+                        child: const SmallHeading(title: "Item Details"),
+                      ),
 
                       // 4px spacing after heading
                       const SizedBox(height: 4),
@@ -786,7 +838,10 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                       const SizedBox(height: 32),
 
                       // Notes section
-                      const SmallHeading(title: "Notes"),
+                      SizedBox(
+                        width: double.infinity,
+                        child: const SmallHeading(title: "Notes"),
+                      ),
 
                       // 12px spacing after heading
                       const SizedBox(height: 12),
@@ -819,10 +874,24 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                       const SizedBox(height: 32),
 
                       // Template Selection section
-                      const SmallHeading(title: "Template Selection"),
+                      SizedBox(
+                        width: double.infinity,
+                        child: const SmallHeading(title: "Template Selection"),
+                      ),
 
                       // Add more spacing at the bottom for better visual appearance
                       const SizedBox(height: 32),
+
+                      // Add Create Invoice button
+                      PrimaryButton(
+                        label: 'CREATE INVOICE',
+                        onPressed: _createInvoice,
+                        isEnabled:
+                            _selectedCustomer != null &&
+                            _invoiceItems.isNotEmpty,
+                      ),
+
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
@@ -832,6 +901,122 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
         ),
       ),
     );
+  }
+
+  // Create invoice and save it
+  void _createInvoice() async {
+    // Validate required fields
+    if (_selectedCustomer == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a client')));
+      return;
+    }
+
+    if (_invoiceItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please add at least one item')),
+      );
+      return;
+    }
+
+    try {
+      // Parse dates
+      final dateFormat = DateFormat('dd/MM/yyyy');
+      final issueDate = dateFormat.parse(_issueDateController.text);
+      final dueDate = dateFormat.parse(_dueDateController.text);
+
+      // Get company info for tax rate
+      final companyService = CompanyService();
+      await companyService.init();
+
+      final companyInfo = companyService.companyInfo;
+      if (companyInfo == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Company information not set')),
+        );
+        return;
+      }
+
+      // Get tax rate from the UI or company settings
+      double taxRate = 0.0;
+      if (_isTaxEnabled) {
+        taxRate = double.tryParse(_taxPercentController.text) ?? 0.0;
+      }
+
+      // Initialize invoice service and generate ID
+      final invoiceService = InvoiceService();
+      await invoiceService.init();
+
+      // Use custom invoice ID or generate a new one
+      String invoiceId =
+          _invoiceIdController.text.isNotEmpty
+              ? _invoiceIdController.text
+              : invoiceService.generateInvoiceId();
+
+      // Create the invoice object
+      final invoice = Invoice(
+        invoiceId: invoiceId,
+        client: Client(
+          clientId: _selectedCustomerId ?? 'unknown',
+          name: _selectedCustomer ?? 'Unknown Client',
+          type: 'organization',
+        ),
+        issueDate: issueDate,
+        dueDate: dueDate,
+        items: List<CatalogItem>.from(_invoiceItems),
+        subtotal: _subtotal,
+        taxRate: taxRate,
+        taxAmount: _taxAmount,
+        total: _total,
+        notes: _notesController.text.isNotEmpty ? _notesController.text : null,
+        status: _determineDueStatus(dueDate),
+      );
+
+      // Save the invoice
+      bool success = await invoiceService.addInvoice(invoice);
+
+      if (success) {
+        // If auto-generate is enabled, increment the last invoice number
+        if (_invoiceSettingsService.isAutoGenerate) {
+          await _invoiceSettingsService.incrementInvoiceNumber();
+        }
+
+        // Navigate to the preview screen
+        if (mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder:
+                  (context) => InvoicePreview(
+                    invoice: invoice,
+                    companyInfo: companyInfo,
+                  ),
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Failed to save invoice')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error creating invoice: $e')));
+    }
+  }
+
+  // Determine invoice status based on due date
+  InvoiceStatus _determineDueStatus(DateTime dueDate) {
+    final now = DateTime.now();
+
+    // If due date is in the past, it's overdue
+    if (dueDate.isBefore(now)) {
+      return InvoiceStatus.overdue;
+    }
+
+    // Otherwise it's outstanding
+    return InvoiceStatus.outstanding;
   }
 
   // Build a row for an invoice item
