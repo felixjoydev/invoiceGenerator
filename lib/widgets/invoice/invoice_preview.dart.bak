@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
-import 'package:pdf/pdf.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/models/invoice.dart';
 import 'package:invoicegenerator/models/company_info.dart';
@@ -8,7 +7,6 @@ import 'package:invoicegenerator/services/pdf_service.dart';
 import 'package:invoicegenerator/screens/invoices/invoice_list_screen.dart';
 import 'package:invoicegenerator/screens/invoices/invoice_create_screen.dart';
 import 'package:intl/intl.dart';
-import 'dart:typed_data';
 
 class InvoicePreview extends StatelessWidget {
   final Invoice invoice;
@@ -47,49 +45,35 @@ class InvoicePreview extends StatelessWidget {
                     ),
                   ),
 
-                  // PDF Preview - Use Expanded to take remaining space
-                  Expanded(
+                  // PDF Preview
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.6,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Center(
-                        child: AspectRatio(
-                          aspectRatio:
-                              1 / 1.414, // A4 aspect ratio (210×297 mm)
-                          child: ClipRect(
-                            child: Material(
-                              color: const Color(
-                                0xFFE7E1CF,
-                              ), // Match PDF background
-                              child: MediaQuery(
-                                data: MediaQuery.of(
-                                  context,
-                                ).copyWith(padding: EdgeInsets.zero),
-                                child: PdfPreview(
-                                  key: UniqueKey(),
-                                  build:
-                                      (format) => PdfService.previewPdf(
-                                        invoice,
-                                        companyInfo,
-                                      ),
-                                  allowPrinting: false,
-                                  allowSharing: false,
-                                  canChangeOrientation: false,
-                                  canChangePageFormat: false,
-                                  canDebug: false,
-                                  useActions: false,
-                                  padding: EdgeInsets.zero,
-                                  previewPageMargin: EdgeInsets.zero,
-                                  pdfPreviewPageDecoration: null,
-                                  scrollViewDecoration: const BoxDecoration(
-                                    color: Colors.transparent,
-                                  ),
-                                  maxPageWidth:
-                                      double
-                                          .infinity, // Take available width in aspect ratio
-                                ),
-                              ),
-                            ),
+                      child: Theme(
+                        data: ThemeData.light().copyWith(
+                          scaffoldBackgroundColor: Colors.transparent,
+                          primaryColor: Colors.transparent,
+                          colorScheme: const ColorScheme.light().copyWith(
+                            background: Colors.transparent,
                           ),
+                        ),
+                        child: PdfPreview(
+                          build:
+                              (format) =>
+                                  PdfService.previewPdf(invoice, companyInfo),
+                          allowPrinting: false,
+                          allowSharing: false,
+                          canChangeOrientation: false,
+                          canChangePageFormat: false,
+                          canDebug: false,
+                          pdfPreviewPageDecoration: const BoxDecoration(
+                            color: Colors.transparent,
+                          ),
+                          scrollViewDecoration: const BoxDecoration(
+                            color: Colors.transparent,
+                          ),
+                          useActions: false,
                         ),
                       ),
                     ),

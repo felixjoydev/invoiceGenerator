@@ -69,6 +69,7 @@ dependencies:
 
   # Animations
   flutter_staggered_animations: ^1.1.1
+  syncfusion_flutter_pdfviewer: ^28.2.12
 
 dev_dependencies:
   flutter_test:
