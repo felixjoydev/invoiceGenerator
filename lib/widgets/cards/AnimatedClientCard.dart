@@ -13,6 +13,7 @@ class AnimatedClientCard extends StatefulWidget {
   final bool? hasDue;
   final VoidCallback onAnimationComplete;
   final VoidCallback? onLongPress;
+  final VoidCallback? onTap;
 
   const AnimatedClientCard({
     super.key,
@@ -27,6 +28,7 @@ class AnimatedClientCard extends StatefulWidget {
     this.hasDue,
     required this.onAnimationComplete,
     this.onLongPress,
+    this.onTap,
   });
 
   @override
@@ -98,6 +100,7 @@ class _AnimatedClientCardState extends State<AnimatedClientCard>
           dueAmount: widget.dueAmount,
           hasDue: widget.hasDue ?? false,
           onLongPress: widget.onLongPress,
+          onTap: widget.onTap,
         ),
       ),
     );

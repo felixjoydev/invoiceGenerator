@@ -12,6 +12,7 @@ class ClientCard extends StatelessWidget {
   final bool hasOutstanding;
   final bool hasDue;
   final VoidCallback? onLongPress;
+  final VoidCallback? onTap;
 
   const ClientCard({
     super.key,
@@ -25,6 +26,7 @@ class ClientCard extends StatelessWidget {
     this.hasOutstanding = true,
     this.hasDue = false,
     this.onLongPress,
+    this.onTap,
   });
 
   @override
@@ -38,6 +40,7 @@ class ClientCard extends StatelessWidget {
           onLongPress!();
         }
       },
+      onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
         width: double.infinity,

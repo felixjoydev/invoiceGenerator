@@ -1,25 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
+import 'package:invoicegenerator/widgets/buttons/secondary_button.dart';
 import 'package:invoicegenerator/widgets/display/SmallHeading.dart';
 import 'package:invoicegenerator/widgets/inputs/text_input.dart';
 import 'package:invoicegenerator/models/client.dart';
 import 'package:invoicegenerator/services/client_service.dart';
-import 'package:invoicegenerator/bottom_sheets/invoices/select_client.dart';
+import 'package:invoicegenerator/widgets/display/MainHeading.dart';
+import 'package:invoicegenerator/widgets/display/app_icon.dart';
 
-class NewClientSheet extends StatefulWidget {
-  final Function(Client)? onClientAdded;
+class EditClientSheet extends StatefulWidget {
+  final Client client;
+  final Function(Client)? onClientUpdated;
+  final Function()? onClientDeleted;
 
-  const NewClientSheet({super.key, this.onClientAdded});
+  const EditClientSheet({
+    super.key,
+    required this.client,
+    this.onClientUpdated,
+    this.onClientDeleted,
+  });
 
   @override
-  State<NewClientSheet> createState() => _NewClientSheetState();
+  State<EditClientSheet> createState() => _EditClientSheetState();
 }
 
-class _NewClientSheetState extends State<NewClientSheet> {
-  // Selected tab index
-  int _selectedTabIndex = 0;
-
+class _EditClientSheetState extends State<EditClientSheet> {
   // Text controllers for the input fields
   final TextEditingController _organizationNameController =
       TextEditingController();
@@ -70,6 +76,9 @@ class _NewClientSheetState extends State<NewClientSheet> {
 
     // Initialize the client service if needed
     _initClientService();
+
+    // Prefill fields with client data
+    _prefillClientData();
 
     // Add listeners to controllers for validation
     _organizationNameController.addListener(_validateForm);
@@ -147,58 +156,31 @@ class _NewClientSheetState extends State<NewClientSheet> {
     super.dispose();
   }
 
+  // Prefill fields with client data
+  void _prefillClientData() {
+    _organizationNameController.text = widget.client.name;
+    _clientIdController.text = widget.client.clientId;
+    _taxIdController.text = widget.client.taxId ?? '';
+    _selectedCountry = widget.client.country;
+    _addressLine1Controller.text = widget.client.addressLine1 ?? '';
+    _addressLine2Controller.text = widget.client.addressLine2 ?? '';
+    _cityController.text = widget.client.city ?? '';
+    _zipController.text = widget.client.zip ?? '';
+    _phoneController.text = widget.client.phone ?? '';
+    _emailController.text = widget.client.email ?? '';
+    _websiteController.text = widget.client.website ?? '';
+    _notesController.text = widget.client.notes ?? '';
+  }
+
   // Handle back button press
   void _handleBackPressed() {
     Navigator.pop(context);
-
-    // Show the select client bottom sheet again
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (BuildContext context) {
-        return SelectClientSheet(
-          onAddNewClientPressed: () {
-            Navigator.pop(context);
-            _showNewClientSheet(context);
-          },
-        );
-      },
-    );
-  }
-
-  // Helper method to show this sheet
-  static void _showNewClientSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (BuildContext context) {
-        return NewClientSheet();
-      },
-    );
-  }
-
-  // Handle tab change
-  void _handleTabChanged(int index) {
-    setState(() {
-      _selectedTabIndex = index;
-    });
-    _validateForm();
   }
 
   // Validate form to enable/disable primary button
   void _validateForm() {
-    bool isValid = false;
-
-    // Basic validation - check if only the name field is filled
-    if (_selectedTabIndex == 0) {
-      // Organization
-      isValid = _organizationNameController.text.isNotEmpty;
-    } else {
-      // Person
-      isValid = _organizationNameController.text.isNotEmpty;
-    }
+    // Basic validation - check if name field is filled
+    bool isValid = _organizationNameController.text.isNotEmpty;
 
     setState(() {
       _isButtonEnabled = isValid;
@@ -310,15 +292,12 @@ class _NewClientSheetState extends State<NewClientSheet> {
     });
   }
 
-  // Initialize client service and get a unique client ID
+  // Initialize client service
   Future<void> _initClientService() async {
     await _clientService.init();
-    setState(() {
-      _clientIdController.text = _clientService.generateClientId();
-    });
   }
 
-  // Save client data
+  // Save updated client data
   void _saveClient() {
     // Validate fields before saving (only name is required)
     if (_organizationNameController.text.isEmpty) {
@@ -365,9 +344,8 @@ class _NewClientSheetState extends State<NewClientSheet> {
       return;
     }
 
-    // Create client object - only name and clientId are absolutely required
-    // along with a type which is derived from the selected tab
-    final client = Client(
+    // Create updated client object
+    final updatedClient = Client(
       name: _organizationNameController.text,
       clientId: _clientIdController.text,
       taxId: _taxIdController.text.isEmpty ? null : _taxIdController.text,
@@ -383,16 +361,24 @@ class _NewClientSheetState extends State<NewClientSheet> {
       email: _emailController.text.isEmpty ? null : _emailController.text,
       website: _websiteController.text.isEmpty ? null : _websiteController.text,
       notes: _notesController.text.isEmpty ? null : _notesController.text,
-      type: _selectedTabIndex == 0 ? 'organization' : 'person',
+      type: widget.client.type,
+      // Preserve other properties
+      invoiceCount: widget.client.invoiceCount,
+      currency: widget.client.currency,
+      amount: widget.client.amount,
+      outstandingAmount: widget.client.outstandingAmount,
+      hasOutstanding: widget.client.hasOutstanding,
+      hasDue: widget.client.hasDue,
+      dueAmount: widget.client.dueAmount,
     );
 
-    // Add client to the service
-    _clientService.addClient(client);
+    // Update client in the service
+    _clientService.updateClient(updatedClient.clientId, updatedClient);
 
     // Show success message
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Client added successfully'),
+        content: Text('Client updated successfully'),
         backgroundColor: Colors.green,
       ),
     );
@@ -401,8 +387,30 @@ class _NewClientSheetState extends State<NewClientSheet> {
     Navigator.pop(context);
 
     // Call the callback if it exists
-    if (widget.onClientAdded != null) {
-      widget.onClientAdded!(client);
+    if (widget.onClientUpdated != null) {
+      widget.onClientUpdated!(updatedClient);
+    }
+  }
+
+  // Delete the client
+  void _deleteClient() {
+    // Delete the client from the service
+    _clientService.deleteClient(widget.client.clientId);
+
+    // Show success message
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Client deleted successfully'),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    // Close the bottom sheet
+    Navigator.pop(context);
+
+    // Call the callback if it exists
+    if (widget.onClientDeleted != null) {
+      widget.onClientDeleted!();
     }
   }
 
@@ -455,21 +463,10 @@ class _NewClientSheetState extends State<NewClientSheet> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               // Header with back button
-                              MainHeading(
-                                text: 'Add New Client',
-                                iconPath: 'assets/icons/back.svg',
-                                onBackPressed: _handleBackPressed,
-                              ),
+                              MainHeading.noIcon(text: 'Edit Client'),
 
-                              // Add spacing between heading and tabs
+                              // Add spacing after heading
                               SizedBox(height: 24),
-
-                              // Tab control for Organization/Person selection
-                              CustomTabBar(
-                                tabs: const ['Organization', 'Person'],
-                                initialTabIndex: _selectedTabIndex,
-                                onTabChanged: _handleTabChanged,
-                              ),
                             ],
                           ),
                         ),
@@ -523,6 +520,29 @@ class _NewClientSheetState extends State<NewClientSheet> {
               ],
             ),
 
+            // Delete button above the primary button
+            Positioned(
+              bottom: 80, // Position above the primary button
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                top: false,
+                child: Container(
+                  width: double.infinity,
+                  color: Color(0xFFDAE4E1),
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child: SecondaryButton(
+                      iconType: IconType.editBox,
+                      text: 'DELETE CLIENT',
+                      color: Color(0xFFD61443),
+                      onPressed: _deleteClient,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
             // Fixed Bottom Button Section
             Positioned(
               bottom: 0,
@@ -538,7 +558,7 @@ class _NewClientSheetState extends State<NewClientSheet> {
                   MediaQuery.of(context).padding.bottom + 16,
                 ),
                 child: PrimaryButton(
-                  label: 'ADD CLIENT',
+                  label: 'SAVE',
                   onPressed: _saveClient,
                   isEnabled: _isButtonEnabled,
                 ),
@@ -555,9 +575,6 @@ class _NewClientSheetState extends State<NewClientSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 32px spacing after tabs
-        const SizedBox(height: 32),
-
         // Basic Information section
         const SmallHeading(title: "Basic Information"),
 
@@ -566,11 +583,8 @@ class _NewClientSheetState extends State<NewClientSheet> {
 
         // Basic info fields
         GenericInputField(
-          label: _selectedTabIndex == 0 ? 'ORGANIZATION NAME' : 'PERSON NAME',
-          hintText:
-              _selectedTabIndex == 0
-                  ? 'Enter organization name'
-                  : 'Enter person name',
+          label: 'NAME',
+          hintText: 'Enter name',
           controller: _organizationNameController,
           focusNode: _organizationNameFocus,
           textInputAction: TextInputAction.next,
@@ -768,218 +782,8 @@ class _NewClientSheetState extends State<NewClientSheet> {
           maxLines: 5,
         ),
 
-        // 40px spacing after notes
-        const SizedBox(height: 40),
-      ],
-    );
-  }
-}
-
-/// Tab control for Organization/Person selection
-class CustomTabBar extends StatefulWidget {
-  final List<String> tabs;
-  final int initialTabIndex;
-  final Function(int) onTabChanged;
-  final Duration animationDuration;
-
-  const CustomTabBar({
-    super.key,
-    required this.tabs,
-    this.initialTabIndex = 0,
-    required this.onTabChanged,
-    this.animationDuration = const Duration(milliseconds: 200),
-  });
-
-  @override
-  State<CustomTabBar> createState() => _CustomTabBarState();
-}
-
-class _CustomTabBarState extends State<CustomTabBar>
-    with SingleTickerProviderStateMixin {
-  late int _activeTabIndex;
-  late AnimationController _animationController;
-
-  // Animation variables
-  bool _isInitialized = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _activeTabIndex = widget.initialTabIndex;
-    _animationController = AnimationController(
-      vsync: this,
-      duration: widget.animationDuration,
-    );
-
-    // Schedule measuring tab widths after the first build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _updateIndicatorPosition();
-    });
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  void _handleTabTap(int index) {
-    if (index == _activeTabIndex) return;
-
-    setState(() {
-      _activeTabIndex = index;
-    });
-
-    _updateIndicatorPosition();
-    widget.onTabChanged(index);
-  }
-
-  void _updateIndicatorPosition() {
-    if (!_isInitialized) {
-      setState(() {
-        _isInitialized = true;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.tabs.isEmpty) {
-      return Container(
-        height: 40,
-        decoration: BoxDecoration(
-          border: Border.all(color: Color(0xFFCAD5D2), width: 1),
-        ),
-        padding: EdgeInsets.all(4),
-      );
-    }
-
-    return Container(
-      height: 40,
-      decoration: BoxDecoration(
-        border: Border.all(color: Color(0xFFCAD5D2), width: 1),
-      ),
-      padding: EdgeInsets.all(4),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final tabWidth = constraints.maxWidth / widget.tabs.length;
-
-          return Stack(
-            children: [
-              // Animated indicator
-              if (_isInitialized)
-                AnimatedPositioned(
-                  duration: widget.animationDuration,
-                  curve: Curves.easeInOut,
-                  left: tabWidth * _activeTabIndex,
-                  top: 0,
-                  bottom: 0,
-                  width: tabWidth,
-                  child: Container(color: Color(0xFFF05022)),
-                ),
-              // Tab buttons
-              Row(children: _buildTabButtons()),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  List<Widget> _buildTabButtons() {
-    List<Widget> tabButtons = [];
-    final int tabCount = widget.tabs.length;
-
-    for (int i = 0; i < tabCount; i++) {
-      // Add tab button
-      tabButtons.add(
-        Expanded(
-          child: GestureDetector(
-            onTap: () => _handleTabTap(i),
-            child: Container(
-              // Make the container transparent since we're using a sliding indicator
-              color: Colors.transparent,
-              child: Center(
-                child: Text(
-                  widget.tabs[i],
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color:
-                        i == _activeTabIndex ? Colors.white : Color(0xFF8B9199),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return tabButtons;
-  }
-}
-
-/// MainHeading with back button for the bottom sheet
-class MainHeading extends StatelessWidget {
-  final String text;
-  final String iconPath;
-  final VoidCallback? onBackPressed;
-
-  const MainHeading({
-    super.key,
-    required this.text,
-    required this.iconPath,
-    this.onBackPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Title with icon on left
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                GestureDetector(
-                  onTap: onBackPressed,
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: SvgPicture.asset(
-                      iconPath,
-                      colorFilter: const ColorFilter.mode(
-                        Color(0xFF373C3A),
-                        BlendMode.srcIn,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  text,
-                  style: const TextStyle(
-                    color: Color(0xFF373C3A),
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Helvetica Now Display',
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Container(
-          height: 4,
-          width: double.infinity,
-          color: const Color(0xFFCAD5D2),
-        ),
+        // 120px spacing after notes to account for delete and save buttons
+        const SizedBox(height: 120),
       ],
     );
   }
@@ -1096,17 +900,23 @@ class DashedLinePainter extends CustomPainter {
   bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
 
-/// Helper method to show the NewClientSheet as a modal bottom sheet
-void showNewClientSheet(
+/// Helper method to show the EditClientSheet as a modal bottom sheet
+void showEditClientSheet(
   BuildContext context, {
-  Function(Client)? onClientAdded,
+  required Client client,
+  Function(Client)? onClientUpdated,
+  Function()? onClientDeleted,
 }) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (BuildContext context) {
-      return NewClientSheet(onClientAdded: onClientAdded);
+      return EditClientSheet(
+        client: client,
+        onClientUpdated: onClientUpdated,
+        onClientDeleted: onClientDeleted,
+      );
     },
   );
 }

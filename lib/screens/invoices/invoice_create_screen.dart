@@ -97,7 +97,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
         setState(() {
           // Set custom notes if available
           final savedNotes = _invoiceSettingsService.customNotes;
-          _notesController.text = savedNotes ?? '';
+          _notesController.text = savedNotes;
 
           // Set invoice ID based on settings
           if (_invoiceSettingsService.isAutoGenerate) {
@@ -423,10 +423,13 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                       // Invoice ID field (pre-filled, disabled)
                       GenericInputField(
                         label: 'INVOICE ID',
-                        hintText: 'Auto-generated',
+                        hintText:
+                            _invoiceSettingsService.isAutoGenerate
+                                ? 'Auto-generated'
+                                : 'Enter invoice ID',
                         controller: _invoiceIdController,
-                        // Make it read-only
-                        readOnly: true,
+                        // Make it read-only only if auto-generate is enabled
+                        readOnly: _invoiceSettingsService.isAutoGenerate,
                       ),
 
                       // Issue Date field using DateInput widget

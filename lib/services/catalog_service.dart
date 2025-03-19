@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:invoicegenerator/models/catalog_item.dart';
+import 'package:invoicegenerator/services/invoice_service.dart';
 
 class CatalogService with ChangeNotifier {
   // Singleton instance
@@ -136,7 +137,65 @@ class CatalogService with ChangeNotifier {
     if (index != -1) {
       _catalogItems[index] = updatedItem;
       await _saveItems();
+
+      // Update this catalog item in all invoices
+      await _updateCatalogItemInInvoices(updatedItem);
+
       notifyListeners();
+    }
+  }
+
+  // Update a catalog item without triggering invoice updates (to prevent circular dependencies)
+  Future<void> updateItemSilently(CatalogItem updatedItem) async {
+    final index = _catalogItems.indexWhere(
+      (item) => item.title == updatedItem.title,
+    );
+    if (index != -1) {
+      _catalogItems[index] = updatedItem;
+      await _saveItems();
+      notifyListeners();
+    }
+  }
+
+  // Update catalog item in all invoices
+  Future<void> _updateCatalogItemInInvoices(CatalogItem updatedItem) async {
+    // Get the invoice service
+    final invoiceService = InvoiceService();
+    await invoiceService.init();
+
+    // Get all invoices
+    final invoices = invoiceService.getAllInvoices();
+    bool anyUpdated = false;
+
+    // Loop through all invoices
+    for (int i = 0; i < invoices.length; i++) {
+      final invoice = invoices[i];
+      bool invoiceUpdated = false;
+
+      // Create a new list of items
+      final updatedItems =
+          invoice.items.map((item) {
+            // If this item matches the updated catalog item (by title)
+            if (item.title == updatedItem.title) {
+              invoiceUpdated = true;
+              // Return the updated catalog item with the same quantity from the invoice
+              return updatedItem.copyWith(quantity: item.quantity);
+            }
+            return item;
+          }).toList();
+
+      // If invoice was updated, update it in the service
+      if (invoiceUpdated) {
+        // Create updated invoice with new items
+        final updatedInvoice = invoice.copyWith(items: updatedItems);
+        await invoiceService.updateInvoice(updatedInvoice);
+        anyUpdated = true;
+      }
+    }
+
+    // Notify listeners if any invoices were updated
+    if (anyUpdated) {
+      invoiceService.notifyListeners();
     }
   }
 
@@ -144,6 +203,12 @@ class CatalogService with ChangeNotifier {
   Future<void> deleteItem(String title) async {
     _catalogItems.removeWhere((item) => item.title == title);
     await _saveItems();
+
+    // Handle deletion in invoices
+    final invoiceService = InvoiceService();
+    await invoiceService.init();
+    await invoiceService.handleDeletedCatalogItem(title);
+
     notifyListeners();
   }
 

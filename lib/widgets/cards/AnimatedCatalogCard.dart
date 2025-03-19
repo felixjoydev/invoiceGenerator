@@ -5,12 +5,14 @@ class AnimatedCatalogCard extends StatefulWidget {
   final CatalogItem item;
   final VoidCallback onAnimationComplete;
   final VoidCallback? onLongPress;
+  final VoidCallback? onTap;
 
   const AnimatedCatalogCard({
     super.key,
     required this.item,
     required this.onAnimationComplete,
     this.onLongPress,
+    this.onTap,
   });
 
   @override
@@ -74,10 +76,12 @@ class _AnimatedCatalogCardState extends State<AnimatedCatalogCard>
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () {
-              // Dismiss keyboard when tapping on the card
-              FocusScope.of(context).unfocus();
-            },
+            onTap:
+                widget.onTap ??
+                () {
+                  // Dismiss keyboard when tapping on the card
+                  FocusScope.of(context).unfocus();
+                },
             onLongPress: widget.onLongPress,
             splashColor: Colors.transparent,
             highlightColor: Colors.transparent,

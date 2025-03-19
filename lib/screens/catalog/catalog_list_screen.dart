@@ -11,14 +11,13 @@ import 'package:invoicegenerator/screens/home/home_screen.dart';
 import 'package:invoicegenerator/screens/clients/client_list_screen.dart';
 import 'package:invoicegenerator/utils/route_transitions.dart';
 import 'package:invoicegenerator/screens/catalog/add_catalog_screen.dart';
-import 'package:invoicegenerator/screens/catalog/edit_catalog_screen.dart';
 import 'package:invoicegenerator/services/catalog_service.dart';
 import 'package:invoicegenerator/models/catalog_item.dart';
 import 'package:invoicegenerator/widgets/display/BlurredBackground.dart';
 import 'package:invoicegenerator/widgets/cards/HighlightedCatalogCard.dart';
 import 'package:invoicegenerator/widgets/display/PressWidget.dart';
 import 'package:invoicegenerator/bottom_sheets/catalog/catalog_sort.dart';
-import 'package:invoicegenerator/bottom_sheets/invoices/new_item.dart';
+import 'package:invoicegenerator/bottom_sheets/catalog/edit_catalog.dart';
 
 class CatalogListScreen extends StatefulWidget {
   const CatalogListScreen({super.key});
@@ -260,18 +259,60 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
   void _handleEditTapped() {
     if (_selectedItem == null) return;
 
-    Navigator.of(context)
-        .push(
-          MaterialPageRoute(
-            builder: (context) => EditCatalogScreen(item: _selectedItem!),
-          ),
-        )
-        .then((_) {
-          // Dismiss the selection and refresh the screen
-          setState(() {
-            _selectedItem = null;
-          });
+    // Store a reference to the selected item
+    final itemToEdit = _selectedItem;
+
+    // Store the original title for comparison
+    final originalTitle = itemToEdit!.title;
+
+    // Clear the selection
+    setState(() {
+      _selectedItem = null;
+    });
+
+    // Show the edit catalog bottom sheet
+    showEditCatalogSheet(
+      context,
+      item: itemToEdit,
+      onSave: (updatedItem) {
+        // Debug print to verify data flow
+        debugPrint(
+          'Updating catalog item from edit button: ${updatedItem.title} - ${updatedItem.amount}',
+        );
+
+        // Check if the title was changed
+        if (originalTitle != updatedItem.title) {
+          debugPrint(
+            'Title changed from $originalTitle to ${updatedItem.title}',
+          );
+          // If title changed, we need to delete the old one and add the new one
+          _catalogService.deleteItem(originalTitle);
+          _catalogService.addItem(updatedItem);
+        } else {
+          // Title unchanged, just update normally
+          _catalogService.updateItem(updatedItem);
+        }
+
+        // Refresh the display
+        setState(() {
+          debugPrint('State updated after edit button item change');
         });
+      },
+      onDelete: () {
+        // Debug print to verify data flow
+        debugPrint(
+          'Deleting catalog item from edit button: ${itemToEdit.title}',
+        );
+
+        // Delete the item from the catalog service
+        _catalogService.deleteItem(itemToEdit.title);
+
+        // Refresh the display
+        setState(() {
+          debugPrint('State updated after edit button item deletion');
+        });
+      },
+    );
   }
 
   // Handle when delete is tapped
@@ -650,6 +691,7 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
                 item: item,
                 onAnimationComplete: () => _handleAnimationComplete(item.title),
                 onLongPress: () => _handleLongPress(item, itemKey),
+                onTap: () => _handleCardTap(item),
               ),
             );
           }
@@ -662,6 +704,7 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
               currency: item.currency,
               amount: item.amount,
               onLongPress: () => _handleLongPress(item, itemKey),
+              onTap: () => _handleCardTap(item),
             ),
           );
         }
@@ -676,6 +719,54 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
           );
         }
       })..add(const SizedBox(height: 16)), // Add bottom spacing
+    );
+  }
+
+  // Handle when a catalog card is tapped
+  void _handleCardTap(CatalogItem item) {
+    // Store the original title for comparison
+    final originalTitle = item.title;
+
+    // Show the edit catalog bottom sheet directly
+    showEditCatalogSheet(
+      context,
+      item: item,
+      onSave: (updatedItem) {
+        // Debug print to verify data flow
+        debugPrint(
+          'Updating catalog item: ${updatedItem.title} - ${updatedItem.amount}',
+        );
+
+        // Check if the title was changed
+        if (originalTitle != updatedItem.title) {
+          debugPrint(
+            'Title changed from $originalTitle to ${updatedItem.title}',
+          );
+          // If title changed, we need to delete the old one and add the new one
+          _catalogService.deleteItem(originalTitle);
+          _catalogService.addItem(updatedItem);
+        } else {
+          // Title unchanged, just update normally
+          _catalogService.updateItem(updatedItem);
+        }
+
+        // Refresh the display
+        setState(() {
+          debugPrint('State updated after item change');
+        });
+      },
+      onDelete: () {
+        // Debug print to verify data flow
+        debugPrint('Deleting catalog item: ${item.title}');
+
+        // Delete the item from the catalog service
+        _catalogService.deleteItem(item.title);
+
+        // Refresh the display
+        setState(() {
+          debugPrint('State updated after item deletion');
+        });
+      },
     );
   }
 }

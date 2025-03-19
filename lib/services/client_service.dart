@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:invoicegenerator/models/client.dart';
+import 'package:invoicegenerator/services/invoice_service.dart';
 
 class ClientService with ChangeNotifier {
   // Singleton pattern
@@ -105,6 +106,25 @@ class ClientService with ChangeNotifier {
 
   // Update an existing client
   Future<void> updateClient(String clientId, Client updatedClient) async {
+    final index = _clients.indexWhere((client) => client.clientId == clientId);
+    if (index != -1) {
+      _clients[index] = updatedClient;
+      await _saveClients();
+
+      // Update this client in all invoices
+      final invoiceService = InvoiceService();
+      await invoiceService.init();
+      await invoiceService.updateClientInInvoices(clientId, updatedClient);
+
+      notifyListeners();
+    }
+  }
+
+  // Update a client without triggering invoice updates (to prevent circular dependencies)
+  Future<void> updateClientSilently(
+    String clientId,
+    Client updatedClient,
+  ) async {
     final index = _clients.indexWhere((client) => client.clientId == clientId);
     if (index != -1) {
       _clients[index] = updatedClient;

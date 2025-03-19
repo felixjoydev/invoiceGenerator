@@ -48,70 +48,129 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
   void initState() {
     super.initState();
     _loadInvoices();
+    // Add listener to refresh when invoices change
+    _invoiceService.addListener(_handleInvoiceUpdates);
+  }
+
+  // Handle invoice service updates
+  void _handleInvoiceUpdates() {
+    if (mounted) {
+      setState(() {
+        // Just trigger a rebuild - invoices are obtained from service
+      });
+    }
   }
 
   // Load invoices from the service
   Future<void> _loadInvoices() async {
-    setState(() {
-      _isLoading = true;
-    });
+    // Set loading state but don't block UI
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
-    // Initialize services
-    await _invoiceService.init();
-    await _companyService.init();
+    try {
+      // Try to load data with error handling
+      try {
+        // Initialize invoice service with timeout
+        await _invoiceService.init().timeout(
+          const Duration(seconds: 1),
+          onTimeout: () {
+            debugPrint('Invoice service init timed out, continuing anyway');
+          },
+        );
+      } catch (e) {
+        debugPrint('Error initializing invoice service: $e');
+        // Continue anyway - service might have partial data
+      }
 
-    setState(() {
-      _isLoading = false;
-    });
+      // Initialize company service separately with error handling
+      try {
+        await _companyService.init().timeout(
+          const Duration(seconds: 1),
+          onTimeout: () {
+            debugPrint('Company service init timed out, continuing anyway');
+          },
+        );
+      } catch (e) {
+        debugPrint('Error initializing company service: $e');
+        // Continue anyway - service might have partial data
+      }
+    } catch (e) {
+      debugPrint('Unexpected error in invoice loading: $e');
+    } finally {
+      // Always set loading to false, even if services have errors
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   // Filtered lists based on search query
   List<Invoice> get _filteredOverdueInvoices {
-    final overdueInvoices = _invoiceService.getInvoicesByStatus(
-      InvoiceStatus.overdue,
-    );
+    try {
+      final overdueInvoices = _invoiceService.getInvoicesByStatus(
+        InvoiceStatus.overdue,
+      );
 
-    if (_searchQuery.isEmpty) {
-      return overdueInvoices;
+      if (_searchQuery.isEmpty) {
+        return overdueInvoices;
+      }
+
+      final query = _searchQuery.toLowerCase();
+      return overdueInvoices.where((invoice) {
+        return invoice.client.name.toLowerCase().contains(query) ||
+            invoice.invoiceId.toLowerCase().contains(query);
+      }).toList();
+    } catch (e) {
+      debugPrint('Error loading overdue invoices: $e');
+      return [];
     }
-
-    final query = _searchQuery.toLowerCase();
-    return overdueInvoices.where((invoice) {
-      return invoice.client.name.toLowerCase().contains(query) ||
-          invoice.invoiceId.toLowerCase().contains(query);
-    }).toList();
   }
 
   List<Invoice> get _filteredOutstandingInvoices {
-    final outstandingInvoices = _invoiceService.getInvoicesByStatus(
-      InvoiceStatus.outstanding,
-    );
+    try {
+      final outstandingInvoices = _invoiceService.getInvoicesByStatus(
+        InvoiceStatus.outstanding,
+      );
 
-    if (_searchQuery.isEmpty) {
-      return outstandingInvoices;
+      if (_searchQuery.isEmpty) {
+        return outstandingInvoices;
+      }
+
+      final query = _searchQuery.toLowerCase();
+      return outstandingInvoices.where((invoice) {
+        return invoice.client.name.toLowerCase().contains(query) ||
+            invoice.invoiceId.toLowerCase().contains(query);
+      }).toList();
+    } catch (e) {
+      debugPrint('Error loading outstanding invoices: $e');
+      return [];
     }
-
-    final query = _searchQuery.toLowerCase();
-    return outstandingInvoices.where((invoice) {
-      return invoice.client.name.toLowerCase().contains(query) ||
-          invoice.invoiceId.toLowerCase().contains(query);
-    }).toList();
   }
 
   List<Invoice> get _filteredPaidInvoices {
-    final paidInvoices = _invoiceService.getInvoicesByStatus(
-      InvoiceStatus.paid,
-    );
+    try {
+      final paidInvoices = _invoiceService.getInvoicesByStatus(
+        InvoiceStatus.paid,
+      );
 
-    if (_searchQuery.isEmpty) {
-      return paidInvoices;
+      if (_searchQuery.isEmpty) {
+        return paidInvoices;
+      }
+
+      final query = _searchQuery.toLowerCase();
+      return paidInvoices.where((invoice) {
+        return invoice.client.name.toLowerCase().contains(query) ||
+            invoice.invoiceId.toLowerCase().contains(query);
+      }).toList();
+    } catch (e) {
+      debugPrint('Error loading paid invoices: $e');
+      return [];
     }
-
-    final query = _searchQuery.toLowerCase();
-    return paidInvoices.where((invoice) {
-      return invoice.client.name.toLowerCase().contains(query) ||
-          invoice.invoiceId.toLowerCase().contains(query);
-    }).toList();
   }
 
   // Handle bottom navigation item selection
@@ -175,6 +234,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    // Remove listener when widget is disposed
+    _invoiceService.removeListener(_handleInvoiceUpdates);
     super.dispose();
   }
 
@@ -295,7 +356,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child:
                       _isLoading
-                          ? const Center(child: CircularProgressIndicator())
+                          ? _buildLoadingContent()
                           : SingleChildScrollView(
                             child:
                                 _selectedTabIndex == 0
@@ -317,6 +378,51 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  // Build loading content that doesn't block the UI
+  Widget _buildLoadingContent() {
+    return Stack(
+      children: [
+        // Show empty state content when loading
+        SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: const [
+              Padding(
+                padding: EdgeInsets.only(top: 100.0),
+                child: Text(
+                  'Loading invoices...',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFF8D9694),
+                    fontFamily: 'Helvetica Now Display',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Show a non-blocking loading indicator
+        Positioned(
+          top: 50,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF13AF5B)),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -359,8 +465,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
               companyName: invoice.client.name,
               date: dateFormat.format(invoice.dueDate),
               invoiceNumber: invoice.invoiceId,
-              amount:
-                  '${_getCurrencySymbol()}${invoice.total.toStringAsFixed(2)}',
+              amount: '${invoice.total.toStringAsFixed(2)}',
               daysText: daysText,
               daysColor: const Color(0xFFD61443),
             ),
@@ -419,8 +524,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
               companyName: invoice.client.name,
               date: dateFormat.format(invoice.dueDate),
               invoiceNumber: invoice.invoiceId,
-              amount:
-                  '${_getCurrencySymbol()}${invoice.total.toStringAsFixed(2)}',
+              amount: '${invoice.total.toStringAsFixed(2)}',
               daysText: daysText,
               daysColor: const Color(0xFFD68814),
             ),
@@ -474,8 +578,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
               companyName: invoice.client.name,
               date: dateFormat.format(invoice.issueDate),
               invoiceNumber: invoice.invoiceId,
-              amount:
-                  '${_getCurrencySymbol()}${invoice.total.toStringAsFixed(2)}',
+              amount: '${invoice.total.toStringAsFixed(2)}',
               daysText: 'PAID',
               daysColor: const Color(0xFF13AF5B),
             ),
@@ -493,10 +596,5 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         }
       })..add(const SizedBox(height: 16)), // Add bottom spacing
     );
-  }
-
-  // Helper to get currency symbol
-  String _getCurrencySymbol() {
-    return _companyService.companyInfo?.currency ?? 'USD';
   }
 }

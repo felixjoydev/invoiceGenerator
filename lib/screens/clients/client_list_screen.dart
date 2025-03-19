@@ -18,8 +18,7 @@ import 'package:invoicegenerator/widgets/display/BlurredBackground.dart';
 import 'package:invoicegenerator/widgets/cards/HighlightedClientCard.dart';
 import 'package:invoicegenerator/widgets/display/PressWidget.dart';
 import 'package:invoicegenerator/bottom_sheets/clients/client_sort.dart';
-import 'package:invoicegenerator/bottom_sheets/invoices/new_client.dart'
-    as new_client_sheet;
+import 'package:invoicegenerator/bottom_sheets/clients/edit_client.dart';
 
 class ClientListScreen extends StatefulWidget {
   const ClientListScreen({super.key});
@@ -395,18 +394,33 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
   void _handleEditTapped() {
     if (_selectedClient == null) return;
 
-    // TODO: Create EditClientScreen and navigate to it
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Edit client functionality will be implemented soon'),
-        duration: Duration(seconds: 2),
-      ),
-    );
+    // Store a reference to the selected client before clearing the selection
+    final clientToEdit = _selectedClient;
 
     // Dismiss the selection
     setState(() {
       _selectedClient = null;
     });
+
+    // Show the edit client bottom sheet
+    showEditClientSheet(
+      context,
+      client: clientToEdit!,
+      onClientUpdated: (updatedClient) {
+        // The client service should already have updated the client
+        // Refresh the display
+        setState(() {
+          _clients = _clientService.clients;
+        });
+      },
+      onClientDeleted: () {
+        // The client service should already have deleted the client
+        // Refresh the display
+        setState(() {
+          _clients = _clientService.clients;
+        });
+      },
+    );
   }
 
   // Handle when delete is tapped
@@ -782,6 +796,7 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
                 onAnimationComplete:
                     () => _handleAnimationComplete(client.clientId),
                 onLongPress: () => _handleLongPress(client, itemKey),
+                onTap: () => _handleCardTap(client),
               ),
             );
           }
@@ -800,6 +815,7 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
               hasDue: client.hasDue,
               dueAmount: client.dueAmount,
               onLongPress: () => _handleLongPress(client, itemKey),
+              onTap: () => _handleCardTap(client),
             ),
           );
         }
@@ -814,6 +830,29 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
           );
         }
       })..add(const SizedBox(height: 16)), // Add bottom spacing
+    );
+  }
+
+  // Handle when a client card is tapped (regular tap)
+  void _handleCardTap(Client client) {
+    // Show the edit client bottom sheet directly
+    showEditClientSheet(
+      context,
+      client: client,
+      onClientUpdated: (updatedClient) {
+        // The client service should already have updated the client
+        // Refresh the display
+        setState(() {
+          _clients = _clientService.clients;
+        });
+      },
+      onClientDeleted: () {
+        // The client service should already have deleted the client
+        // Refresh the display
+        setState(() {
+          _clients = _clientService.clients;
+        });
+      },
     );
   }
 }

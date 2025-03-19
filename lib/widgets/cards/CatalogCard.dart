@@ -6,6 +6,7 @@ class CatalogCard extends StatelessWidget {
   final String currency;
   final String amount;
   final VoidCallback? onLongPress;
+  final VoidCallback? onTap;
 
   const CatalogCard({
     super.key,
@@ -14,6 +15,7 @@ class CatalogCard extends StatelessWidget {
     required this.currency,
     required this.amount,
     this.onLongPress,
+    this.onTap,
   });
 
   @override
@@ -21,10 +23,12 @@ class CatalogCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          // Dismiss keyboard when tapping on the card
-          FocusScope.of(context).unfocus();
-        },
+        onTap:
+            onTap ??
+            () {
+              // Dismiss keyboard when tapping on the card
+              FocusScope.of(context).unfocus();
+            },
         onLongPress: onLongPress,
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
