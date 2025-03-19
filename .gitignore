@@ -5,11 +5,9 @@
 *.swp
 .DS_Store
 .atom/
-.build/
 .buildlog/
 .history
 .svn/
-.swiftpm/
 migrate_working_dir/
 
 # IntelliJ related
@@ -27,11 +25,14 @@ migrate_working_dir/
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
+.dart_tool/**/*
 .flutter-plugins
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
 /build/
+build/**/*
 
 # Symbolication related
 app.*.symbols
@@ -43,3 +44,20 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Flutter build directories
+Flutter/
+ios/Flutter/Debug/
+ios/Flutter/Release/
+ios/Flutter/**/*
+
+# iOS build related
+ios/build/
+ios/**/*.framework/
+ios/**/*.xcframework/
+
+# Large files
+**/*.dill
+**/*.dill.track.dill
+**/*snapshot_data
+**/*kernel_blob.bin
