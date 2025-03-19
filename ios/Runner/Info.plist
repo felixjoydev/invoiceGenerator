@@ -45,5 +45,21 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to photo library to select logo images</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to camera to capture logo images</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app does not require access to the microphone</string>
+	<key>UISupportsDocumentBrowser</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>NSDocumentDirectory</key>
+	<true/>
+	<key>NSFileProviderDomainUsageDescription</key>
+	<string>This app needs access to files to allow you to select logo images from the Files app</string>
 </dict>
 </plist>

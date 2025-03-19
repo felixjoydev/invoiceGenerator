@@ -19,6 +19,7 @@ import 'package:invoicegenerator/models/invoice.dart';
 import 'package:invoicegenerator/services/company_service.dart';
 import 'package:invoicegenerator/widgets/invoice/invoice_preview.dart';
 import 'package:intl/intl.dart';
+import 'dart:io';
 
 class InvoiceListScreen extends StatefulWidget {
   const InvoiceListScreen({super.key});
@@ -215,11 +216,27 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     // Navigate to the invoice preview
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder:
-            (context) => InvoicePreview(
-              invoice: invoice,
-              companyInfo: _companyService.companyInfo!,
-            ),
+        builder: (context) {
+          final companyInfo = _companyService.companyInfo!;
+          final logoPath = companyInfo.logoPath;
+
+          debugPrint(
+            'InvoiceListScreen - Opening preview with logo path: $logoPath',
+          );
+          if (logoPath != null) {
+            final logoFile = File(logoPath);
+            final exists = logoFile.existsSync();
+            debugPrint(
+              'InvoiceListScreen - Logo file exists: $exists (path: $logoPath)',
+            );
+          }
+
+          return InvoicePreview(
+            invoice: invoice,
+            companyInfo: companyInfo,
+            logoPath: logoPath,
+          );
+        },
       ),
     );
   }

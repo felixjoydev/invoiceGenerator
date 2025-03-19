@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
 import 'package:invoicegenerator/widgets/display/SmallHeading.dart';
 import 'package:invoicegenerator/bottom_sheets/invoices/new_item.dart';
 import 'package:invoicegenerator/widgets/inputs/text_input.dart';
 import 'package:invoicegenerator/widgets/inputs/dropdown_input.dart';
-import 'package:invoicegenerator/widgets/inputs/toggle.dart';
 import 'package:invoicegenerator/widgets/inputs/index.dart';
 import 'package:invoicegenerator/models/company_info.dart';
 import 'package:invoicegenerator/services/company_service.dart';
 import 'package:invoicegenerator/screens/settings/settings_screen.dart';
+import 'dart:io';
 
 class BusinessDetailsSheet extends StatefulWidget {
   const BusinessDetailsSheet({super.key});
@@ -86,7 +84,8 @@ class _BusinessDetailsSheetState extends State<BusinessDetailsSheet> {
 
   // Initialize company service and load company data
   Future<void> _initCompanyService() async {
-    await _companyService.init();
+    debugPrint('Initializing company service in BusinessDetailsSheet');
+    await _companyService.refresh();
     _loadCompanyData();
   }
 
@@ -94,6 +93,19 @@ class _BusinessDetailsSheetState extends State<BusinessDetailsSheet> {
   void _loadCompanyData() {
     final companyInfo = _companyService.companyInfo;
     if (companyInfo != null) {
+      debugPrint(
+        'Loading company info with logo path: ${companyInfo.logoPath}',
+      );
+
+      // Check if the logo file exists
+      if (companyInfo.logoPath != null) {
+        final logoFile = File(companyInfo.logoPath!);
+        final exists = logoFile.existsSync();
+        debugPrint(
+          'Loaded logo file exists: $exists (${companyInfo.logoPath})',
+        );
+      }
+
       setState(() {
         // Basic Details
         _businessNameController.text = companyInfo.businessName;
@@ -129,6 +141,8 @@ class _BusinessDetailsSheetState extends State<BusinessDetailsSheet> {
 
       // Add listeners after populating fields to avoid triggering _markFormModified
       _addControllerListeners();
+    } else {
+      debugPrint('No company info found to load');
     }
   }
 
@@ -186,6 +200,7 @@ class _BusinessDetailsSheetState extends State<BusinessDetailsSheet> {
 
   // Handle back button press
   void _handleBackPressed() {
+    debugPrint('Handling back button press in BusinessDetailsSheet');
     Navigator.pop(context);
 
     // Show the settings bottom sheet again
@@ -200,33 +215,39 @@ class _BusinessDetailsSheetState extends State<BusinessDetailsSheet> {
   }
 
   // Handle currency selection
-  void _handleCurrencySelected(String currency) {
-    setState(() {
-      _selectedCurrency = currency;
-      _markFormModified();
-    });
-  }
 
   // Handle country selection
-  void _handleCountrySelected(String country) {
-    setState(() {
-      _selectedCountry = country;
-      _markFormModified();
-    });
-  }
 
   // Handle tax toggle
-  void _handleTaxToggle(bool value) {
-    setState(() {
-      _isTaxEnabled = value;
-      _markFormModified();
-    });
-  }
 
   // Handle logo selection
   void _handleLogoSelected(String path) {
+    debugPrint('Logo selected: $path');
+
+    // Check if the file exists
+    final logoFile = File(path);
+    if (!logoFile.existsSync()) {
+      debugPrint('Logo file does not exist: $path');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error: Image file not found'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _logoPath = path;
+      _markFormModified();
+    });
+  }
+
+  // Handle logo removal
+  void _handleLogoRemoved() {
+    debugPrint('Logo removed');
+    setState(() {
+      _logoPath = null;
       _markFormModified();
     });
   }
@@ -441,8 +462,23 @@ class _BusinessDetailsSheetState extends State<BusinessDetailsSheet> {
       ifscCode: _companyService.companyInfo?.ifscCode,
     );
 
+    debugPrint('Saving company info with logo path: ${companyInfo.logoPath}');
+
     // Save to service
     await _companyService.saveCompanyInfo(companyInfo);
+
+    // Verify that the company info was saved properly
+    await _companyService.refresh();
+    final savedInfo = _companyService.companyInfo;
+    debugPrint(
+      'Verified saved company info with logo path: ${savedInfo?.logoPath}',
+    );
+
+    if (savedInfo?.logoPath != null) {
+      final logoFile = File(savedInfo!.logoPath!);
+      final exists = logoFile.existsSync();
+      debugPrint('Verified saved logo file exists: $exists');
+    }
 
     // Show success message
     if (mounted) {
@@ -563,8 +599,17 @@ class _BusinessDetailsSheetState extends State<BusinessDetailsSheet> {
                                         const SizedBox(height: 24),
 
                                         // Upload Logo Section
-                                        UploadLogoSection(
-                                          onLogoSelected: _handleLogoSelected,
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            UploadLogoSection(
+                                              onLogoSelected:
+                                                  _handleLogoSelected,
+                                              initialLogoPath: _logoPath,
+                                              onLogoRemoved: _handleLogoRemoved,
+                                            ),
+                                          ],
                                         ),
 
                                         // Business Name Input
@@ -829,6 +874,8 @@ class _BusinessDetailsSheetState extends State<BusinessDetailsSheet> {
 
 // Helper method to show the BusinessDetailsSheet as a modal bottom sheet
 void showBusinessDetailsSheet(BuildContext context) {
+  debugPrint('Showing BusinessDetailsSheet');
+
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,

@@ -5,11 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
+  // Ensure Flutter is initialized first
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Supabase client - replace with your own URLs and keys
   await Supabase.initialize(url: 'SUPABASE_URL', anonKey: 'SUPABASE_ANON_KEY');
 
+  // Run the app
   runApp(const ProviderScope(child: InvoiceGeneratorApp()));
 }
 
@@ -22,7 +24,6 @@ class InvoiceGeneratorApp extends StatelessWidget {
       title: 'Invoice Generator',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme(),
-      // Show the CompanyBasicDetailsScreen
       home: const CompanyBasicDetailsScreen(),
     );
   }

@@ -11,6 +11,7 @@ import 'package:invoicegenerator/screens/home/first_time_home_screen.dart';
 import 'package:invoicegenerator/services/company_service.dart';
 import 'package:invoicegenerator/models/company_info.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
 
 class CompanyContactScreen extends StatefulWidget {
   const CompanyContactScreen({super.key});
@@ -118,6 +119,22 @@ class _CompanyContactScreenState extends State<CompanyContactScreen> {
       // Get basic company details
       final businessName = prefs.getString('temp_business_name') ?? '';
       final logoPath = prefs.getString('temp_logo_path');
+      debugPrint('Onboarding: Loading temp logo path: $logoPath');
+
+      // Verify the logo file exists
+      if (logoPath != null) {
+        final logoFile = File(logoPath);
+        final exists = await logoFile.exists();
+        debugPrint('Onboarding: Logo file exists: $exists ($logoPath)');
+
+        // If the file doesn't exist, we'll set it to null
+        if (!exists) {
+          debugPrint(
+            'Onboarding: Logo file does not exist, will be set to null',
+          );
+        }
+      }
+
       final currency = prefs.getString('temp_currency') ?? 'USD';
       final taxRateStr = prefs.getString('temp_tax_rate');
       final double? taxRate =
@@ -139,10 +156,11 @@ class _CompanyContactScreenState extends State<CompanyContactScreen> {
       final website =
           _websiteController.text.isEmpty ? null : _websiteController.text;
 
-      // Create the company info object
+      // Create company info object
       final companyInfo = CompanyInfo(
         businessName: businessName,
-        logoPath: logoPath,
+        logoPath:
+            logoPath != null && File(logoPath).existsSync() ? logoPath : null,
         currency: currency,
         taxRate: taxRate,
         enableTax: enableTax,
@@ -160,8 +178,28 @@ class _CompanyContactScreenState extends State<CompanyContactScreen> {
         ifscCode: null,
       );
 
+      debugPrint(
+        'Onboarding: Creating company info with logo path: ${companyInfo.logoPath}',
+      );
+
       // Save company info
       await _companyService.saveCompanyInfo(companyInfo);
+
+      // Wait a bit to ensure the logo file is properly backed up
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Verify the company info was saved properly
+      await _companyService.refresh();
+      final savedInfo = _companyService.companyInfo;
+      debugPrint(
+        'Verified saved company info with logo path: ${savedInfo?.logoPath}',
+      );
+
+      if (savedInfo?.logoPath != null) {
+        final logoFile = File(savedInfo!.logoPath!);
+        final exists = await logoFile.exists();
+        debugPrint('Verified saved logo file exists: $exists');
+      }
 
       // Clean up temporary data
       await prefs.remove('temp_business_name');

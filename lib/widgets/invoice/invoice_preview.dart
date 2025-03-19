@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
-import 'package:pdf/pdf.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/models/invoice.dart';
 import 'package:invoicegenerator/models/company_info.dart';
@@ -8,20 +7,32 @@ import 'package:invoicegenerator/services/pdf_service.dart';
 import 'package:invoicegenerator/screens/invoices/invoice_list_screen.dart';
 import 'package:invoicegenerator/screens/invoices/invoice_create_screen.dart';
 import 'package:intl/intl.dart';
-import 'dart:typed_data';
+import 'dart:io';
 
 class InvoicePreview extends StatelessWidget {
   final Invoice invoice;
   final CompanyInfo companyInfo;
+  final String? logoPath;
 
   const InvoicePreview({
     super.key,
     required this.invoice,
     required this.companyInfo,
+    this.logoPath,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Add debugging for logo path
+    debugPrint('InvoicePreview - Logo path: $logoPath');
+    if (logoPath != null) {
+      final logoFile = File(logoPath!);
+      final exists = logoFile.existsSync();
+      debugPrint(
+        'InvoicePreview - Logo file exists: $exists (path: $logoPath)',
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFDAE4E1),
       body: Column(
@@ -70,6 +81,7 @@ class InvoicePreview extends StatelessWidget {
                                       (format) => PdfService.previewPdf(
                                         invoice,
                                         companyInfo,
+                                        logoPath: logoPath,
                                       ),
                                   allowPrinting: false,
                                   allowSharing: false,
@@ -115,6 +127,7 @@ class InvoicePreview extends StatelessWidget {
                         final path = await PdfService.savePdf(
                           invoice,
                           companyInfo,
+                          logoPath: logoPath,
                         );
                         if (path != null) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -129,7 +142,11 @@ class InvoicePreview extends StatelessWidget {
                         }
                       },
                       onSharePressed: () async {
-                        await PdfService.sharePdf(invoice, companyInfo);
+                        await PdfService.sharePdf(
+                          invoice,
+                          companyInfo,
+                          logoPath: logoPath,
+                        );
                       },
                     ),
                   ),

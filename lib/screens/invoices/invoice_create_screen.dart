@@ -26,6 +26,8 @@ import 'package:invoicegenerator/services/invoice_settings_service.dart';
 import 'package:invoicegenerator/widgets/invoice/invoice_preview.dart';
 import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
 import 'package:intl/intl.dart';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 class InvoiceCreateScreen extends StatefulWidget {
   const InvoiceCreateScreen({super.key});
@@ -987,13 +989,28 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
 
         // Navigate to the preview screen
         if (mounted) {
+          final logoPath = companyInfo.logoPath;
+
+          debugPrint(
+            'InvoiceCreateScreen - Opening preview with logo path: $logoPath',
+          );
+          if (logoPath != null) {
+            final logoFile = File(logoPath);
+            final exists = logoFile.existsSync();
+            debugPrint(
+              'InvoiceCreateScreen - Logo file exists: $exists (path: $logoPath)',
+            );
+          }
+
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder:
-                  (context) => InvoicePreview(
-                    invoice: invoice,
-                    companyInfo: companyInfo,
-                  ),
+              builder: (context) {
+                return InvoicePreview(
+                  invoice: invoice,
+                  companyInfo: companyInfo,
+                  logoPath: logoPath,
+                );
+              },
             ),
           );
         }

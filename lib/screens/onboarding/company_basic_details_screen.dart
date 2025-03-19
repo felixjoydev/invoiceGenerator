@@ -9,6 +9,7 @@ import 'package:invoicegenerator/widgets/utils/keyboard_dismiss_wrapper.dart';
 import 'package:invoicegenerator/screens/onboarding/company_address_screen.dart';
 import 'package:invoicegenerator/widgets/utils/slide_page_route.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
 
 class CompanyBasicDetailsScreen extends StatefulWidget {
   const CompanyBasicDetailsScreen({super.key});
@@ -26,10 +27,51 @@ class _CompanyBasicDetailsScreenState extends State<CompanyBasicDetailsScreen> {
   String? _logoPath;
 
   @override
+  void initState() {
+    super.initState();
+    _loadSavedData();
+  }
+
+  @override
   void dispose() {
     _businessNameController.dispose();
     _taxController.dispose();
     super.dispose();
+  }
+
+  // Load any saved data from shared preferences
+  Future<void> _loadSavedData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      final savedBusinessName = prefs.getString('temp_business_name');
+      final savedLogoPath = prefs.getString('temp_logo_path');
+      final savedCurrency = prefs.getString('temp_currency');
+      final savedTaxEnabled = prefs.getBool('temp_enable_tax');
+      final savedTaxRate = prefs.getString('temp_tax_rate');
+
+      if (mounted) {
+        setState(() {
+          if (savedBusinessName != null) {
+            _businessNameController.text = savedBusinessName;
+          }
+          if (savedLogoPath != null) {
+            _logoPath = savedLogoPath;
+          }
+          if (savedCurrency != null) {
+            _selectedCurrency = savedCurrency;
+          }
+          if (savedTaxEnabled != null) {
+            _isTaxEnabled = savedTaxEnabled;
+          }
+          if (savedTaxRate != null) {
+            _taxController.text = savedTaxRate;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading temporary company data: $e');
+    }
   }
 
   // Save data to shared preferences temporarily
@@ -39,7 +81,17 @@ class _CompanyBasicDetailsScreenState extends State<CompanyBasicDetailsScreen> {
 
       await prefs.setString('temp_business_name', _businessNameController.text);
       if (_logoPath != null) {
-        await prefs.setString('temp_logo_path', _logoPath!);
+        debugPrint('Saving temp logo path: $_logoPath');
+        // Verify the logo file exists
+        final logoFile = File(_logoPath!);
+        final exists = await logoFile.exists();
+        debugPrint('Logo file exists: $exists');
+
+        if (exists) {
+          await prefs.setString('temp_logo_path', _logoPath!);
+        } else {
+          debugPrint('Logo file does not exist, not saving');
+        }
       }
       await prefs.setString('temp_currency', _selectedCurrency);
       await prefs.setBool('temp_enable_tax', _isTaxEnabled);
@@ -105,7 +157,10 @@ class _CompanyBasicDetailsScreenState extends State<CompanyBasicDetailsScreen> {
                         const SizedBox(height: 24),
 
                         // Form Fields
-                        UploadLogoSection(onLogoSelected: _handleLogoSelected),
+                        UploadLogoSection(
+                          onLogoSelected: _handleLogoSelected,
+                          initialLogoPath: _logoPath,
+                        ),
 
                         const SizedBox(height: 0),
 

@@ -13,8 +13,9 @@ class PdfService {
   // Generate PDF document from invoice data
   static Future<pw.Document> generateInvoicePdf(
     Invoice invoice,
-    CompanyInfo companyInfo,
-  ) async {
+    CompanyInfo companyInfo, {
+    String? logoPath,
+  }) async {
     final pdf = pw.Document();
     final dateFormat = DateFormat('MM/dd/yyyy');
 
@@ -40,6 +41,122 @@ class PdfService {
     final PdfColor themeColorLight = PdfColor.fromHex('#E46512');
     final PdfColor dividerColor = PdfColor.fromHex('#F19F69');
     final PdfColor backgroundColor = PdfColor.fromHex('#E7E1CF');
+
+    // Load logo image if path is provided
+    pw.Widget? logoWidget;
+    if (logoPath != null) {
+      debugPrint('PDF Service - Logo path provided: $logoPath');
+      try {
+        final File logoFile = File(logoPath);
+        final bool fileExists = logoFile.existsSync();
+        debugPrint('PDF Service - Logo file exists: $fileExists');
+
+        if (fileExists) {
+          // Check if the file is an SVG
+          final bool isSvg = logoPath.toLowerCase().endsWith('.svg');
+          debugPrint('PDF Service - Is SVG file: $isSvg');
+
+          if (isSvg) {
+            // Create a colored box as a placeholder for SVG files
+            debugPrint('PDF Service - Creating placeholder for SVG logo');
+            logoWidget = pw.Container(
+              width: 120,
+              height: 75,
+              color: themeColor,
+              alignment: pw.Alignment.center,
+              child: pw.Text(
+                'LOGO',
+                style: pw.TextStyle(
+                  font: victorMonoFont,
+                  color: PdfColors.white,
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            );
+          } else {
+            // Regular bitmap image handling
+            try {
+              debugPrint('PDF Service - Reading logo file bytes');
+              final Uint8List logoBytes = logoFile.readAsBytesSync();
+              debugPrint(
+                'PDF Service - Logo bytes length: ${logoBytes.length}',
+              );
+
+              // For non-SVG files, try to create an image
+              final pw.Image logoImage = pw.Image(
+                pw.MemoryImage(logoBytes),
+                width: 120,
+                height: 75,
+                fit: pw.BoxFit.contain,
+              );
+              logoWidget = logoImage;
+              debugPrint('PDF Service - Logo widget created successfully');
+            } catch (e) {
+              debugPrint('PDF Service - Error creating image: $e');
+              // If image creation fails, create a placeholder
+              logoWidget = pw.Container(
+                width: 120,
+                height: 75,
+                color: themeColor,
+                alignment: pw.Alignment.center,
+                child: pw.Text(
+                  'LOGO',
+                  style: pw.TextStyle(
+                    font: victorMonoFont,
+                    color: PdfColors.white,
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              );
+            }
+          }
+        } else {
+          debugPrint(
+            'PDF Service - Logo file does not exist at path: $logoPath',
+          );
+
+          // Create a placeholder for missing logo
+          logoWidget = pw.Container(
+            width: 120,
+            height: 75,
+            color: themeColor,
+            alignment: pw.Alignment.center,
+            child: pw.Text(
+              'LOGO',
+              style: pw.TextStyle(
+                font: victorMonoFont,
+                color: PdfColors.white,
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('PDF Service - Error loading logo image for PDF: $e');
+
+        // Create a placeholder on error
+        logoWidget = pw.Container(
+          width: 120,
+          height: 75,
+          color: themeColor,
+          alignment: pw.Alignment.center,
+          child: pw.Text(
+            'LOGO',
+            style: pw.TextStyle(
+              font: victorMonoFont,
+              color: PdfColors.white,
+              fontSize: 16,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+        );
+      }
+    } else {
+      debugPrint('PDF Service - No logo path provided');
+    }
 
     // Add page
     pdf.addPage(
@@ -119,22 +236,13 @@ class PdfService {
                       pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.end,
                         children: [
-                          // Logo container
-                          pw.Container(
-                            width: 120,
-                            height: 75,
-                            color: themeColor,
-                            alignment: pw.Alignment.center,
-                            child: pw.Text(
-                              'LOGO HERE',
-                              style: pw.TextStyle(
-                                font: victorMonoFont,
-                                color: PdfColors.white,
-                                fontSize: 16,
-                                fontWeight: pw.FontWeight.bold,
-                              ),
+                          // Logo container - only show if we have a logo
+                          if (logoWidget != null)
+                            pw.Container(
+                              width: 120,
+                              height: 75,
+                              child: logoWidget,
                             ),
-                          ),
                           pw.SizedBox(height: 16),
                           // Company details
                           pw.Column(
@@ -383,7 +491,7 @@ class PdfService {
                                     text: pw.TextSpan(
                                       children: [
                                         pw.TextSpan(
-                                          text: '${companyInfo.currency}',
+                                          text: companyInfo.currency,
                                           style: pw.TextStyle(
                                             font: victorMonoFont,
                                             color: themeColor,
@@ -397,7 +505,15 @@ class PdfService {
                                         ),
                                         pw.TextSpan(
                                           text:
-                                              '${(item.amount is num ? (item.amount as num).toStringAsFixed(2) : (double.tryParse(item.amount.toString()) ?? 0.0).toStringAsFixed(2))}',
+                                              (item.amount is num
+                                                  ? (item.amount as num)
+                                                      .toStringAsFixed(2)
+                                                  : (double.tryParse(
+                                                            item.amount
+                                                                .toString(),
+                                                          ) ??
+                                                          0.0)
+                                                      .toStringAsFixed(2)),
                                           style: pw.TextStyle(
                                             font: ttfFont,
                                             color: themeColor,
@@ -420,7 +536,7 @@ class PdfService {
                               ),
                           ],
                         );
-                      }).toList(),
+                      }),
 
                       // Thick divider after items
                       pw.Container(height: 4, color: dividerColor),
@@ -714,9 +830,17 @@ class PdfService {
   }
 
   // Save the PDF to a file and share it
-  static Future<void> sharePdf(Invoice invoice, CompanyInfo companyInfo) async {
+  static Future<void> sharePdf(
+    Invoice invoice,
+    CompanyInfo companyInfo, {
+    String? logoPath,
+  }) async {
     // Generate the PDF
-    final pdf = await generateInvoicePdf(invoice, companyInfo);
+    final pdf = await generateInvoicePdf(
+      invoice,
+      companyInfo,
+      logoPath: logoPath,
+    );
 
     // Get temporary directory
     final output = await getTemporaryDirectory();
@@ -736,20 +860,30 @@ class PdfService {
   // Preview PDF (returns PDF data)
   static Future<Uint8List> previewPdf(
     Invoice invoice,
-    CompanyInfo companyInfo,
-  ) async {
-    final pdf = await generateInvoicePdf(invoice, companyInfo);
+    CompanyInfo companyInfo, {
+    String? logoPath,
+  }) async {
+    final pdf = await generateInvoicePdf(
+      invoice,
+      companyInfo,
+      logoPath: logoPath,
+    );
     return pdf.save();
   }
 
   // Save the PDF to device
   static Future<String?> savePdf(
     Invoice invoice,
-    CompanyInfo companyInfo,
-  ) async {
+    CompanyInfo companyInfo, {
+    String? logoPath,
+  }) async {
     try {
       // Generate the PDF
-      final pdf = await generateInvoicePdf(invoice, companyInfo);
+      final pdf = await generateInvoicePdf(
+        invoice,
+        companyInfo,
+        logoPath: logoPath,
+      );
 
       // Get directory for saving
       final dir = await getApplicationDocumentsDirectory();

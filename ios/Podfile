@@ -31,14 +31,29 @@ target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
+  # Explicit dependencies with version pinning
+  pod 'SwiftyGif', '5.4.4'
+  pod 'DKPhotoGallery', '0.0.19'  
+  pod 'DKImagePickerController', '4.3.9'
+  
+  # Use a pre-processor macro to disable printing if needed
+  pod 'printing', :path => '.symlinks/plugins/printing/ios', :inhibit_warnings => true do |printing_pod|
+    printing_pod.compiler_flags = '-DPRINT_LIB_VERSION=1.0.0'
+  end
+  
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 
 post_install do |installer|
-  # Add the Flutter framework search path
+  # Comprehensive framework search paths
   framework_search_paths = [
     '$(PODS_ROOT)/../../Flutter',
-    '$(PODS_CONFIGURATION_BUILD_DIR)'
+    '$(PODS_CONFIGURATION_BUILD_DIR)',
+    '$(PODS_ROOT)/../Flutter',
+    '$(SRCROOT)/../Flutter',
+    '$(BUILT_PRODUCTS_DIR)',
+    '$(SRCROOT)/Flutter',
+    './Flutter', # Direct path to Flutter framework
   ]
 
   installer.pods_project.targets.each do |target|
@@ -48,20 +63,79 @@ post_install do |installer|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
       
-      # Add framework search paths to all targets
-      config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= []
+      # Add comprehensive framework search paths to all targets
+      config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= ['$(inherited)']
       config.build_settings['FRAMEWORK_SEARCH_PATHS'].concat(framework_search_paths)
+      
+      # Ensure all modules can be found
+      config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
+      config.build_settings['DEFINES_MODULE'] = 'YES'
+      config.build_settings['SWIFT_VERSION'] = '5.0'
+      config.build_settings['ENABLE_BITCODE'] = 'NO'
+      
+      # Fix for all modules - ensure header visibility
+      config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
+      config.build_settings['HEADER_SEARCH_PATHS'] << '${PODS_ROOT}/Headers/Public'
+      config.build_settings['HEADER_SEARCH_PATHS'] << '${PODS_ROOT}/Headers/Public/Flutter'
+      config.build_settings['HEADER_SEARCH_PATHS'] << '$(SRCROOT)/Flutter'
+      
+      # Fix for Xcode 15
+      if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 12.0
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+      end
+      
+      # Special handling for printing module
+      if target.name == 'printing'
+        # Add all possible paths to find Flutter.framework
+        config.build_settings['OTHER_LDFLAGS'] ||= ['$(inherited)', '-framework', 'Flutter']
+        config.build_settings['FRAMEWORK_SEARCH_PATHS'] = ['$(inherited)'] + framework_search_paths
+        # Add the Flutter framework path directly
+        config.build_settings['LIBRARY_SEARCH_PATHS'] ||= ['$(inherited)']
+        config.build_settings['LIBRARY_SEARCH_PATHS'] << '$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)'
+        config.build_settings['LIBRARY_SEARCH_PATHS'] << '$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)'
+        # Add Swift compatibility
+        config.build_settings['SWIFT_VERSION'] = '5.0'
+        config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
+        # Disabled bitcode
+        config.build_settings['ENABLE_BITCODE'] = 'NO'
+      end
+      
+      # Specific fixes for SwiftyGif module
+      if target.name == 'SwiftyGif' || target.name == 'DKPhotoGallery'
+        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+      end
       
       # Fix for app_links module
       if target.name == 'app_links'
-        config.build_settings['SWIFT_VERSION'] = '5.0'
-        config.build_settings['ENABLE_BITCODE'] = 'NO'
         config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
-        config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
-        config.build_settings['DEFINES_MODULE'] = 'YES'
-        config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
-        config.build_settings['HEADER_SEARCH_PATHS'] << '${PODS_ROOT}/Headers/Public/Flutter'
       end
     end
   end
+  
+  # Global build settings for Swift module compatibility
+  installer.pods_project.build_configurations.each do |config|
+    config.build_settings['SWIFT_VERSION'] = '5.0'
+    config.build_settings['ENABLE_BITCODE'] = 'NO'
+    config.build_settings['DEFINES_MODULE'] = 'YES'
+    config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
+    config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+    config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
+  end
+  
+  # Fix Swift version in main project
+  app_project_path = Pathname.new(File.join(installer.sandbox.target_support_files_root.to_s, '../..'))
+  app_xcodeproj_path = Dir.entries(app_project_path).select { |entry| entry.end_with? '.xcodeproj' }.first
+  app_project = Xcodeproj::Project.open(File.join(app_project_path, app_xcodeproj_path))
+  
+  app_project.targets.each do |target|
+    target.build_configurations.each do |build_config|
+      build_config.build_settings['SWIFT_VERSION'] = '5.0'
+      build_config.build_settings['ENABLE_BITCODE'] = 'NO'
+      # Add same framework search paths to main project
+      build_config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= ['$(inherited)']
+      build_config.build_settings['FRAMEWORK_SEARCH_PATHS'].concat(framework_search_paths)
+    end
+  end
+  
+  app_project.save
 end
