@@ -9,12 +9,69 @@ import 'package:invoicegenerator/models/invoice.dart';
 import 'package:invoicegenerator/models/company_info.dart';
 import 'package:intl/intl.dart';
 
+// Template class to define PDF color schemes
+class PdfTemplate {
+  final String name;
+  final PdfColor themeColor;
+  final PdfColor themeColorLight;
+  final PdfColor dividerColor;
+  final PdfColor backgroundColor;
+
+  const PdfTemplate({
+    required this.name,
+    required this.themeColor,
+    required this.themeColorLight,
+    required this.dividerColor,
+    required this.backgroundColor,
+  });
+
+  // Predefined templates
+  static const PdfTemplate orange = PdfTemplate(
+    name: 'Orange',
+    themeColor: PdfColor.fromInt(0xCE5506),
+    themeColorLight: PdfColor.fromInt(0xE46512),
+    dividerColor: PdfColor.fromInt(0xF19F69),
+    backgroundColor: PdfColor.fromInt(0xE7E1CF),
+  );
+
+  static const PdfTemplate grey = PdfTemplate(
+    name: 'Grey',
+    themeColor: PdfColor.fromInt(0x373C3A),
+    themeColorLight: PdfColor.fromInt(0x768581),
+    dividerColor: PdfColor.fromInt(0xCAD5D2),
+    backgroundColor: PdfColor.fromInt(0xDAE4E1),
+  );
+
+  static const PdfTemplate blue = PdfTemplate(
+    name: 'Blue',
+    themeColor: PdfColor.fromInt(0x0C6AC9),
+    themeColorLight: PdfColor.fromInt(0x1981E9),
+    dividerColor: PdfColor.fromInt(0x4397EC),
+    backgroundColor: PdfColor.fromInt(0xCFDBE7),
+  );
+
+  static const PdfTemplate minimal = PdfTemplate(
+    name: 'Minimal',
+    themeColor: PdfColor.fromInt(0x373C3A),
+    themeColorLight: PdfColor.fromInt(0x959595),
+    dividerColor: PdfColor.fromInt(0xE8E8E8),
+    backgroundColor: PdfColor.fromInt(0xFFFFFF),
+  );
+
+  // Default template to use if none specified
+  static const PdfTemplate defaultTemplate = orange;
+
+  // List of all available templates
+  static const List<PdfTemplate> allTemplates = [orange, grey, blue, minimal];
+}
+
 class PdfService {
   // Generate PDF document from invoice data
   static Future<pw.Document> generateInvoicePdf(
     Invoice invoice,
     CompanyInfo companyInfo, {
     String? logoPath,
+    PdfTemplate template = PdfTemplate.defaultTemplate,
   }) async {
     final pdf = pw.Document();
     final dateFormat = DateFormat('MM/dd/yyyy');
@@ -34,13 +91,11 @@ class PdfService {
     final ttfFontBold = pw.Font.ttf(fontBoldData);
     final victorMonoFont = pw.Font.ttf(victorMonoData);
 
-    // Define theme color
-    final PdfColor themeColor = PdfColor.fromHex(
-      '#CE5506',
-    ); // Orange like in sample
-    final PdfColor themeColorLight = PdfColor.fromHex('#E46512');
-    final PdfColor dividerColor = PdfColor.fromHex('#F19F69');
-    final PdfColor backgroundColor = PdfColor.fromHex('#E7E1CF');
+    // Use colors from the template
+    final PdfColor themeColor = template.themeColor;
+    final PdfColor themeColorLight = template.themeColorLight;
+    final PdfColor dividerColor = template.dividerColor;
+    final PdfColor backgroundColor = template.backgroundColor;
 
     // Load logo image if path is provided
     pw.Widget? logoWidget;
@@ -165,7 +220,7 @@ class PdfService {
           pageFormat: PdfPageFormat.a4,
           theme: pw.ThemeData.withFont(base: ttfFont, bold: ttfFontBold),
           buildBackground: (pw.Context context) {
-            // Fill the entire page with the beige background color
+            // Fill the entire page with the background color from the template
             return pw.Container(
               width: PdfPageFormat.a4.width,
               height: PdfPageFormat.a4.height,
@@ -946,12 +1001,14 @@ class PdfService {
     Invoice invoice,
     CompanyInfo companyInfo, {
     String? logoPath,
+    PdfTemplate template = PdfTemplate.defaultTemplate,
   }) async {
-    // Generate the PDF
+    // Generate the PDF with the specified template
     final pdf = await generateInvoicePdf(
       invoice,
       companyInfo,
       logoPath: logoPath,
+      template: template,
     );
 
     // Get temporary directory
@@ -974,11 +1031,13 @@ class PdfService {
     Invoice invoice,
     CompanyInfo companyInfo, {
     String? logoPath,
+    PdfTemplate template = PdfTemplate.defaultTemplate,
   }) async {
     final pdf = await generateInvoicePdf(
       invoice,
       companyInfo,
       logoPath: logoPath,
+      template: template,
     );
     return pdf.save();
   }
@@ -988,13 +1047,15 @@ class PdfService {
     Invoice invoice,
     CompanyInfo companyInfo, {
     String? logoPath,
+    PdfTemplate template = PdfTemplate.defaultTemplate,
   }) async {
     try {
-      // Generate the PDF
+      // Generate the PDF with the specified template
       final pdf = await generateInvoicePdf(
         invoice,
         companyInfo,
         logoPath: logoPath,
+        template: template,
       );
 
       // Get directory for saving

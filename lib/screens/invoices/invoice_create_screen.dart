@@ -25,9 +25,9 @@ import 'package:invoicegenerator/services/company_service.dart';
 import 'package:invoicegenerator/services/invoice_settings_service.dart';
 import 'package:invoicegenerator/widgets/invoice/invoice_preview.dart';
 import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
+import 'package:invoicegenerator/services/pdf_service.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 
 class InvoiceCreateScreen extends StatefulWidget {
   final Invoice? invoiceToEdit;
@@ -58,6 +58,9 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
 
   // Tax toggle
   bool _isTaxEnabled = false;
+
+  // Selected template
+  String _selectedTemplate = 'Orange'; // Default template
 
   // Tax text field focus node to handle selection behavior
   final FocusNode _taxFocusNode = FocusNode();
@@ -128,6 +131,9 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     if (invoice.notes != null) {
       _notesController.text = invoice.notes!;
     }
+
+    // Set template
+    _selectedTemplate = invoice.templateName;
   }
 
   // Initialize invoice settings
@@ -380,6 +386,21 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
           },
         );
       },
+    );
+  }
+
+  // Handle template selection
+  void _handleTemplateSelected(String templateName) {
+    setState(() {
+      _selectedTemplate = templateName;
+    });
+  }
+
+  // Add this method to find the template by name
+  PdfTemplate _getTemplateByName(String name) {
+    return PdfTemplate.allTemplates.firstWhere(
+      (template) => template.name == name,
+      orElse: () => PdfTemplate.defaultTemplate,
     );
   }
 
@@ -925,6 +946,87 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                         child: const SmallHeading(title: "Template Selection"),
                       ),
 
+                      // 24px spacing after heading
+                      const SizedBox(height: 24),
+
+                      // Template previews in a horizontal scrollable row
+                      SizedBox(
+                        height:
+                            172, // Increased from 162 to 172 to accommodate shadow
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: 10,
+                            ), // Add bottom padding for shadow
+                            child: Row(
+                              children: [
+                                // Orange Template Preview
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 16.0),
+                                  child: GestureDetector(
+                                    onTap:
+                                        () => _handleTemplateSelected('Orange'),
+                                    child: _buildTemplatePreview(
+                                      isSelected: _selectedTemplate == 'Orange',
+                                      backgroundColor: const Color(0xFFE7E1CF),
+                                      accentColor: const Color(0xFFCE5506),
+                                      accentColorLight: const Color(0xFFE46512),
+                                      dividerColor: const Color(0xFFF19F69),
+                                    ),
+                                  ),
+                                ),
+
+                                // Grey Template Preview
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 16.0),
+                                  child: GestureDetector(
+                                    onTap:
+                                        () => _handleTemplateSelected('Grey'),
+                                    child: _buildTemplatePreview(
+                                      isSelected: _selectedTemplate == 'Grey',
+                                      backgroundColor: const Color(0xFFDAE4E1),
+                                      accentColor: const Color(0xFF373C3A),
+                                      accentColorLight: const Color(0xFF768581),
+                                      dividerColor: const Color(0xFFCAD5D2),
+                                    ),
+                                  ),
+                                ),
+
+                                // Blue Template Preview
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 16.0),
+                                  child: GestureDetector(
+                                    onTap:
+                                        () => _handleTemplateSelected('Blue'),
+                                    child: _buildTemplatePreview(
+                                      isSelected: _selectedTemplate == 'Blue',
+                                      backgroundColor: const Color(0xFFCFDBE7),
+                                      accentColor: const Color(0xFF0C6AC9),
+                                      accentColorLight: const Color(0xFF1981E9),
+                                      dividerColor: const Color(0xFF4397EC),
+                                    ),
+                                  ),
+                                ),
+
+                                // Minimal Template Preview
+                                GestureDetector(
+                                  onTap:
+                                      () => _handleTemplateSelected('Minimal'),
+                                  child: _buildTemplatePreview(
+                                    isSelected: _selectedTemplate == 'Minimal',
+                                    backgroundColor: const Color(0xFFFFFFFF),
+                                    accentColor: const Color(0xFF373C3A),
+                                    accentColorLight: const Color(0xFF959595),
+                                    dividerColor: const Color(0xFFE8E8E8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
                       // Add more spacing at the bottom for better visual appearance
                       const SizedBox(height: 32),
 
@@ -1025,6 +1127,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
             _isEditMode && widget.invoiceToEdit!.status == InvoiceStatus.paid
                 ? InvoiceStatus.paid
                 : _determineDueStatus(dueDate),
+        templateName: _selectedTemplate, // Set the selected template
       );
 
       // Save the invoice
@@ -1053,6 +1156,9 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
               'InvoiceCreateScreen - Logo file exists: $exists (path: $logoPath)',
             );
           }
+
+          // Get template object from template name
+          _getTemplateByName(_selectedTemplate);
 
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -1195,6 +1301,610 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  // Build a template preview
+  Widget _buildTemplatePreview({
+    required bool isSelected,
+    required Color backgroundColor,
+    required Color accentColor,
+    required Color accentColorLight,
+    required Color dividerColor,
+  }) {
+    return Stack(
+      children: [
+        // Template container
+        Container(
+          width: 114,
+          height: 162,
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            boxShadow: [
+              BoxShadow(
+                color: const Color.fromRGBO(128, 128, 128, 0.08),
+                blurRadius: 0,
+                spreadRadius: 1,
+                offset: const Offset(0, 0),
+              ),
+              BoxShadow(
+                color: const Color.fromRGBO(128, 128, 128, 0.08),
+                blurRadius: 1,
+                spreadRadius: 0,
+                offset: const Offset(0, 1),
+              ),
+              BoxShadow(
+                color: const Color.fromRGBO(128, 128, 128, 0.08),
+                blurRadius: 2,
+                spreadRadius: 0,
+                offset: const Offset(0, 2),
+              ),
+              BoxShadow(
+                color: const Color.fromRGBO(128, 128, 128, 0.08),
+                blurRadius: 4,
+                spreadRadius: 0,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+        ),
+
+        // Selection border - pixelated
+        if (isSelected) ...[
+          // Draw individual "pixel" squares for the border - Top row
+          ...List.generate(
+            57,
+            (index) => Positioned(
+              top: 0,
+              left: index * 2.0,
+              child: Container(
+                width: 2,
+                height: 2,
+                color: const Color(0xFFF05022),
+              ),
+            ),
+          ),
+
+          // Bottom row
+          ...List.generate(
+            57,
+            (index) => Positioned(
+              top: 160,
+              left: index * 2.0,
+              child: Container(
+                width: 2,
+                height: 2,
+                color: const Color(0xFFF05022),
+              ),
+            ),
+          ),
+
+          // Left column
+          ...List.generate(
+            80,
+            (index) => Positioned(
+              top: index * 2.0 + 2,
+              left: 0,
+              child: Container(
+                width: 2,
+                height: 2,
+                color: const Color(0xFFF05022),
+              ),
+            ),
+          ),
+
+          // Right column
+          ...List.generate(
+            80,
+            (index) => Positioned(
+              top: index * 2.0 + 2,
+              left: 112,
+              child: Container(
+                width: 2,
+                height: 2,
+                color: const Color(0xFFF05022),
+              ),
+            ),
+          ),
+        ],
+
+        // Template content
+        Positioned(
+          top: 2,
+          left: 2,
+          child: Container(
+            width: 110,
+            height: 158,
+            color: backgroundColor,
+            child: Padding(
+              padding: const EdgeInsets.all(6.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header section
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // "Invoice" title
+                      Expanded(
+                        child: Text(
+                          'Invoice',
+                          style: TextStyle(
+                            fontFamily: 'Helvetica Now Display',
+                            color: accentColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      // Logo placeholder
+                      Container(
+                        width: 24,
+                        height: 16,
+                        color: accentColor,
+                        alignment: Alignment.center,
+                        child: Text(
+                          'LOGO',
+                          style: TextStyle(
+                            fontFamily: 'Victor Mono',
+                            color: Colors.white,
+                            fontSize: 6,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Client & Company info placeholder
+                  const SizedBox(height: 5),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Client info
+                      Expanded(
+                        flex: 1,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'BILL TO',
+                              style: TextStyle(
+                                fontFamily: 'Victor Mono',
+                                color: accentColorLight,
+                                fontSize: 4,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              'Client Name',
+                              style: TextStyle(
+                                fontFamily: 'Helvetica Now Display',
+                                color: accentColor,
+                                fontSize: 4,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              'Address',
+                              style: TextStyle(
+                                fontFamily: 'Helvetica Now Display',
+                                color: accentColor,
+                                fontSize: 3,
+                              ),
+                            ),
+                            Text(
+                              'City, Country',
+                              style: TextStyle(
+                                fontFamily: 'Helvetica Now Display',
+                                color: accentColor,
+                                fontSize: 3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Company info
+                      Expanded(
+                        flex: 1,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              'Your Company',
+                              style: TextStyle(
+                                fontFamily: 'Helvetica Now Display',
+                                color: accentColor,
+                                fontSize: 4,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              'Company Address',
+                              style: TextStyle(
+                                fontFamily: 'Helvetica Now Display',
+                                color: accentColor,
+                                fontSize: 3,
+                              ),
+                            ),
+                            Text(
+                              'M: 555-1234',
+                              style: TextStyle(
+                                fontFamily: 'Helvetica Now Display',
+                                color: accentColor,
+                                fontSize: 3,
+                              ),
+                            ),
+                            Text(
+                              'E: email@example.com',
+                              style: TextStyle(
+                                fontFamily: 'Helvetica Now Display',
+                                color: accentColor,
+                                fontSize: 3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Invoice details
+                  const SizedBox(height: 4),
+                  Container(
+                    height: 0.3,
+                    color: dividerColor,
+                  ), // Thinner divider
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'INVOICE ID',
+                            style: TextStyle(
+                              fontFamily: 'Victor Mono',
+                              color: accentColorLight,
+                              fontSize: 3,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'INV-001',
+                            style: TextStyle(
+                              fontFamily: 'Helvetica Now Display',
+                              color: accentColor,
+                              fontSize: 3,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ISSUE DATE',
+                            style: TextStyle(
+                              fontFamily: 'Victor Mono',
+                              color: accentColorLight,
+                              fontSize: 3,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '01/01/2023',
+                            style: TextStyle(
+                              fontFamily: 'Helvetica Now Display',
+                              color: accentColor,
+                              fontSize: 3,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'DUE DATE',
+                            style: TextStyle(
+                              fontFamily: 'Victor Mono',
+                              color: accentColorLight,
+                              fontSize: 3,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '15/01/2023',
+                            style: TextStyle(
+                              fontFamily: 'Helvetica Now Display',
+                              color: accentColor,
+                              fontSize: 3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Container(
+                    height: 0.3,
+                    color: dividerColor,
+                  ), // Thinner divider
+                  // Item header
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 4,
+                        child: Text(
+                          'ITEM NAME',
+                          style: TextStyle(
+                            fontFamily: 'Victor Mono',
+                            color: accentColorLight,
+                            fontSize: 3,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          'QTY',
+                          style: TextStyle(
+                            fontFamily: 'Victor Mono',
+                            color: accentColorLight,
+                            fontSize: 3,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          'PRICE',
+                          style: TextStyle(
+                            fontFamily: 'Victor Mono',
+                            color: accentColorLight,
+                            fontSize: 3,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Container(
+                    height: 0.5,
+                    color: dividerColor,
+                  ), // Thinner thick divider
+                  // Items
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 4,
+                        child: Text(
+                          'Service Item 1',
+                          style: TextStyle(
+                            fontFamily: 'Helvetica Now Display',
+                            color: accentColor,
+                            fontSize: 3,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          '2',
+                          style: TextStyle(
+                            fontFamily: 'Helvetica Now Display',
+                            color: accentColor,
+                            fontSize: 3,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Row(
+                          children: [
+                            Text(
+                              'USD',
+                              style: TextStyle(
+                                fontFamily: 'Victor Mono',
+                                color: accentColor,
+                                fontSize: 3,
+                              ),
+                            ),
+                            Text(
+                              ' 100.00',
+                              style: TextStyle(
+                                fontFamily: 'Helvetica Now Display',
+                                color: accentColor,
+                                fontSize: 3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Container(
+                    height: 0.2,
+                    color: dividerColor.withOpacity(0.5),
+                  ), // Even thinner divider
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 4,
+                        child: Text(
+                          'Product Item 2',
+                          style: TextStyle(
+                            fontFamily: 'Helvetica Now Display',
+                            color: accentColor,
+                            fontSize: 3,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          '1',
+                          style: TextStyle(
+                            fontFamily: 'Helvetica Now Display',
+                            color: accentColor,
+                            fontSize: 3,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Row(
+                          children: [
+                            Text(
+                              'USD',
+                              style: TextStyle(
+                                fontFamily: 'Victor Mono',
+                                color: accentColor,
+                                fontSize: 3,
+                              ),
+                            ),
+                            Text(
+                              ' 50.00',
+                              style: TextStyle(
+                                fontFamily: 'Helvetica Now Display',
+                                color: accentColor,
+                                fontSize: 3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Totals section
+                  const SizedBox(height: 2),
+                  Container(
+                    height: 0.5,
+                    color: dividerColor,
+                  ), // Thinner thick divider
+                  const SizedBox(height: 2),
+                  // Subtotal
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'SUBTOTAL',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontFamily: 'Victor Mono',
+                            color: accentColorLight,
+                            fontSize: 3,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'USD',
+                        style: TextStyle(
+                          fontFamily: 'Victor Mono',
+                          color: accentColor,
+                          fontSize: 3,
+                        ),
+                      ),
+                      Text(
+                        ' 250.00',
+                        style: TextStyle(
+                          fontFamily: 'Helvetica Now Display',
+                          color: accentColor,
+                          fontSize: 3,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 1),
+                  // Total
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'TOTAL',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontFamily: 'Victor Mono',
+                            color: accentColorLight,
+                            fontSize: 3,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'USD',
+                        style: TextStyle(
+                          fontFamily: 'Victor Mono',
+                          color: accentColor,
+                          fontSize: 3,
+                        ),
+                      ),
+                      Text(
+                        ' 250.00',
+                        style: TextStyle(
+                          fontFamily: 'Helvetica Now Display',
+                          color: accentColor,
+                          fontSize: 3,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Notes section
+                  const SizedBox(height: 3),
+                  Text(
+                    'NOTES',
+                    style: TextStyle(
+                      fontFamily: 'Victor Mono',
+                      color: accentColorLight,
+                      fontSize: 3,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Container(
+                    height: 0.3,
+                    color: dividerColor,
+                  ), // Thinner divider
+                  const SizedBox(height: 1),
+                  Text(
+                    'Thank you for your business.',
+                    style: TextStyle(
+                      fontFamily: 'Helvetica Now Display',
+                      color: accentColor,
+                      fontSize: 3,
+                    ),
+                  ),
+                  Text(
+                    'Payment due within 15 days.',
+                    style: TextStyle(
+                      fontFamily: 'Helvetica Now Display',
+                      color: accentColor,
+                      fontSize: 3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

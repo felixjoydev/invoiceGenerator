@@ -7,6 +7,7 @@ import 'package:invoicegenerator/services/pdf_service.dart';
 import 'package:invoicegenerator/screens/invoices/invoice_create_screen.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
+import 'package:pdf/pdf.dart';
 
 /// Shows a bottom sheet with a preview of the invoice and actions
 void showInvoicePreviewSheet({
@@ -41,6 +42,14 @@ class InvoicePreviewSheet extends StatelessWidget {
     this.logoPath,
   }) : super(key: key);
 
+  // Helper method to get template by name
+  PdfTemplate _getTemplateByName(String name) {
+    return PdfTemplate.allTemplates.firstWhere(
+      (template) => template.name == name,
+      orElse: () => PdfTemplate.defaultTemplate,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Add debugging for logo path
@@ -52,6 +61,17 @@ class InvoicePreviewSheet extends StatelessWidget {
         'InvoicePreviewSheet - Logo file exists: $exists (path: $logoPath)',
       );
     }
+
+    // Get the template from invoice template name
+    final template = _getTemplateByName(invoice.templateName);
+
+    // Convert PdfColor to Flutter Color for PDF preview background
+    final backgroundColor = Color.fromARGB(
+      255,
+      (template.backgroundColor.red * 255).round(),
+      (template.backgroundColor.green * 255).round(),
+      (template.backgroundColor.blue * 255).round(),
+    );
 
     // Calculate the height to be almost full screen
     final screenHeight = MediaQuery.of(context).size.height;
@@ -109,38 +129,90 @@ class InvoicePreviewSheet extends StatelessWidget {
                             child: AspectRatio(
                               aspectRatio:
                                   1 / 1.414, // A4 aspect ratio (210×297 mm)
-                              child: ClipRect(
-                                child: Material(
-                                  color: const Color(
-                                    0xFFE7E1CF,
-                                  ), // Match PDF background
-                                  child: MediaQuery(
-                                    data: MediaQuery.of(
-                                      context,
-                                    ).copyWith(padding: EdgeInsets.zero),
-                                    child: PdfPreview(
-                                      key: UniqueKey(),
-                                      build:
-                                          (format) => PdfService.previewPdf(
-                                            invoice,
-                                            companyInfo,
-                                            logoPath: logoPath,
-                                          ),
-                                      allowPrinting: false,
-                                      allowSharing: false,
-                                      canChangeOrientation: false,
-                                      canChangePageFormat: false,
-                                      canDebug: false,
-                                      useActions: false,
-                                      padding: EdgeInsets.zero,
-                                      previewPageMargin: EdgeInsets.zero,
-                                      pdfPreviewPageDecoration: null,
-                                      scrollViewDecoration: const BoxDecoration(
-                                        color: Colors.transparent,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color.fromRGBO(
+                                        128,
+                                        128,
+                                        128,
+                                        0.08,
                                       ),
-                                      maxPageWidth:
-                                          double
-                                              .infinity, // Take available width in aspect ratio
+                                      blurRadius: 0,
+                                      spreadRadius: 1,
+                                      offset: const Offset(0, 0),
+                                    ),
+                                    BoxShadow(
+                                      color: const Color.fromRGBO(
+                                        128,
+                                        128,
+                                        128,
+                                        0.08,
+                                      ),
+                                      blurRadius: 1,
+                                      spreadRadius: 0,
+                                      offset: const Offset(0, 1),
+                                    ),
+                                    BoxShadow(
+                                      color: const Color.fromRGBO(
+                                        128,
+                                        128,
+                                        128,
+                                        0.08,
+                                      ),
+                                      blurRadius: 2,
+                                      spreadRadius: 0,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                    BoxShadow(
+                                      color: const Color.fromRGBO(
+                                        128,
+                                        128,
+                                        128,
+                                        0.08,
+                                      ),
+                                      blurRadius: 4,
+                                      spreadRadius: 0,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipRect(
+                                  child: Material(
+                                    color:
+                                        backgroundColor, // Use the template background color
+                                    child: MediaQuery(
+                                      data: MediaQuery.of(
+                                        context,
+                                      ).copyWith(padding: EdgeInsets.zero),
+                                      child: PdfPreview(
+                                        key: UniqueKey(),
+                                        build:
+                                            (format) => PdfService.previewPdf(
+                                              invoice,
+                                              companyInfo,
+                                              logoPath: logoPath,
+                                              template:
+                                                  template, // Pass the template
+                                            ),
+                                        allowPrinting: false,
+                                        allowSharing: false,
+                                        canChangeOrientation: false,
+                                        canChangePageFormat: false,
+                                        canDebug: false,
+                                        useActions: false,
+                                        padding: EdgeInsets.zero,
+                                        previewPageMargin: EdgeInsets.zero,
+                                        pdfPreviewPageDecoration: null,
+                                        scrollViewDecoration:
+                                            const BoxDecoration(
+                                              color: Colors.transparent,
+                                            ),
+                                        maxPageWidth:
+                                            double
+                                                .infinity, // Take available width in aspect ratio
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -179,6 +251,7 @@ class InvoicePreviewSheet extends StatelessWidget {
                               invoice,
                               companyInfo,
                               logoPath: logoPath,
+                              template: template, // Pass the template
                             );
                             if (path != null) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -199,6 +272,7 @@ class InvoicePreviewSheet extends StatelessWidget {
                               invoice,
                               companyInfo,
                               logoPath: logoPath,
+                              template: template, // Pass the template
                             );
                           },
                         ),

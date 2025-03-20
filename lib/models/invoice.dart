@@ -15,6 +15,7 @@ class Invoice {
   final double total;
   final String? notes;
   final InvoiceStatus status;
+  final String templateName; // Store the template name
 
   Invoice({
     required this.invoiceId,
@@ -28,6 +29,7 @@ class Invoice {
     required this.total,
     this.notes,
     this.status = InvoiceStatus.outstanding,
+    this.templateName = 'Orange', // Default to Orange template
   });
 
   // Create a copy with updated fields
@@ -43,6 +45,7 @@ class Invoice {
     double? total,
     String? notes,
     InvoiceStatus? status,
+    String? templateName,
   }) {
     return Invoice(
       invoiceId: invoiceId ?? this.invoiceId,
@@ -56,6 +59,7 @@ class Invoice {
       total: total ?? this.total,
       notes: notes ?? this.notes,
       status: status ?? this.status,
+      templateName: templateName ?? this.templateName,
     );
   }
 
@@ -73,6 +77,7 @@ class Invoice {
       'total': total,
       'notes': notes,
       'status': status.index,
+      'templateName': templateName,
     };
   }
 
@@ -93,6 +98,8 @@ class Invoice {
       total: map['total'],
       notes: map['notes'],
       status: InvoiceStatus.values[map['status']],
+      templateName:
+          map['templateName'] ?? 'Orange', // Default to Orange if not present
     );
   }
 }
