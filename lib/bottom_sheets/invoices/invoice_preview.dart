@@ -7,7 +7,7 @@ import 'package:invoicegenerator/services/pdf_service.dart';
 import 'package:invoicegenerator/screens/invoices/invoice_create_screen.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
-import 'package:pdf/pdf.dart';
+import 'package:invoicegenerator/screens/invoices/invoice_list_screen.dart';
 
 /// Shows a bottom sheet with a preview of the invoice and actions
 void showInvoicePreviewSheet({
@@ -244,7 +244,19 @@ class InvoicePreviewSheet extends StatelessWidget {
                                       invoiceToEdit: invoice,
                                     ),
                               ),
-                            );
+                            ).then((_) {
+                              // After returning from edit, pass the invoice ID to animate
+                              ScaffoldMessenger.of(context).clearSnackBars();
+                              Navigator.of(context).pushAndRemoveUntil(
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) => InvoiceListScreen(
+                                        invoiceIdToAnimate: invoice.invoiceId,
+                                      ),
+                                ),
+                                (route) => false,
+                              );
+                            });
                           },
                           onDownloadPressed: () async {
                             final path = await PdfService.savePdf(

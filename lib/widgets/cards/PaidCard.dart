@@ -9,6 +9,8 @@ class DueCard extends StatelessWidget {
   final String daysText;
   final Color daysColor;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final bool isHighlighted;
 
   const DueCard({
     super.key,
@@ -19,112 +21,124 @@ class DueCard extends StatelessWidget {
     this.daysText = 'PAID ON 10/03/2025',
     this.daysColor = const Color(0xFF13AF5B),
     this.onTap,
+    this.onLongPress,
+    this.isHighlighted = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       behavior: HitTestBehavior.opaque, // Makes entire area clickable
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Left side - Company and invoice details
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                companyName,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF3A3A3A),
+      child: Container(
+        height:
+            60, // Added fixed height for better touch detection to match CatalogCard
+        decoration: BoxDecoration(
+          color: isHighlighted ? const Color(0xFFECF0EF) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        padding: isHighlighted ? const EdgeInsets.all(8) : EdgeInsets.zero,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Left side - Company and invoice details
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  companyName,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF3A3A3A),
+                  ),
                 ),
-              ),
-              SizedBox(height: 4),
-              Row(
-                children: [
-                  Text(
-                    AppTheme.ensureVictorMonoUppercase(date),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Victor Mono',
-                      color: Color(0xFF768681),
+                SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text(
+                      AppTheme.ensureVictorMonoUppercase(date),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Victor Mono',
+                        color: Color(0xFF768681),
+                      ),
                     ),
-                  ),
-                  SizedBox(width: 4),
-                  Container(
-                    width: 4,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Color(0xFF768681),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          offset: Offset(0, 4),
-                          blurRadius: 4,
-                        ),
-                      ],
+                    SizedBox(width: 4),
+                    Container(
+                      width: 4,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Color(0xFF768681),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            offset: Offset(0, 4),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  SizedBox(width: 4),
-                  Text(
-                    AppTheme.ensureVictorMonoUppercase(invoiceNumber),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Victor Mono',
-                      color: Color(0xFF768681),
+                    SizedBox(width: 4),
+                    Text(
+                      AppTheme.ensureVictorMonoUppercase(invoiceNumber),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Victor Mono',
+                        color: Color(0xFF768681),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          // Right side - Amount and due days
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'USD',
-                    style: TextStyle(
-                      color: Color(0xFF8D9694),
-                      fontSize: 14,
-                      fontFamily: 'Victor Mono',
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.right,
-                  ),
-                  SizedBox(width: 7),
-                  Text(
-                    amount.replaceAll('\$', ''),
-                    style: TextStyle(
-                      color: Color(0xFF3A3A3A),
-                      fontSize: 16,
-                      fontFamily: 'Helvetica Now Display',
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.right,
-                  ),
-                ],
-              ),
-              SizedBox(height: 4),
-              Text(
-                AppTheme.ensureVictorMonoUppercase(daysText),
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Victor Mono',
-                  color: daysColor,
+                  ],
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+            // Right side - Amount and due days
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'USD',
+                      style: TextStyle(
+                        color: Color(0xFF8D9694),
+                        fontSize: 14,
+                        fontFamily: 'Victor Mono',
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                    SizedBox(width: 7),
+                    Text(
+                      amount.replaceAll('\$', ''),
+                      style: TextStyle(
+                        color: Color(0xFF3A3A3A),
+                        fontSize: 16,
+                        fontFamily: 'Helvetica Now Display',
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                  ],
+                ),
+                SizedBox(height: 4),
+                Text(
+                  AppTheme.ensureVictorMonoUppercase(daysText),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Victor Mono',
+                    color: daysColor,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

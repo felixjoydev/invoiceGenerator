@@ -83,7 +83,7 @@ class _CustomTabBarState extends State<CustomTabBar>
       decoration: BoxDecoration(
         border: Border.all(color: Color(0xFFCAD5D2), width: 1),
       ),
-      padding: EdgeInsets.all(4),
+      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final tabWidth = constraints.maxWidth / widget.tabs.length;
@@ -124,13 +124,20 @@ class _CustomTabBarState extends State<CustomTabBar>
               // Make the container transparent since we're using a sliding indicator
               color: Colors.transparent,
               child: Center(
-                child: Text(
-                  widget.tabs[i],
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color:
-                        i == _activeTabIndex ? Colors.white : Color(0xFF8B9199),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 2),
+                  child: Text(
+                    widget.tabs[i],
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color:
+                          i == _activeTabIndex
+                              ? Colors.white
+                              : Color(0xFF8B9199),
+                    ),
                   ),
                 ),
               ),

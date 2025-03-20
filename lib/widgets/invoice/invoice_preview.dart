@@ -275,7 +275,10 @@ class InvoicePreview extends StatelessWidget {
                   onPressed: () {
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(
-                        builder: (context) => const InvoiceListScreen(),
+                        builder:
+                            (context) => InvoiceListScreen(
+                              invoiceIdToAnimate: invoice.invoiceId,
+                            ),
                       ),
                       (route) => false,
                     );

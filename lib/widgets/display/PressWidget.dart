@@ -4,8 +4,16 @@ import 'package:flutter_svg/flutter_svg.dart';
 class PressWidget extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback? onMarkAsPaid;
+  final bool showMarkAsPaid;
 
-  const PressWidget({super.key, required this.onEdit, required this.onDelete});
+  const PressWidget({
+    super.key,
+    required this.onEdit,
+    required this.onDelete,
+    this.onMarkAsPaid,
+    this.showMarkAsPaid = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -51,9 +59,47 @@ class PressWidget extends StatelessWidget {
               ),
             ),
           ),
+
+          // Line divider
           const SizedBox(height: 10),
           Container(height: 1, color: const Color(0xFFCAD5D2)),
           const SizedBox(height: 10),
+
+          // Mark as Paid option
+          if (showMarkAsPaid) ...[
+            GestureDetector(
+              onTap: onMarkAsPaid,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'MARK AS PAID',
+                      style: TextStyle(
+                        color: Color(0xFF13AF5B),
+                        fontSize: 14,
+                        fontFamily: 'Victor Mono',
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SvgPicture.asset(
+                      'assets/icons/paid-mark.svg',
+                      width: 24,
+                      height: 24,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Line divider
+            const SizedBox(height: 10),
+            Container(height: 1, color: const Color(0xFFCAD5D2)),
+            const SizedBox(height: 10),
+          ],
+
           GestureDetector(
             onTap: onDelete,
             behavior: HitTestBehavior.opaque,

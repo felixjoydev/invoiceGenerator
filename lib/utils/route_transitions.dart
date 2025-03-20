@@ -114,11 +114,13 @@ String _getRouteName(Widget widget) {
 class ContentSlideTransition extends StatefulWidget {
   final bool slideFromRight;
   final Widget child;
+  final bool disableAnimation;
 
   const ContentSlideTransition({
     super.key,
     required this.slideFromRight,
     required this.child,
+    this.disableAnimation = false,
   });
 
   @override
@@ -138,8 +140,11 @@ class _ContentSlideTransitionState extends State<ContentSlideTransition>
       vsync: this,
     );
 
+    // If animation is disabled, use zero offset (no animation)
     final beginOffset =
-        widget.slideFromRight
+        widget.disableAnimation
+            ? Offset.zero
+            : widget.slideFromRight
             ? const Offset(1.0, 0.0) // From right
             : const Offset(-1.0, 0.0); // From left
 
