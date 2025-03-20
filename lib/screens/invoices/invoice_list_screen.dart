@@ -17,7 +17,7 @@ import 'package:invoicegenerator/utils/route_transitions.dart';
 import 'package:invoicegenerator/services/invoice_service.dart';
 import 'package:invoicegenerator/models/invoice.dart';
 import 'package:invoicegenerator/services/company_service.dart';
-import 'package:invoicegenerator/widgets/invoice/invoice_preview.dart';
+import 'package:invoicegenerator/bottom_sheets/invoices/invoice_preview.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 
@@ -213,31 +213,25 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       return;
     }
 
-    // Navigate to the invoice preview
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) {
-          final companyInfo = _companyService.companyInfo!;
-          final logoPath = companyInfo.logoPath;
+    // Get company info and logo path
+    final companyInfo = _companyService.companyInfo!;
+    final logoPath = companyInfo.logoPath;
 
-          debugPrint(
-            'InvoiceListScreen - Opening preview with logo path: $logoPath',
-          );
-          if (logoPath != null) {
-            final logoFile = File(logoPath);
-            final exists = logoFile.existsSync();
-            debugPrint(
-              'InvoiceListScreen - Logo file exists: $exists (path: $logoPath)',
-            );
-          }
+    debugPrint('InvoiceListScreen - Opening preview with logo path: $logoPath');
+    if (logoPath != null) {
+      final logoFile = File(logoPath);
+      final exists = logoFile.existsSync();
+      debugPrint(
+        'InvoiceListScreen - Logo file exists: $exists (path: $logoPath)',
+      );
+    }
 
-          return InvoicePreview(
-            invoice: invoice,
-            companyInfo: companyInfo,
-            logoPath: logoPath,
-          );
-        },
-      ),
+    // Show the invoice preview bottom sheet instead of navigating to full screen
+    showInvoicePreviewSheet(
+      context: context,
+      invoice: invoice,
+      companyInfo: companyInfo,
+      logoPath: logoPath,
     );
   }
 
@@ -476,16 +470,14 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
           final difference = now.difference(invoice.dueDate).inDays;
           final daysText = '$difference days due';
 
-          return GestureDetector(
+          return DueCard(
+            companyName: invoice.client.name,
+            date: dateFormat.format(invoice.dueDate),
+            invoiceNumber: invoice.invoiceId,
+            amount: '${invoice.total.toStringAsFixed(2)}',
+            daysText: daysText,
+            daysColor: const Color(0xFFD61443),
             onTap: () => _handleInvoiceTapped(invoice),
-            child: DueCard(
-              companyName: invoice.client.name,
-              date: dateFormat.format(invoice.dueDate),
-              invoiceNumber: invoice.invoiceId,
-              amount: '${invoice.total.toStringAsFixed(2)}',
-              daysText: daysText,
-              daysColor: const Color(0xFFD61443),
-            ),
           );
         }
         // Return divider for odd indices
@@ -535,16 +527,14 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
           final difference = invoice.dueDate.difference(now).inDays;
           final daysText = 'DUE IN $difference DAYS';
 
-          return GestureDetector(
+          return Outstanding.DueCard(
+            companyName: invoice.client.name,
+            date: dateFormat.format(invoice.dueDate),
+            invoiceNumber: invoice.invoiceId,
+            amount: '${invoice.total.toStringAsFixed(2)}',
+            daysText: daysText,
+            daysColor: const Color(0xFFD68814),
             onTap: () => _handleInvoiceTapped(invoice),
-            child: Outstanding.DueCard(
-              companyName: invoice.client.name,
-              date: dateFormat.format(invoice.dueDate),
-              invoiceNumber: invoice.invoiceId,
-              amount: '${invoice.total.toStringAsFixed(2)}',
-              daysText: daysText,
-              daysColor: const Color(0xFFD68814),
-            ),
           );
         }
         // Return divider for odd indices
@@ -589,16 +579,14 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
           final invoice = filteredInvoices[invoiceIndex];
           final dateFormat = DateFormat('MM/dd/yyyy');
 
-          return GestureDetector(
+          return Paid.DueCard(
+            companyName: invoice.client.name,
+            date: dateFormat.format(invoice.issueDate),
+            invoiceNumber: invoice.invoiceId,
+            amount: '${invoice.total.toStringAsFixed(2)}',
+            daysText: 'PAID',
+            daysColor: const Color(0xFF13AF5B),
             onTap: () => _handleInvoiceTapped(invoice),
-            child: Paid.DueCard(
-              companyName: invoice.client.name,
-              date: dateFormat.format(invoice.issueDate),
-              invoiceNumber: invoice.invoiceId,
-              amount: '${invoice.total.toStringAsFixed(2)}',
-              daysText: 'PAID',
-              daysColor: const Color(0xFF13AF5B),
-            ),
           );
         }
         // Return divider for odd indices

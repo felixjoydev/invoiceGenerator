@@ -222,9 +222,88 @@ class PdfService {
                                     style: pw.TextStyle(
                                       color: themeColor,
                                       fontSize: 12,
-                                      fontWeight: pw.FontWeight.normal,
+                                      fontWeight: pw.FontWeight.bold,
                                     ),
                                   ),
+                                  // Combine address lines 1 and 2 on one line if both exist
+                                  if (invoice.client.addressLine1 != null &&
+                                      invoice.client.addressLine1!.isNotEmpty)
+                                    pw.Text(
+                                      invoice.client.addressLine2 != null &&
+                                              invoice
+                                                  .client
+                                                  .addressLine2!
+                                                  .isNotEmpty
+                                          ? '${invoice.client.addressLine1}, ${invoice.client.addressLine2}'
+                                          : invoice.client.addressLine1!,
+                                      style: pw.TextStyle(
+                                        color: themeColor,
+                                        fontSize: 12,
+                                        fontWeight: pw.FontWeight.normal,
+                                      ),
+                                    ),
+                                  // City, country, and zip in one line if available
+                                  if ((invoice.client.city != null &&
+                                          invoice.client.city!.isNotEmpty) ||
+                                      (invoice.client.country != null &&
+                                          invoice.client.country!.isNotEmpty) ||
+                                      (invoice.client.zip != null &&
+                                          invoice.client.zip!.isNotEmpty))
+                                    pw.Text(
+                                      [
+                                            if (invoice.client.city != null &&
+                                                invoice.client.city!.isNotEmpty)
+                                              invoice.client.city,
+                                            if (invoice.client.country !=
+                                                    null &&
+                                                invoice
+                                                    .client
+                                                    .country!
+                                                    .isNotEmpty)
+                                              invoice.client.country,
+                                            if (invoice.client.zip != null &&
+                                                invoice.client.zip!.isNotEmpty)
+                                              invoice.client.zip,
+                                          ]
+                                          .where((element) => element != null)
+                                          .join(', '),
+                                      style: pw.TextStyle(
+                                        color: themeColor,
+                                        fontSize: 12,
+                                        fontWeight: pw.FontWeight.normal,
+                                      ),
+                                    ),
+                                  // Contact details
+                                  if (invoice.client.phone != null &&
+                                      invoice.client.phone!.isNotEmpty)
+                                    pw.Text(
+                                      'M: ${invoice.client.phone}',
+                                      style: pw.TextStyle(
+                                        color: themeColor,
+                                        fontSize: 12,
+                                        fontWeight: pw.FontWeight.normal,
+                                      ),
+                                    ),
+                                  if (invoice.client.email != null &&
+                                      invoice.client.email!.isNotEmpty)
+                                    pw.Text(
+                                      'E: ${invoice.client.email}',
+                                      style: pw.TextStyle(
+                                        color: themeColor,
+                                        fontSize: 12,
+                                        fontWeight: pw.FontWeight.normal,
+                                      ),
+                                    ),
+                                  if (invoice.client.website != null &&
+                                      invoice.client.website!.isNotEmpty)
+                                    pw.Text(
+                                      'W: ${invoice.client.website}',
+                                      style: pw.TextStyle(
+                                        color: themeColor,
+                                        fontSize: 12,
+                                        fontWeight: pw.FontWeight.normal,
+                                      ),
+                                    ),
                                 ],
                               ),
                             ],
@@ -256,9 +335,43 @@ class PdfService {
                                   fontWeight: pw.FontWeight.bold,
                                 ),
                               ),
+                              // Address line 1 and 2 in one line
                               if (companyInfo.addressLine1.isNotEmpty)
                                 pw.Text(
-                                  '${companyInfo.addressLine1}, ${companyInfo.city}, ${companyInfo.country}',
+                                  companyInfo.addressLine2 != null &&
+                                          companyInfo.addressLine2!.isNotEmpty
+                                      ? '${companyInfo.addressLine1}, ${companyInfo.addressLine2}'
+                                      : companyInfo.addressLine1,
+                                  style: pw.TextStyle(
+                                    color: themeColor,
+                                    fontSize: 12,
+                                    fontWeight: pw.FontWeight.normal,
+                                  ),
+                                ),
+                              // City and ZIP in one line
+                              if (companyInfo.city.isNotEmpty ||
+                                  (companyInfo.zip != null &&
+                                      companyInfo.zip!.isNotEmpty))
+                                pw.Text(
+                                  [
+                                        if (companyInfo.city.isNotEmpty)
+                                          companyInfo.city,
+                                        if (companyInfo.zip != null &&
+                                            companyInfo.zip!.isNotEmpty)
+                                          companyInfo.zip,
+                                      ]
+                                      .where((element) => element != null)
+                                      .join(', '),
+                                  style: pw.TextStyle(
+                                    color: themeColor,
+                                    fontSize: 12,
+                                    fontWeight: pw.FontWeight.normal,
+                                  ),
+                                ),
+                              // Country on a separate line
+                              if (companyInfo.country.isNotEmpty)
+                                pw.Text(
+                                  companyInfo.country,
                                   style: pw.TextStyle(
                                     color: themeColor,
                                     fontSize: 12,
@@ -571,7 +684,7 @@ class PdfService {
                                 text: pw.TextSpan(
                                   children: [
                                     pw.TextSpan(
-                                      text: '${companyInfo.currency}',
+                                      text: companyInfo.currency,
                                       style: pw.TextStyle(
                                         font: victorMonoFont,
                                         color: themeColor,
@@ -584,8 +697,7 @@ class PdfService {
                                       style: pw.TextStyle(font: ttfFont),
                                     ),
                                     pw.TextSpan(
-                                      text:
-                                          '${invoice.subtotal.toStringAsFixed(2)}',
+                                      text: invoice.subtotal.toStringAsFixed(2),
                                       style: pw.TextStyle(
                                         font: ttfFont,
                                         color: themeColor,
@@ -602,8 +714,8 @@ class PdfService {
 
                         pw.SizedBox(height: 8),
 
-                        // TAX Row (if enabled)
-                        if (companyInfo.enableTax && invoice.taxRate > 0) ...[
+                        // TAX Row (if tax rate is greater than 0)
+                        if (invoice.taxRate > 0) ...[
                           pw.Row(
                             children: [
                               pw.Expanded(
@@ -630,7 +742,7 @@ class PdfService {
                                   text: pw.TextSpan(
                                     children: [
                                       pw.TextSpan(
-                                        text: '${companyInfo.currency}',
+                                        text: companyInfo.currency,
                                         style: pw.TextStyle(
                                           font: victorMonoFont,
                                           color: themeColor,
@@ -643,8 +755,9 @@ class PdfService {
                                         style: pw.TextStyle(font: ttfFont),
                                       ),
                                       pw.TextSpan(
-                                        text:
-                                            '${invoice.taxAmount.toStringAsFixed(2)}',
+                                        text: invoice.taxAmount.toStringAsFixed(
+                                          2,
+                                        ),
                                         style: pw.TextStyle(
                                           font: ttfFont,
                                           color: themeColor,
@@ -688,7 +801,7 @@ class PdfService {
                                 text: pw.TextSpan(
                                   children: [
                                     pw.TextSpan(
-                                      text: '${companyInfo.currency}',
+                                      text: companyInfo.currency,
                                       style: pw.TextStyle(
                                         font: victorMonoFont,
                                         color: themeColor,
@@ -701,8 +814,7 @@ class PdfService {
                                       style: pw.TextStyle(font: ttfFont),
                                     ),
                                     pw.TextSpan(
-                                      text:
-                                          '${invoice.total.toStringAsFixed(2)}',
+                                      text: invoice.total.toStringAsFixed(2),
                                       style: pw.TextStyle(
                                         font: ttfFont,
                                         color: themeColor,

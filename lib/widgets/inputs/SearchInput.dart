@@ -77,7 +77,7 @@ class _SearchInputState extends State<SearchInput> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       height: 56, // Set a fixed height for the entire search input component
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -221,7 +221,7 @@ class _FunctionalSearchInputState extends State<FunctionalSearchInput> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       height:
           72, // Set a fixed height (slightly taller to account for the different spacing)
       child: Column(

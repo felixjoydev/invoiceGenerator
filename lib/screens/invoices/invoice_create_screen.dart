@@ -30,7 +30,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 class InvoiceCreateScreen extends StatefulWidget {
-  const InvoiceCreateScreen({super.key});
+  final Invoice? invoiceToEdit;
+
+  const InvoiceCreateScreen({super.key, this.invoiceToEdit});
 
   @override
   State<InvoiceCreateScreen> createState() => _InvoiceCreateScreenState();
@@ -38,9 +40,7 @@ class InvoiceCreateScreen extends StatefulWidget {
 
 class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
   // Text controllers for the input fields
-  final TextEditingController _invoiceIdController = TextEditingController(
-    text: 'INV001', // Pre-filled
-  );
+  final TextEditingController _invoiceIdController = TextEditingController();
   final TextEditingController _issueDateController = TextEditingController();
   final TextEditingController _dueDateController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
@@ -51,6 +51,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
   // Selected customer
   String? _selectedCustomer;
   String? _selectedCustomerId;
+  Client? _selectedClientObject;
 
   // List to store invoice items (empty for first-time users)
   final List<CatalogItem> _invoiceItems = [];
@@ -64,19 +65,30 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
   // Invoice settings service
   final _invoiceSettingsService = InvoiceSettingsService();
 
+  // Flag for edit mode
+  bool _isEditMode = false;
+
   @override
   void initState() {
     super.initState();
 
-    // Set today's date as default for issue date and due date
-    final now = DateTime.now();
-    final formattedDate =
-        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
-    _issueDateController.text = formattedDate;
-    _dueDateController.text = formattedDate;
+    // Check if we're in edit mode
+    _isEditMode = widget.invoiceToEdit != null;
 
-    // Load invoice settings and initialize fields
-    _initializeInvoiceSettings();
+    if (_isEditMode) {
+      // Populate form with existing invoice data
+      _populateFormWithInvoice(widget.invoiceToEdit!);
+    } else {
+      // Set today's date as default for issue date and due date
+      final now = DateTime.now();
+      final formattedDate =
+          '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+      _issueDateController.text = formattedDate;
+      _dueDateController.text = formattedDate;
+
+      // Load invoice settings and initialize fields
+      _initializeInvoiceSettings();
+    }
 
     // Setup focus listener to select all text when tax field gets focus
     _taxFocusNode.addListener(() {
@@ -88,6 +100,34 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
         );
       }
     });
+  }
+
+  // Populate form with existing invoice data
+  void _populateFormWithInvoice(Invoice invoice) {
+    // Set invoice ID
+    _invoiceIdController.text = invoice.invoiceId;
+
+    // Set dates
+    final dateFormat = DateFormat('dd/MM/yyyy');
+    _issueDateController.text = dateFormat.format(invoice.issueDate);
+    _dueDateController.text = dateFormat.format(invoice.dueDate);
+
+    // Set client
+    _selectedCustomer = invoice.client.name;
+    _selectedCustomerId = invoice.client.clientId;
+    _selectedClientObject = invoice.client;
+
+    // Set invoice items
+    _invoiceItems.addAll(invoice.items);
+
+    // Set tax
+    _isTaxEnabled = invoice.taxRate > 0;
+    _taxPercentController.text = invoice.taxRate.toStringAsFixed(2);
+
+    // Set notes
+    if (invoice.notes != null) {
+      _notesController.text = invoice.notes!;
+    }
   }
 
   // Initialize invoice settings
@@ -288,6 +328,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     setState(() {
       _selectedCustomer = client.name;
       _selectedCustomerId = client.clientId;
+      _selectedClientObject = client;
     });
   }
 
@@ -889,7 +930,8 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
 
                       // Add Create Invoice button
                       PrimaryButton(
-                        label: 'CREATE INVOICE',
+                        label:
+                            _isEditMode ? 'UPDATE INVOICE' : 'CREATE INVOICE',
                         onPressed: _createInvoice,
                         isEnabled:
                             _selectedCustomer != null &&
@@ -955,18 +997,22 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
 
       // Use custom invoice ID or generate a new one
       String invoiceId =
-          _invoiceIdController.text.isNotEmpty
+          _isEditMode
               ? _invoiceIdController.text
-              : invoiceService.generateInvoiceId();
+              : (_invoiceIdController.text.isNotEmpty
+                  ? _invoiceIdController.text
+                  : invoiceService.generateInvoiceId());
 
       // Create the invoice object
       final invoice = Invoice(
         invoiceId: invoiceId,
-        client: Client(
-          clientId: _selectedCustomerId ?? 'unknown',
-          name: _selectedCustomer ?? 'Unknown Client',
-          type: 'organization',
-        ),
+        client:
+            _selectedClientObject ??
+            Client(
+              clientId: _selectedCustomerId ?? 'unknown',
+              name: _selectedCustomer ?? 'Unknown Client',
+              type: 'organization',
+            ),
         issueDate: issueDate,
         dueDate: dueDate,
         items: List<CatalogItem>.from(_invoiceItems),
@@ -975,15 +1021,21 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
         taxAmount: _taxAmount,
         total: _total,
         notes: _notesController.text.isNotEmpty ? _notesController.text : null,
-        status: _determineDueStatus(dueDate),
+        status:
+            _isEditMode && widget.invoiceToEdit!.status == InvoiceStatus.paid
+                ? InvoiceStatus.paid
+                : _determineDueStatus(dueDate),
       );
 
       // Save the invoice
-      bool success = await invoiceService.addInvoice(invoice);
+      bool success =
+          _isEditMode
+              ? await invoiceService.updateInvoice(invoice)
+              : await invoiceService.addInvoice(invoice);
 
       if (success) {
         // If auto-generate is enabled, increment the last invoice number
-        if (_invoiceSettingsService.isAutoGenerate) {
+        if (!_isEditMode && _invoiceSettingsService.isAutoGenerate) {
           await _invoiceSettingsService.incrementInvoiceNumber();
         }
 

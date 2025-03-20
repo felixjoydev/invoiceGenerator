@@ -8,6 +8,8 @@ import 'package:invoicegenerator/screens/invoices/invoice_list_screen.dart';
 import 'package:invoicegenerator/screens/invoices/invoice_create_screen.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
+import 'package:invoicegenerator/services/invoice_service.dart';
+import 'package:invoicegenerator/services/company_service.dart';
 
 class InvoicePreview extends StatelessWidget {
   final Invoice invoice;
@@ -112,16 +114,48 @@ class InvoicePreview extends StatelessWidget {
                     padding: const EdgeInsets.all(16.0),
                     child: InvoiceActionButtons(
                       onEditPressed: () {
-                        // Navigate back to edit screen with invoice data
+                        // Navigate to edit screen with invoice data
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder:
-                                (context) => InvoiceCreateScreen(
-                                  // Pass invoice for editing if needed
-                                ),
+                                (context) =>
+                                    InvoiceCreateScreen(invoiceToEdit: invoice),
                           ),
-                        );
+                        ).then((_) async {
+                          // Refresh the preview by fetching the latest invoice data
+                          final invoiceService = InvoiceService();
+                          await invoiceService.init();
+
+                          // Refresh company info
+                          final companyService = CompanyService();
+                          await companyService.init();
+                          final latestCompanyInfo = companyService.companyInfo;
+
+                          if (latestCompanyInfo != null) {
+                            // Find the updated invoice using its ID
+                            final updatedInvoices =
+                                invoiceService.getAllInvoices();
+                            final updatedInvoice = updatedInvoices.firstWhere(
+                              (inv) => inv.invoiceId == invoice.invoiceId,
+                              orElse:
+                                  () =>
+                                      invoice, // Fallback to original invoice if not found
+                            );
+
+                            // Navigate to a new instance of InvoicePreview with the updated invoice
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                builder:
+                                    (context) => InvoicePreview(
+                                      invoice: updatedInvoice,
+                                      companyInfo: latestCompanyInfo,
+                                      logoPath: latestCompanyInfo.logoPath,
+                                    ),
+                              ),
+                            );
+                          }
+                        });
                       },
                       onDownloadPressed: () async {
                         final path = await PdfService.savePdf(
@@ -165,7 +199,7 @@ class InvoicePreview extends StatelessWidget {
             child: SafeArea(
               top: false,
               child: Container(
-                padding: const EdgeInsets.only(top: 16),
+                padding: const EdgeInsets.only(top: 8),
                 height: 72,
                 child: TextButton(
                   onPressed: () {
@@ -507,7 +541,7 @@ class ZigzagPatternPainter extends CustomPainter {
 
     final path = Path();
     const zigzagHeight = 8.0;
-    const zigzagWidth = 20.0;
+    const zigzagWidth = 16.0;
 
     // Start from top-left
     path.moveTo(0, 0);
