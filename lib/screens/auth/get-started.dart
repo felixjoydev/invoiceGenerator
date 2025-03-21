@@ -57,11 +57,14 @@ class GetStartedContent extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     // Logo with smaller dimensions (40px width)
-                    SvgPicture.asset(
-                      'assets/icons/logo.svg',
-                      width: 40,
-                      height: 49,
-                      alignment: Alignment.centerLeft,
+                    Hero(
+                      tag: 'logo',
+                      child: SvgPicture.asset(
+                        'assets/icons/logo.svg',
+                        width: 40,
+                        height: 49,
+                        alignment: Alignment.centerLeft,
+                      ),
                     ),
                     // Invo Black SVG
                     SvgPicture.asset(

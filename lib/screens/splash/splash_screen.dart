@@ -31,24 +31,17 @@ class _SplashScreenState extends State<SplashScreen>
 
     _animationController.forward();
 
-    // Navigate to the get started screen after a delay with fade transition
+    // Navigate to the get started screen after a delay with custom transition
     Timer(const Duration(seconds: 3), () {
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder:
               (context, animation, secondaryAnimation) =>
                   const GetStartedScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            const begin = 0.0;
-            const end = 1.0;
-            var curve = CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeInOut,
-            );
-            var fade = Tween(begin: begin, end: end).animate(curve);
-            return FadeTransition(opacity: fade, child: child);
-          },
           transitionDuration: const Duration(milliseconds: 800),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
         ),
       );
     });
@@ -67,10 +60,37 @@ class _SplashScreenState extends State<SplashScreen>
       body: Center(
         child: FadeTransition(
           opacity: _fadeAnimation,
-          child: SvgPicture.asset(
-            'assets/icons/logo.svg',
-            width: 100, // Width set to 100
-            height: 125, // Height adjusted proportionally (5:4 ratio)
+          child: Hero(
+            tag: 'logo',
+            flightShuttleBuilder: (
+              BuildContext flightContext,
+              Animation<double> animation,
+              HeroFlightDirection flightDirection,
+              BuildContext fromHeroContext,
+              BuildContext toHeroContext,
+            ) {
+              return AnimatedBuilder(
+                animation: animation,
+                builder: (context, child) {
+                  return SvgPicture.asset(
+                    'assets/icons/logo.svg',
+                    width: Tween<double>(
+                      begin: 100,
+                      end: 40,
+                    ).evaluate(animation),
+                    height: Tween<double>(
+                      begin: 125,
+                      end: 49,
+                    ).evaluate(animation),
+                  );
+                },
+              );
+            },
+            child: SvgPicture.asset(
+              'assets/icons/logo.svg',
+              width: 100, // Width set to 100
+              height: 125, // Height adjusted proportionally
+            ),
           ),
         ),
       ),
