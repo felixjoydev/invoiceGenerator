@@ -31,8 +31,13 @@ import 'dart:io';
 
 class InvoiceCreateScreen extends StatefulWidget {
   final Invoice? invoiceToEdit;
+  final int? returnTabIndex;
 
-  const InvoiceCreateScreen({super.key, this.invoiceToEdit});
+  const InvoiceCreateScreen({
+    super.key,
+    this.invoiceToEdit,
+    this.returnTabIndex,
+  });
 
   @override
   State<InvoiceCreateScreen> createState() => _InvoiceCreateScreenState();
@@ -1160,15 +1165,17 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
           // Get template object from template name
           _getTemplateByName(_selectedTemplate);
 
-          Navigator.of(context).push(
+          // After successful save, navigate to invoice preview
+          Navigator.pushReplacement(
+            context,
             MaterialPageRoute(
-              builder: (context) {
-                return InvoicePreview(
-                  invoice: invoice,
-                  companyInfo: companyInfo,
-                  logoPath: logoPath,
-                );
-              },
+              builder:
+                  (context) => InvoicePreview(
+                    invoice: invoice,
+                    companyInfo: companyInfo,
+                    logoPath: logoPath,
+                    returnTabIndex: widget.returnTabIndex ?? 0,
+                  ),
             ),
           );
         }

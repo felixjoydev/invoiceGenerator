@@ -27,11 +27,83 @@ import 'package:invoicegenerator/widgets/cards/HighlightedInvoiceCard.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
 
 class InvoiceListScreen extends StatefulWidget {
   final String? invoiceIdToAnimate;
+  final int initialTabIndex;
 
-  const InvoiceListScreen({super.key, this.invoiceIdToAnimate});
+  // Store scroll positions by tab index
+  static final Map<int, double> _scrollPositions = {
+    0: 0.0, // All tab
+    1: 0.0, // Overdue tab
+    2: 0.0, // Outstanding tab
+    3: 0.0, // Paid tab
+  };
+
+  const InvoiceListScreen({
+    super.key,
+    this.invoiceIdToAnimate,
+    this.initialTabIndex = 0,
+  });
+
+  // Static method to navigate with correct tab index and animation
+  static void navigateWithTab(
+    BuildContext context, {
+    required int tabIndex,
+    String? invoiceIdToAnimate,
+    bool saveCurrentPosition = false,
+  }) {
+    // Always try to get the current state to save position
+    final currentState =
+        context.findAncestorStateOfType<_InvoiceListScreenState>();
+
+    // If saveCurrentPosition is true, save the current tab's position
+    if (saveCurrentPosition &&
+        currentState != null &&
+        currentState._scrollController.hasClients) {
+      int currentTabIndex = currentState._selectedTabIndex;
+      saveScrollPosition(
+        currentTabIndex,
+        currentState._scrollController.offset,
+      );
+    }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder:
+            (context) => InvoiceListScreen(
+              invoiceIdToAnimate: invoiceIdToAnimate,
+              initialTabIndex: tabIndex,
+            ),
+      ),
+    );
+  }
+
+  // Static method to save a specific tab's scroll position
+  static void saveScrollPosition(int tabIndex, double position) {
+    _scrollPositions[tabIndex] = position;
+    debugPrint('Saved scroll position for tab $tabIndex: $position');
+  }
+
+  // Static method to save the current tab's scroll position
+  static void saveScrollPositionForCurrentTab(
+    BuildContext context,
+    int tabIndex,
+  ) {
+    final currentState =
+        context.findAncestorStateOfType<_InvoiceListScreenState>();
+    if (currentState != null && currentState._scrollController.hasClients) {
+      saveScrollPosition(tabIndex, currentState._scrollController.offset);
+      debugPrint(
+        'Explicitly saved scroll position for tab $tabIndex: ${currentState._scrollController.offset}',
+      );
+    } else {
+      debugPrint(
+        'Could not find current state to save scroll position for tab $tabIndex',
+      );
+    }
+  }
 
   @override
   State<InvoiceListScreen> createState() => _InvoiceListScreenState();
@@ -43,6 +115,12 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
   // Search controller
   final TextEditingController _searchController = TextEditingController();
+
+  // Page storage bucket to preserve scroll positions
+  final PageStorageBucket _bucket = PageStorageBucket();
+
+  // Fixed scroll controller for each tab
+  final ScrollController _scrollController = ScrollController();
 
   // Search query
   String _searchQuery = '';
@@ -70,6 +148,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
   void initState() {
     super.initState();
     _loadInvoices();
+    // Set the selected tab index from widget property
+    _selectedTabIndex = widget.initialTabIndex;
     // Add listener to refresh when invoices change
     _invoiceService.addListener(_handleInvoiceUpdates);
 
@@ -77,6 +157,73 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     if (widget.invoiceIdToAnimate != null) {
       _newlyAddedInvoiceIds.add(widget.invoiceIdToAnimate!);
       debugPrint('Will animate invoice: ${widget.invoiceIdToAnimate}');
+    }
+
+    // Restore scroll position
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Add a small delay to ensure controller is properly attached
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (_scrollController.hasClients) {
+          final position =
+              InvoiceListScreen._scrollPositions[_selectedTabIndex] ?? 0.0;
+          if (position == 0.0) {
+            debugPrint(
+              'Tab $_selectedTabIndex has no saved position, starting at 0.0',
+            );
+          } else {
+            debugPrint(
+              'Restoring tab $_selectedTabIndex to saved position: $position',
+            );
+          }
+          _scrollController.jumpTo(position);
+        }
+      });
+    });
+
+    // Add listener to save scroll position when scrolling
+    _scrollController.addListener(_saveScrollPosition);
+  }
+
+  @override
+  void didUpdateWidget(InvoiceListScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // If the tab index changed, save and restore scroll positions
+    if (oldWidget.initialTabIndex != widget.initialTabIndex) {
+      // Save current scroll position for the old tab
+      _saveScrollPosition();
+
+      setState(() {
+        _selectedTabIndex = widget.initialTabIndex;
+      });
+
+      // Restore scroll position for the new tab after UI updates
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Add a small delay to ensure controller is properly attached
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (_scrollController.hasClients) {
+            final position =
+                InvoiceListScreen._scrollPositions[_selectedTabIndex] ?? 0.0;
+            _scrollController.jumpTo(position);
+            debugPrint(
+              'Restored scroll position for tab $_selectedTabIndex: $position',
+            );
+          }
+        });
+      });
+    }
+
+    // If a new invoice ID was provided to animate
+    if (widget.invoiceIdToAnimate != null &&
+        widget.invoiceIdToAnimate != oldWidget.invoiceIdToAnimate) {
+      debugPrint(
+        'Invoice ID to animate changed to: ${widget.invoiceIdToAnimate}',
+      );
+
+      // Add to the set of newly added invoice IDs
+      setState(() {
+        _newlyAddedInvoiceIds.add(widget.invoiceIdToAnimate!);
+      });
     }
   }
 
@@ -336,6 +483,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       invoice: invoice,
       companyInfo: companyInfo,
       logoPath: logoPath,
+      currentTabIndex: _selectedTabIndex,
     );
   }
 
@@ -643,8 +791,24 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     );
   }
 
+  // Save current scroll position
+  void _saveScrollPosition() {
+    if (_scrollController.hasClients) {
+      InvoiceListScreen._scrollPositions[_selectedTabIndex] =
+          _scrollController.offset;
+      debugPrint(
+        'Saved scroll position for tab $_selectedTabIndex: ${_scrollController.offset}',
+      );
+    }
+  }
+
   @override
   void dispose() {
+    // Save final scroll position
+    _saveScrollPosition();
+
+    _scrollController.removeListener(_saveScrollPosition);
+    _scrollController.dispose();
     _searchController.dispose();
     // Remove listener when widget is disposed
     _invoiceService.removeListener(_handleInvoiceUpdates);
@@ -662,193 +826,224 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         // Prevent bottom navigation from being pushed up by keyboard
         resizeToAvoidBottomInset: false,
         backgroundColor: AppTheme.background,
-        body: Stack(
-          children: [
-            Column(
-              children: [
-                // Custom top navigation with invoice icon on left, sort and add icons on right
-                SafeArea(
-                  bottom: false,
-                  child: NavContainer(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Invoice icon and title
-                        Row(
-                          children: [
-                            SvgPicture.asset(
-                              'assets/icons/invoice.svg',
-                              width: 24,
-                              height: 24,
-                              colorFilter: ColorFilter.mode(
-                                const Color(0xFF373C3A),
-                                BlendMode.srcIn,
-                              ),
-                            ),
-                            const SizedBox(width: 8), // 8px spacing
-                            const Text(
-                              'Invoices',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF373C3A),
-                                fontFamily: 'HelveticaNowDisplay',
-                                letterSpacing: -0.8,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        // Sort and Add icons on the right with 16px spacing
-                        Row(
-                          children: [
-                            SvgPicture.asset(
-                              'assets/icons/sort.svg',
-                              width: 24,
-                              height: 24,
-                              colorFilter: ColorFilter.mode(
-                                const Color(0xFF373C3A),
-                                BlendMode.srcIn,
-                              ),
-                            ),
-                            const SizedBox(width: 16), // 16px spacing
-                            GestureDetector(
-                              onTap: _handleAddTapped,
-                              child: SvgPicture.asset(
-                                'assets/icons/add-black.svg',
+        body: PageStorage(
+          bucket: _bucket,
+          child: Stack(
+            key: ValueKey('invoice-list-stack-${_selectedTabIndex}'),
+            children: [
+              Column(
+                children: [
+                  // Custom top navigation with invoice icon on left, sort and add icons on right
+                  SafeArea(
+                    bottom: false,
+                    child: NavContainer(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Invoice icon and title
+                          Row(
+                            children: [
+                              SvgPicture.asset(
+                                'assets/icons/invoice.svg',
                                 width: 24,
                                 height: 24,
+                                colorFilter: ColorFilter.mode(
+                                  const Color(0xFF373C3A),
+                                  BlendMode.srcIn,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // 32px spacing after TopNav
-                const SizedBox(height: 16),
-
-                // Tabs for invoice categories
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: CustomTabBar(
-                    tabs: const ['All', 'Overdue', 'Outstanding', 'Paid'],
-                    initialTabIndex: _selectedTabIndex,
-                    onTabChanged: (index) {
-                      setState(() {
-                        _selectedTabIndex = index;
-                      });
-                    },
-                  ),
-                ),
-
-                // 16px spacing after Tabs
-                const SizedBox(height: 16),
-
-                // Search Input
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: SearchInput(
-                    controller: _searchController,
-                    hintText: 'Search invoices',
-                    onChanged: _handleSearchInputChanged,
-                  ),
-                ),
-
-                // 24px spacing after Search Input
-                const SizedBox(height: 24),
-
-                // Main content area with cards based on selected tab
-                Expanded(
-                  child: ContentSlideTransition(
-                    // Direction determination happens in the route
-                    slideFromRight:
-                        ModalRoute.of(context)?.settings.arguments
-                            is HomeScreen,
-                    // Disable slide animation if we have newly added items to animate
-                    disableAnimation: _newlyAddedInvoiceIds.isNotEmpty,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child:
-                          _isLoading
-                              ? _buildLoadingContent()
-                              : SingleChildScrollView(
-                                child:
-                                    _selectedTabIndex == 0
-                                        ? _buildAllCards()
-                                        : _selectedTabIndex == 1
-                                        ? _buildOverdueCards()
-                                        : _selectedTabIndex == 2
-                                        ? _buildOutstandingCards()
-                                        : _buildPaidCards(),
+                              const SizedBox(width: 8), // 8px spacing
+                              const Text(
+                                'Invoices',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF373C3A),
+                                  fontFamily: 'HelveticaNowDisplay',
+                                  letterSpacing: -0.8,
+                                ),
                               ),
-                    ),
-                  ),
-                ),
+                            ],
+                          ),
 
-                // Bottom navigation with invoice selected
-                BottomNav(
-                  activeItem: BottomNavItem.invoice,
-                  onItemSelected: _handleNavItemSelected,
-                  onAddTapped: _handleAddTapped,
-                ),
-              ],
-            ),
-
-            // Overlay for long press with fade-in animation
-            if (_selectedInvoice != null)
-              AnimatedOpacity(
-                opacity: 1.0,
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-                child: BlurredBackground(onTap: _handleBackgroundTap),
-              ),
-
-            // Selected item and press widget with absolute positioning
-            if (_selectedInvoice != null)
-              Stack(
-                children: [
-                  // Highlighted invoice card - positioned at original location
-                  Positioned(
-                    left: _selectedItemPosition.dx,
-                    top: _selectedItemPosition.dy,
-                    width: _selectedItemSize.width,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: HighlightedInvoiceCard(invoice: _selectedInvoice!),
-                    ),
-                  ),
-
-                  // PressWidget - positioned either above or below the card
-                  Positioned(
-                    left: _selectedItemPosition.dx,
-                    top:
-                        _showPressWidgetAbove
-                            ? _selectedItemPosition.dy -
-                                (_selectedInvoice?.status == InvoiceStatus.paid
-                                    ? 112.0
-                                    : 168.0) // Adjust height based on whether Mark as Paid is shown
-                            : _selectedItemPosition.dy +
-                                _selectedItemSize.height +
-                                8.0, // Below the card with 8px spacing
-                    width: _selectedItemSize.width,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: PressWidget(
-                        onEdit: _handleEditTapped,
-                        onDelete: _handleDeleteTapped,
-                        onMarkAsPaid: _handleMarkAsPaidTapped,
-                        // Only show for non-paid invoices
-                        showMarkAsPaid:
-                            _selectedInvoice?.status != InvoiceStatus.paid,
+                          // Sort and Add icons on the right with 16px spacing
+                          Row(
+                            children: [
+                              SvgPicture.asset(
+                                'assets/icons/sort.svg',
+                                width: 24,
+                                height: 24,
+                                colorFilter: ColorFilter.mode(
+                                  const Color(0xFF373C3A),
+                                  BlendMode.srcIn,
+                                ),
+                              ),
+                              const SizedBox(width: 16), // 16px spacing
+                              GestureDetector(
+                                onTap: _handleAddTapped,
+                                child: SvgPicture.asset(
+                                  'assets/icons/add-black.svg',
+                                  width: 24,
+                                  height: 24,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),
+
+                  // 32px spacing after TopNav
+                  const SizedBox(height: 16),
+
+                  // Tabs for invoice categories
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: CustomTabBar(
+                      tabs: const ['All', 'Overdue', 'Outstanding', 'Paid'],
+                      initialTabIndex: _selectedTabIndex,
+                      onTabChanged: (index) {
+                        // Save current scroll position
+                        _saveScrollPosition();
+
+                        setState(() {
+                          _selectedTabIndex = index;
+                        });
+
+                        // Restore scroll position for the new tab after UI updates
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          // Add a small delay to ensure controller is properly attached
+                          Future.delayed(const Duration(milliseconds: 100), () {
+                            if (_scrollController.hasClients) {
+                              final position =
+                                  InvoiceListScreen
+                                      ._scrollPositions[_selectedTabIndex] ??
+                                  0.0;
+                              _scrollController.jumpTo(position);
+                              debugPrint(
+                                'Restored scroll position for tab $_selectedTabIndex: $position',
+                              );
+                            }
+                          });
+                        });
+                      },
+                    ),
+                  ),
+
+                  // 16px spacing after Tabs
+                  const SizedBox(height: 16),
+
+                  // Search Input
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: SearchInput(
+                      controller: _searchController,
+                      hintText: 'Search invoices',
+                      onChanged: _handleSearchInputChanged,
+                    ),
+                  ),
+
+                  // 24px spacing after Search Input
+                  const SizedBox(height: 24),
+
+                  // Main content area with cards based on selected tab
+                  Expanded(
+                    child: ContentSlideTransition(
+                      key: ValueKey('content-slide-${_selectedTabIndex}'),
+                      // Direction determination happens in the route
+                      slideFromRight:
+                          ModalRoute.of(context)?.settings.arguments
+                              is HomeScreen,
+                      // Disable slide animation if we have newly added items to animate
+                      disableAnimation: _newlyAddedInvoiceIds.isNotEmpty,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child:
+                            _isLoading
+                                ? _buildLoadingContent()
+                                : SingleChildScrollView(
+                                  // Use scroll controller to maintain position
+                                  controller: _scrollController,
+                                  // Skip page storage approach since we're handling scroll manually
+                                  child:
+                                      _selectedTabIndex == 0
+                                          ? _buildAllCards()
+                                          : _selectedTabIndex == 1
+                                          ? _buildOverdueCards()
+                                          : _selectedTabIndex == 2
+                                          ? _buildOutstandingCards()
+                                          : _buildPaidCards(),
+                                ),
+                      ),
+                    ),
+                  ),
+
+                  // Bottom navigation with invoice selected
+                  BottomNav(
+                    activeItem: BottomNavItem.invoice,
+                    onItemSelected: _handleNavItemSelected,
+                    onAddTapped: _handleAddTapped,
+                  ),
                 ],
               ),
-          ],
+
+              // Overlay for long press with fade-in animation
+              if (_selectedInvoice != null)
+                AnimatedOpacity(
+                  opacity: 1.0,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  child: BlurredBackground(onTap: _handleBackgroundTap),
+                ),
+
+              // Selected item and press widget with absolute positioning
+              if (_selectedInvoice != null)
+                Stack(
+                  children: [
+                    // Highlighted invoice card - positioned at original location
+                    Positioned(
+                      left: _selectedItemPosition.dx,
+                      top: _selectedItemPosition.dy,
+                      width: _selectedItemSize.width,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: HighlightedInvoiceCard(
+                          invoice: _selectedInvoice!,
+                        ),
+                      ),
+                    ),
+
+                    // PressWidget - positioned either above or below the card
+                    Positioned(
+                      left: _selectedItemPosition.dx,
+                      top:
+                          _showPressWidgetAbove
+                              ? _selectedItemPosition.dy -
+                                  (_selectedInvoice?.status ==
+                                          InvoiceStatus.paid
+                                      ? 112.0
+                                      : 168.0) // Adjust height based on whether Mark as Paid is shown
+                              : _selectedItemPosition.dy +
+                                  _selectedItemSize.height +
+                                  8.0, // Below the card with 8px spacing
+                      width: _selectedItemSize.width,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: PressWidget(
+                          onEdit: _handleEditTapped,
+                          onDelete: _handleDeleteTapped,
+                          onMarkAsPaid: _handleMarkAsPaidTapped,
+                          // Only show for non-paid invoices
+                          showMarkAsPaid:
+                              _selectedInvoice?.status != InvoiceStatus.paid,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -919,20 +1114,191 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       );
     }
 
-    return Column(
-      children: List.generate(filteredInvoices.length * 2 - 1, (index) {
-        // Return card for even indices
-        if (index.isEven) {
-          final invoiceIndex = index ~/ 2;
-          final invoice = filteredInvoices[invoiceIndex];
-          final dateFormat = DateFormat('MM/dd/yyyy');
-          final isNewlyAdded = _newlyAddedInvoiceIds.contains(
-            invoice.invoiceId,
-          );
-          final itemKey = GlobalKey();
+    // Wrap in KeyedSubtree to preserve state
+    return KeyedSubtree(
+      key: ValueKey('all-cards-${filteredInvoices.length}'),
+      child: Column(
+        children: List.generate(filteredInvoices.length * 2 - 1, (index) {
+          // Return card for even indices
+          if (index.isEven) {
+            final invoiceIndex = index ~/ 2;
+            final invoice = filteredInvoices[invoiceIndex];
+            final dateFormat = DateFormat('MM/dd/yyyy');
+            final isNewlyAdded = _newlyAddedInvoiceIds.contains(
+              invoice.invoiceId,
+            );
+            final itemKey = GlobalKey();
 
-          // Different card types based on invoice status
-          if (invoice.status == InvoiceStatus.overdue) {
+            // Different card types based on invoice status
+            if (invoice.status == InvoiceStatus.overdue) {
+              // Calculate days overdue
+              final now = DateTime.now();
+              final difference = now.difference(invoice.dueDate).inDays;
+              final daysText = '$difference days due';
+
+              // Use animated card for newly added invoices
+              if (isNewlyAdded) {
+                return KeyedSubtree(
+                  key: itemKey,
+                  child: AnimatedInvoiceCard(
+                    companyName: invoice.client.name,
+                    date: dateFormat.format(invoice.issueDate),
+                    invoiceNumber: invoice.invoiceId,
+                    amount: invoice.total.toStringAsFixed(2),
+                    daysText: daysText,
+                    daysColor: const Color(0xFFD61443),
+                    onTap: () => _handleInvoiceTapped(invoice),
+                    onAnimationComplete:
+                        () => _handleAnimationComplete(invoice.invoiceId),
+                    onLongPress: () => _handleLongPress(invoice, itemKey),
+                  ),
+                );
+              }
+
+              return KeyedSubtree(
+                key: itemKey,
+                child: DueCard(
+                  companyName: invoice.client.name,
+                  date: dateFormat.format(invoice.issueDate),
+                  invoiceNumber: invoice.invoiceId,
+                  amount: invoice.total.toStringAsFixed(2),
+                  daysText: daysText,
+                  daysColor: const Color(0xFFD61443),
+                  onTap: () => _handleInvoiceTapped(invoice),
+                  onLongPress: () => _handleLongPress(invoice, itemKey),
+                ),
+              );
+            } else if (invoice.status == InvoiceStatus.outstanding) {
+              // Calculate days until due
+              final now = DateTime.now();
+              final difference = invoice.dueDate.difference(now).inDays;
+              final daysText = 'DUE IN $difference DAYS';
+
+              // Use animated card for newly added invoices
+              if (isNewlyAdded) {
+                return KeyedSubtree(
+                  key: itemKey,
+                  child: AnimatedOutstandingCard(
+                    companyName: invoice.client.name,
+                    date: dateFormat.format(invoice.issueDate),
+                    invoiceNumber: invoice.invoiceId,
+                    amount: invoice.total.toStringAsFixed(2),
+                    daysText: daysText,
+                    daysColor: const Color(0xFFD68814),
+                    onTap: () => _handleInvoiceTapped(invoice),
+                    onAnimationComplete:
+                        () => _handleAnimationComplete(invoice.invoiceId),
+                    onLongPress: () => _handleLongPress(invoice, itemKey),
+                  ),
+                );
+              }
+
+              return KeyedSubtree(
+                key: itemKey,
+                child: Outstanding.DueCard(
+                  companyName: invoice.client.name,
+                  date: dateFormat.format(invoice.issueDate),
+                  invoiceNumber: invoice.invoiceId,
+                  amount: invoice.total.toStringAsFixed(2),
+                  daysText: daysText,
+                  daysColor: const Color(0xFFD68814),
+                  onTap: () => _handleInvoiceTapped(invoice),
+                  onLongPress: () => _handleLongPress(invoice, itemKey),
+                ),
+              );
+            } else {
+              // Paid
+              // Get formatted paid date or fallback to issue date
+              final displayDate =
+                  invoice.paidDate != null
+                      ? dateFormat.format(invoice.paidDate!)
+                      : dateFormat.format(invoice.issueDate);
+              final daysText = 'PAID ON $displayDate';
+
+              // Use animated card for newly added invoices
+              if (isNewlyAdded) {
+                return KeyedSubtree(
+                  key: itemKey,
+                  child: AnimatedPaidCard(
+                    companyName: invoice.client.name,
+                    date: dateFormat.format(invoice.issueDate),
+                    invoiceNumber: invoice.invoiceId,
+                    amount: invoice.total.toStringAsFixed(2),
+                    daysText: daysText,
+                    daysColor: const Color(0xFF13AF5B),
+                    onTap: () => _handleInvoiceTapped(invoice),
+                    onAnimationComplete:
+                        () => _handleAnimationComplete(invoice.invoiceId),
+                    onLongPress: () => _handleLongPress(invoice, itemKey),
+                  ),
+                );
+              }
+
+              return KeyedSubtree(
+                key: itemKey,
+                child: Paid.DueCard(
+                  companyName: invoice.client.name,
+                  date: dateFormat.format(invoice.issueDate),
+                  invoiceNumber: invoice.invoiceId,
+                  amount: invoice.total.toStringAsFixed(2),
+                  daysText: daysText,
+                  daysColor: const Color(0xFF13AF5B),
+                  onTap: () => _handleInvoiceTapped(invoice),
+                  onLongPress: () => _handleLongPress(invoice, itemKey),
+                ),
+              );
+            }
+          }
+          // Return divider for odd indices
+          else {
+            return Column(
+              children: const [
+                SizedBox(height: 16),
+                Divider(height: 1, color: Color(0xFFCAD5D2)),
+                SizedBox(height: 16),
+              ],
+            );
+          }
+        })..add(const SizedBox(height: 16)), // Add bottom spacing
+      ),
+    );
+  }
+
+  // Build the Overdue tab content
+  Widget _buildOverdueCards() {
+    final filteredInvoices = _filteredOverdueInvoices;
+
+    if (filteredInvoices.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.only(top: 32.0),
+          child: Text(
+            'No overdue invoices found',
+            style: TextStyle(
+              fontSize: 16,
+              color: Color(0xFF8D9694),
+              fontFamily: 'Helvetica Now Display',
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Wrap in KeyedSubtree to preserve state
+    return KeyedSubtree(
+      key: ValueKey('overdue-cards-${filteredInvoices.length}'),
+      child: Column(
+        children: List.generate(filteredInvoices.length * 2 - 1, (index) {
+          // Return card for even indices
+          if (index.isEven) {
+            final invoiceIndex = index ~/ 2;
+            final invoice = filteredInvoices[invoiceIndex];
+            final dateFormat = DateFormat('MM/dd/yyyy');
+            final isNewlyAdded = _newlyAddedInvoiceIds.contains(
+              invoice.invoiceId,
+            );
+            final itemKey = GlobalKey();
+
             // Calculate days overdue
             final now = DateTime.now();
             final difference = now.difference(invoice.dueDate).inDays;
@@ -970,7 +1336,57 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                 onLongPress: () => _handleLongPress(invoice, itemKey),
               ),
             );
-          } else if (invoice.status == InvoiceStatus.outstanding) {
+          }
+          // Return divider for odd indices
+          else {
+            return Column(
+              children: const [
+                SizedBox(height: 16),
+                Divider(height: 1, color: Color(0xFFCAD5D2)),
+                SizedBox(height: 16),
+              ],
+            );
+          }
+        })..add(const SizedBox(height: 16)), // Add bottom spacing
+      ),
+    );
+  }
+
+  // Build the Outstanding tab content
+  Widget _buildOutstandingCards() {
+    final filteredInvoices = _filteredOutstandingInvoices;
+
+    if (filteredInvoices.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.only(top: 32.0),
+          child: Text(
+            'No outstanding invoices found',
+            style: TextStyle(
+              fontSize: 16,
+              color: Color(0xFF8D9694),
+              fontFamily: 'Helvetica Now Display',
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Wrap in KeyedSubtree to preserve state
+    return KeyedSubtree(
+      key: ValueKey('outstanding-cards-${filteredInvoices.length}'),
+      child: Column(
+        children: List.generate(filteredInvoices.length * 2 - 1, (index) {
+          // Return card for even indices
+          if (index.isEven) {
+            final invoiceIndex = index ~/ 2;
+            final invoice = filteredInvoices[invoiceIndex];
+            final dateFormat = DateFormat('MM/dd/yyyy');
+            final isNewlyAdded = _newlyAddedInvoiceIds.contains(
+              invoice.invoiceId,
+            );
+            final itemKey = GlobalKey();
+
             // Calculate days until due
             final now = DateTime.now();
             final difference = invoice.dueDate.difference(now).inDays;
@@ -1008,8 +1424,57 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                 onLongPress: () => _handleLongPress(invoice, itemKey),
               ),
             );
-          } else {
-            // Paid
+          }
+          // Return divider for odd indices
+          else {
+            return Column(
+              children: const [
+                SizedBox(height: 16),
+                Divider(height: 1, color: Color(0xFFCAD5D2)),
+                SizedBox(height: 16),
+              ],
+            );
+          }
+        })..add(const SizedBox(height: 16)), // Add bottom spacing
+      ),
+    );
+  }
+
+  // Build the Paid tab content
+  Widget _buildPaidCards() {
+    final filteredInvoices = _filteredPaidInvoices;
+
+    if (filteredInvoices.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.only(top: 32.0),
+          child: Text(
+            'No paid invoices found',
+            style: TextStyle(
+              fontSize: 16,
+              color: Color(0xFF8D9694),
+              fontFamily: 'Helvetica Now Display',
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Wrap in KeyedSubtree to preserve state
+    return KeyedSubtree(
+      key: ValueKey('paid-cards-${filteredInvoices.length}'),
+      child: Column(
+        children: List.generate(filteredInvoices.length * 2 - 1, (index) {
+          // Return card for even indices
+          if (index.isEven) {
+            final invoiceIndex = index ~/ 2;
+            final invoice = filteredInvoices[invoiceIndex];
+            final dateFormat = DateFormat('MM/dd/yyyy');
+            final isNewlyAdded = _newlyAddedInvoiceIds.contains(
+              invoice.invoiceId,
+            );
+            final itemKey = GlobalKey();
+
             // Get formatted paid date or fallback to issue date
             final displayDate =
                 invoice.paidDate != null
@@ -1050,272 +1515,18 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
               ),
             );
           }
-        }
-        // Return divider for odd indices
-        else {
-          return Column(
-            children: const [
-              SizedBox(height: 16),
-              Divider(height: 1, color: Color(0xFFCAD5D2)),
-              SizedBox(height: 16),
-            ],
-          );
-        }
-      })..add(const SizedBox(height: 16)), // Add bottom spacing
-    );
-  }
-
-  // Build the Overdue tab content
-  Widget _buildOverdueCards() {
-    final filteredInvoices = _filteredOverdueInvoices;
-
-    if (filteredInvoices.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.only(top: 32.0),
-          child: Text(
-            'No overdue invoices found',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF8D9694),
-              fontFamily: 'Helvetica Now Display',
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: List.generate(filteredInvoices.length * 2 - 1, (index) {
-        // Return card for even indices
-        if (index.isEven) {
-          final invoiceIndex = index ~/ 2;
-          final invoice = filteredInvoices[invoiceIndex];
-          final dateFormat = DateFormat('MM/dd/yyyy');
-          final isNewlyAdded = _newlyAddedInvoiceIds.contains(
-            invoice.invoiceId,
-          );
-          final itemKey = GlobalKey();
-
-          // Calculate days overdue
-          final now = DateTime.now();
-          final difference = now.difference(invoice.dueDate).inDays;
-          final daysText = '$difference days due';
-
-          // Use animated card for newly added invoices
-          if (isNewlyAdded) {
-            return KeyedSubtree(
-              key: itemKey,
-              child: AnimatedInvoiceCard(
-                companyName: invoice.client.name,
-                date: dateFormat.format(invoice.issueDate),
-                invoiceNumber: invoice.invoiceId,
-                amount: invoice.total.toStringAsFixed(2),
-                daysText: daysText,
-                daysColor: const Color(0xFFD61443),
-                onTap: () => _handleInvoiceTapped(invoice),
-                onAnimationComplete:
-                    () => _handleAnimationComplete(invoice.invoiceId),
-                onLongPress: () => _handleLongPress(invoice, itemKey),
-              ),
+          // Return divider for odd indices
+          else {
+            return Column(
+              children: const [
+                SizedBox(height: 16),
+                Divider(height: 1, color: Color(0xFFCAD5D2)),
+                SizedBox(height: 16),
+              ],
             );
           }
-
-          return KeyedSubtree(
-            key: itemKey,
-            child: DueCard(
-              companyName: invoice.client.name,
-              date: dateFormat.format(invoice.issueDate),
-              invoiceNumber: invoice.invoiceId,
-              amount: invoice.total.toStringAsFixed(2),
-              daysText: daysText,
-              daysColor: const Color(0xFFD61443),
-              onTap: () => _handleInvoiceTapped(invoice),
-              onLongPress: () => _handleLongPress(invoice, itemKey),
-            ),
-          );
-        }
-        // Return divider for odd indices
-        else {
-          return Column(
-            children: const [
-              SizedBox(height: 16),
-              Divider(height: 1, color: Color(0xFFCAD5D2)),
-              SizedBox(height: 16),
-            ],
-          );
-        }
-      })..add(const SizedBox(height: 16)), // Add bottom spacing
-    );
-  }
-
-  // Build the Outstanding tab content
-  Widget _buildOutstandingCards() {
-    final filteredInvoices = _filteredOutstandingInvoices;
-
-    if (filteredInvoices.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.only(top: 32.0),
-          child: Text(
-            'No outstanding invoices found',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF8D9694),
-              fontFamily: 'Helvetica Now Display',
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: List.generate(filteredInvoices.length * 2 - 1, (index) {
-        // Return card for even indices
-        if (index.isEven) {
-          final invoiceIndex = index ~/ 2;
-          final invoice = filteredInvoices[invoiceIndex];
-          final dateFormat = DateFormat('MM/dd/yyyy');
-          final isNewlyAdded = _newlyAddedInvoiceIds.contains(
-            invoice.invoiceId,
-          );
-          final itemKey = GlobalKey();
-
-          // Calculate days until due
-          final now = DateTime.now();
-          final difference = invoice.dueDate.difference(now).inDays;
-          final daysText = 'DUE IN $difference DAYS';
-
-          // Use animated card for newly added invoices
-          if (isNewlyAdded) {
-            return KeyedSubtree(
-              key: itemKey,
-              child: AnimatedOutstandingCard(
-                companyName: invoice.client.name,
-                date: dateFormat.format(invoice.issueDate),
-                invoiceNumber: invoice.invoiceId,
-                amount: invoice.total.toStringAsFixed(2),
-                daysText: daysText,
-                daysColor: const Color(0xFFD68814),
-                onTap: () => _handleInvoiceTapped(invoice),
-                onAnimationComplete:
-                    () => _handleAnimationComplete(invoice.invoiceId),
-                onLongPress: () => _handleLongPress(invoice, itemKey),
-              ),
-            );
-          }
-
-          return KeyedSubtree(
-            key: itemKey,
-            child: Outstanding.DueCard(
-              companyName: invoice.client.name,
-              date: dateFormat.format(invoice.issueDate),
-              invoiceNumber: invoice.invoiceId,
-              amount: invoice.total.toStringAsFixed(2),
-              daysText: daysText,
-              daysColor: const Color(0xFFD68814),
-              onTap: () => _handleInvoiceTapped(invoice),
-              onLongPress: () => _handleLongPress(invoice, itemKey),
-            ),
-          );
-        }
-        // Return divider for odd indices
-        else {
-          return Column(
-            children: const [
-              SizedBox(height: 16),
-              Divider(height: 1, color: Color(0xFFCAD5D2)),
-              SizedBox(height: 16),
-            ],
-          );
-        }
-      })..add(const SizedBox(height: 16)), // Add bottom spacing
-    );
-  }
-
-  // Build the Paid tab content
-  Widget _buildPaidCards() {
-    final filteredInvoices = _filteredPaidInvoices;
-
-    if (filteredInvoices.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.only(top: 32.0),
-          child: Text(
-            'No paid invoices found',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF8D9694),
-              fontFamily: 'Helvetica Now Display',
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: List.generate(filteredInvoices.length * 2 - 1, (index) {
-        // Return card for even indices
-        if (index.isEven) {
-          final invoiceIndex = index ~/ 2;
-          final invoice = filteredInvoices[invoiceIndex];
-          final dateFormat = DateFormat('MM/dd/yyyy');
-          final isNewlyAdded = _newlyAddedInvoiceIds.contains(
-            invoice.invoiceId,
-          );
-          final itemKey = GlobalKey();
-
-          // Get formatted paid date or fallback to issue date
-          final displayDate =
-              invoice.paidDate != null
-                  ? dateFormat.format(invoice.paidDate!)
-                  : dateFormat.format(invoice.issueDate);
-          final daysText = 'PAID ON $displayDate';
-
-          // Use animated card for newly added invoices
-          if (isNewlyAdded) {
-            return KeyedSubtree(
-              key: itemKey,
-              child: AnimatedPaidCard(
-                companyName: invoice.client.name,
-                date: dateFormat.format(invoice.issueDate),
-                invoiceNumber: invoice.invoiceId,
-                amount: invoice.total.toStringAsFixed(2),
-                daysText: daysText,
-                daysColor: const Color(0xFF13AF5B),
-                onTap: () => _handleInvoiceTapped(invoice),
-                onAnimationComplete:
-                    () => _handleAnimationComplete(invoice.invoiceId),
-                onLongPress: () => _handleLongPress(invoice, itemKey),
-              ),
-            );
-          }
-
-          return KeyedSubtree(
-            key: itemKey,
-            child: Paid.DueCard(
-              companyName: invoice.client.name,
-              date: dateFormat.format(invoice.issueDate),
-              invoiceNumber: invoice.invoiceId,
-              amount: invoice.total.toStringAsFixed(2),
-              daysText: daysText,
-              daysColor: const Color(0xFF13AF5B),
-              onTap: () => _handleInvoiceTapped(invoice),
-              onLongPress: () => _handleLongPress(invoice, itemKey),
-            ),
-          );
-        }
-        // Return divider for odd indices
-        else {
-          return Column(
-            children: const [
-              SizedBox(height: 16),
-              Divider(height: 1, color: Color(0xFFCAD5D2)),
-              SizedBox(height: 16),
-            ],
-          );
-        }
-      })..add(const SizedBox(height: 16)), // Add bottom spacing
+        })..add(const SizedBox(height: 16)), // Add bottom spacing
+      ),
     );
   }
 }

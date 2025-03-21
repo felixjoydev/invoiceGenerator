@@ -15,12 +15,14 @@ class InvoicePreview extends StatelessWidget {
   final Invoice invoice;
   final CompanyInfo companyInfo;
   final String? logoPath;
+  final int returnTabIndex;
 
   const InvoicePreview({
     super.key,
     required this.invoice,
     required this.companyInfo,
     this.logoPath,
+    required this.returnTabIndex,
   });
 
   // Helper method to get template by name
@@ -219,6 +221,7 @@ class InvoicePreview extends StatelessWidget {
                                       invoice: updatedInvoice,
                                       companyInfo: latestCompanyInfo,
                                       logoPath: latestCompanyInfo.logoPath,
+                                      returnTabIndex: returnTabIndex,
                                     ),
                               ),
                             );
@@ -273,14 +276,10 @@ class InvoicePreview extends StatelessWidget {
                 height: 72,
                 child: TextButton(
                   onPressed: () {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder:
-                            (context) => InvoiceListScreen(
-                              invoiceIdToAnimate: invoice.invoiceId,
-                            ),
-                      ),
-                      (route) => false,
+                    InvoiceListScreen.navigateWithTab(
+                      context,
+                      tabIndex: returnTabIndex,
+                      invoiceIdToAnimate: invoice.invoiceId,
                     );
                   },
                   child: const Text(
@@ -313,14 +312,14 @@ class InvoiceHeader extends StatelessWidget {
   final String dueDate;
 
   const InvoiceHeader({
-    Key? key,
+    super.key,
     required this.clientName,
     required this.issueDate,
     required this.invoiceId,
     required this.currency,
     required this.amount,
     required this.dueDate,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -441,11 +440,11 @@ class InvoiceActionButtons extends StatelessWidget {
   final VoidCallback onSharePressed;
 
   const InvoiceActionButtons({
-    Key? key,
+    super.key,
     required this.onEditPressed,
     required this.onDownloadPressed,
     required this.onSharePressed,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -592,7 +591,7 @@ class InvoiceActionButtons extends StatelessWidget {
 
 // Zigzag pattern with sharp edges at the bottom
 class ZigzagPattern extends StatelessWidget {
-  const ZigzagPattern({Key? key}) : super(key: key);
+  const ZigzagPattern({super.key});
 
   @override
   Widget build(BuildContext context) {

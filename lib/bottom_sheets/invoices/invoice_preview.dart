@@ -16,6 +16,7 @@ void showInvoicePreviewSheet({
   required Invoice invoice,
   required CompanyInfo companyInfo,
   String? logoPath,
+  required int currentTabIndex,
 }) {
   showModalBottomSheet(
     context: context,
@@ -26,6 +27,7 @@ void showInvoicePreviewSheet({
         invoice: invoice,
         companyInfo: companyInfo,
         logoPath: logoPath,
+        currentTabIndex: currentTabIndex,
       );
     },
   );
@@ -35,12 +37,14 @@ class InvoicePreviewSheet extends StatelessWidget {
   final Invoice invoice;
   final CompanyInfo companyInfo;
   final String? logoPath;
+  final int currentTabIndex;
 
   const InvoicePreviewSheet({
     super.key,
     required this.invoice,
     required this.companyInfo,
     this.logoPath,
+    required this.currentTabIndex,
   });
 
   // Helper method to get template by name
@@ -173,6 +177,12 @@ class InvoicePreviewSheet extends StatelessWidget {
                             // Close the bottom sheet
                             Navigator.of(context).pop();
 
+                            // Save scroll position before navigating
+                            InvoiceListScreen.saveScrollPositionForCurrentTab(
+                              context,
+                              currentTabIndex,
+                            );
+
                             // Navigate back to invoice list and show message
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -183,12 +193,14 @@ class InvoicePreviewSheet extends StatelessWidget {
                               ),
                             );
 
-                            // Replace current screen with invoice list
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
-                                builder: (context) => const InvoiceListScreen(),
-                              ),
-                              (route) => false,
+                            // Return to invoice list with correct tab
+                            InvoiceListScreen.navigateWithTab(
+                              context,
+                              tabIndex: currentTabIndex,
+                              invoiceIdToAnimate:
+                                  null, // No animation for deleted invoice
+                              saveCurrentPosition:
+                                  false, // We already saved it above
                             );
                           },
                           borderRadius: BorderRadius.circular(4),
@@ -239,6 +251,12 @@ class InvoicePreviewSheet extends StatelessWidget {
       // Close the bottom sheet
       Navigator.of(context).pop();
 
+      // Save scroll position before navigating
+      InvoiceListScreen.saveScrollPositionForCurrentTab(
+        context,
+        currentTabIndex,
+      );
+
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -247,14 +265,12 @@ class InvoicePreviewSheet extends StatelessWidget {
         ),
       );
 
-      // Return to invoice list with animation
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder:
-              (context) =>
-                  InvoiceListScreen(invoiceIdToAnimate: invoice.invoiceId),
-        ),
-        (route) => false,
+      // Return to invoice list with correct tab and animation
+      InvoiceListScreen.navigateWithTab(
+        context,
+        tabIndex: currentTabIndex,
+        invoiceIdToAnimate: invoice.invoiceId,
+        saveCurrentPosition: false, // We already saved it above
       );
     }
 
@@ -315,26 +331,35 @@ class InvoicePreviewSheet extends StatelessWidget {
                             // Close bottom sheet first
                             Navigator.pop(context);
 
-                            // Then navigate to edit screen with invoice data
+                            // Remember the tab index for later
+                            final tabToReturn = currentTabIndex;
+                            final invoiceId = invoice.invoiceId;
+
+                            // Save current scroll position for this tab right now
+                            // This needs to happen before we leave the current screen
+                            InvoiceListScreen.saveScrollPositionForCurrentTab(
+                              context,
+                              tabToReturn,
+                            );
+
+                            // Navigate to edit screen with invoice data
                             Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder:
                                     (context) => InvoiceCreateScreen(
                                       invoiceToEdit: invoice,
+                                      returnTabIndex: tabToReturn,
                                     ),
                               ),
                             ).then((_) {
-                              // After returning from edit, pass the invoice ID to animate
-                              ScaffoldMessenger.of(context).clearSnackBars();
-                              Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(
-                                  builder:
-                                      (context) => InvoiceListScreen(
-                                        invoiceIdToAnimate: invoice.invoiceId,
-                                      ),
-                                ),
-                                (route) => false,
+                              // After returning from edit, restore scroll position when navigating
+                              // Don't save current position again (we want to keep the original position)
+                              InvoiceListScreen.navigateWithTab(
+                                context,
+                                tabIndex: tabToReturn,
+                                invoiceIdToAnimate: invoiceId,
+                                saveCurrentPosition: false,
                               );
                             });
                           },

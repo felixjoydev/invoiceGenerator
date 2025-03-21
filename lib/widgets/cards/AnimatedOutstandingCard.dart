@@ -44,7 +44,7 @@ class _AnimatedOutstandingCardState extends State<AnimatedOutstandingCard>
     // Setup animation controller
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 500),
     );
 
     // Setup fade animation
@@ -53,9 +53,9 @@ class _AnimatedOutstandingCardState extends State<AnimatedOutstandingCard>
       end: 1.0,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
-    // Remove slide animation - items will simply appear in place
+    // Remove slide animation - items will simply appear in place and fade in
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0.0, 0.0), // Changed from (0.0, 1.0) to (0.0, 0.0)
+      begin: const Offset(0.0, 0.0),
       end: const Offset(0.0, 0.0),
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
