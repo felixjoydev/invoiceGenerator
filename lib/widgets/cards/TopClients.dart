@@ -1,11 +1,80 @@
 import 'package:flutter/material.dart';
 import 'package:invoicegenerator/theme/app_theme.dart';
+import 'package:invoicegenerator/services/client_service.dart';
+import 'package:invoicegenerator/models/client.dart';
+import 'package:invoicegenerator/screens/clients/client_list_screen.dart';
+import 'package:invoicegenerator/utils/route_transitions.dart';
+import 'package:invoicegenerator/widgets/charts/client_chart.dart';
 
-class TopClients extends StatelessWidget {
+class TopClients extends StatefulWidget {
   const TopClients({super.key});
 
   @override
+  State<TopClients> createState() => _TopClientsState();
+}
+
+class _TopClientsState extends State<TopClients> {
+  // Client service instance
+  final ClientService _clientService = ClientService();
+
+  // List to store top clients
+  List<Client> _topClients = [];
+
+  @override
+  void initState() {
+    super.initState();
+    // Load clients and listen for changes
+    _loadClients();
+    _clientService.addListener(_onClientDataChanged);
+  }
+
+  @override
+  void dispose() {
+    // Remove listener when widget is disposed
+    _clientService.removeListener(_onClientDataChanged);
+    super.dispose();
+  }
+
+  // Load clients from the service
+  Future<void> _loadClients() async {
+    await _clientService.init();
+    _updateTopClients();
+  }
+
+  // Update when client data changes
+  void _onClientDataChanged() {
+    if (mounted) {
+      _updateTopClients();
+    }
+  }
+
+  // Update the list of top clients
+  void _updateTopClients() {
+    // Get all clients from the service
+    List<Client> allClients = List.from(_clientService.clients);
+
+    // Sort by amount (highest to lowest)
+    allClients.sort((a, b) => b.amount.compareTo(a.amount));
+
+    // Take only the top 4 (or less if there are fewer clients)
+    setState(() {
+      _topClients = allClients.take(4).toList();
+    });
+  }
+
+  // Navigate to client list screen
+  void _viewAllClients() {
+    context.navigateWithSlide(const ClientListScreen());
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Find the highest amount for progress bar calculation
+    double maxAmount =
+        _topClients.isNotEmpty
+            ? _topClients.first.amount
+            : 1.0; // Prevent division by zero
+
     return SizedBox(
       width: double.infinity,
       child: Column(
@@ -26,260 +95,37 @@ class TopClients extends StatelessWidget {
               SizedBox(height: 16),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // First client
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
+                children:
+                    _topClients.isNotEmpty
+                        ? _buildClientList(maxAmount)
+                        : [
+                          // Show placeholder message if no clients
                           Text(
-                            'Acuro',
+                            'No clients yet. Add your first client!',
                             style: TextStyle(
-                              color: Color(0xFF3A3A3A),
+                              color: Color(0xFF8D9694),
                               fontSize: 16,
                               fontFamily: 'Helvetica Now Display',
-                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          Row(
-                            children: [
-                              Text(
-                                'USD',
-                                style: TextStyle(
-                                  color: Color(0xFF8D9694),
-                                  fontSize: 14,
-                                  fontFamily: 'Victor Mono',
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.right,
-                              ),
-                              SizedBox(width: 7),
-                              Text(
-                                '4500.00',
-                                style: TextStyle(
-                                  color: Color(0xFF3A3A3A),
-                                  fontSize: 16,
-                                  fontFamily: 'Helvetica Now Display',
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.right,
-                              ),
-                            ],
-                          ),
                         ],
-                      ),
-                      SizedBox(height: 8),
-                      Container(
-                        height: 12,
-                        color: Color(0xFFB7C2BF),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            width: 256,
-                            height: 12,
-                            color: Color(0xFF768681),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 8),
-
-                  // Second client
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Micro Company',
-                            style: TextStyle(
-                              color: Color(0xFF3A3A3A),
-                              fontSize: 16,
-                              fontFamily: 'Helvetica Now Display',
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              Text(
-                                'USD',
-                                style: TextStyle(
-                                  color: Color(0xFF8D9694),
-                                  fontSize: 14,
-                                  fontFamily: 'Victor Mono',
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.right,
-                              ),
-                              SizedBox(width: 7),
-                              Text(
-                                '4500.00',
-                                style: TextStyle(
-                                  color: Color(0xFF3A3A3A),
-                                  fontSize: 16,
-                                  fontFamily: 'Helvetica Now Display',
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.right,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 8),
-                      Container(
-                        height: 12,
-                        color: Color(0xFFB7C2BF),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            width: 228,
-                            height: 12,
-                            color: Color(0xFF768681),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 8),
-
-                  // Third client
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Huku Inc',
-                            style: TextStyle(
-                              color: Color(0xFF3A3A3A),
-                              fontSize: 16,
-                              fontFamily: 'Helvetica Now Display',
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              Text(
-                                'USD',
-                                style: TextStyle(
-                                  color: Color(0xFF8D9694),
-                                  fontSize: 14,
-                                  fontFamily: 'Victor Mono',
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.right,
-                              ),
-                              SizedBox(width: 7),
-                              Text(
-                                '4500.00',
-                                style: TextStyle(
-                                  color: Color(0xFF3A3A3A),
-                                  fontSize: 16,
-                                  fontFamily: 'Helvetica Now Display',
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.right,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 8),
-                      Container(
-                        height: 12,
-                        color: Color(0xFFB7C2BF),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            width: 189,
-                            height: 12,
-                            color: Color(0xFF768681),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 8),
-
-                  // Fourth client
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Fortanix',
-                            style: TextStyle(
-                              color: Color(0xFF3A3A3A),
-                              fontSize: 16,
-                              fontFamily: 'Helvetica Now Display',
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              Text(
-                                'USD',
-                                style: TextStyle(
-                                  color: Color(0xFF8D9694),
-                                  fontSize: 14,
-                                  fontFamily: 'Victor Mono',
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.right,
-                              ),
-                              SizedBox(width: 7),
-                              Text(
-                                '4500.00',
-                                style: TextStyle(
-                                  color: Color(0xFF3A3A3A),
-                                  fontSize: 16,
-                                  fontFamily: 'Helvetica Now Display',
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.right,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 8),
-                      Container(
-                        height: 12,
-                        color: Color(0xFFB7C2BF),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            width: 43,
-                            height: 12,
-                            color: Color(0xFF768681),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
               ),
             ],
           ),
           SizedBox(height: 16),
-          Center(
-            child: Text(
-              AppTheme.ensureVictorMonoUppercase('View all clients'),
-              style: TextStyle(
-                color: Color(0xFFF05022),
-                fontSize: 14,
-                fontFamily: 'Victor Mono',
-                fontWeight: FontWeight.bold,
+          GestureDetector(
+            onTap: _viewAllClients,
+            child: Center(
+              child: Text(
+                AppTheme.ensureVictorMonoUppercase('View all clients'),
+                style: TextStyle(
+                  color: Color(0xFFF05022),
+                  fontSize: 14,
+                  fontFamily: 'Victor Mono',
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
             ),
           ),
           SizedBox(height: 16),
@@ -287,5 +133,71 @@ class TopClients extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  // Build the list of client items
+  List<Widget> _buildClientList(double maxAmount) {
+    List<Widget> clientWidgets = [];
+
+    for (int i = 0; i < _topClients.length; i++) {
+      final client = _topClients[i];
+
+      // Add client item
+      clientWidgets.add(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  client.name,
+                  style: TextStyle(
+                    color: Color(0xFF3A3A3A),
+                    fontSize: 16,
+                    fontFamily: 'Helvetica Now Display',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Row(
+                  children: [
+                    Text(
+                      client.currency,
+                      style: TextStyle(
+                        color: Color(0xFF8D9694),
+                        fontSize: 14,
+                        fontFamily: 'Victor Mono',
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                    SizedBox(width: 7),
+                    Text(
+                      client.amount.toStringAsFixed(2),
+                      style: TextStyle(
+                        color: Color(0xFF3A3A3A),
+                        fontSize: 16,
+                        fontFamily: 'Helvetica Now Display',
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            ClientChart(amount: client.amount, maxAmount: maxAmount),
+          ],
+        ),
+      );
+
+      // Add spacing between client items, except for the last one
+      if (i < _topClients.length - 1) {
+        clientWidgets.add(SizedBox(height: 8));
+      }
+    }
+
+    return clientWidgets;
   }
 }
