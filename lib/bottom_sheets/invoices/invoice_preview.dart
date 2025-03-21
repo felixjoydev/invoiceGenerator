@@ -301,30 +301,328 @@ class InvoicePreviewSheet extends StatelessWidget {
                   bottom: false,
                   child: Column(
                     children: [
-                      // Top section with invoice header
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: InvoiceHeader(
-                          clientName: invoice.client.name,
-                          issueDate: DateFormat(
-                            'MM/dd/yyyy',
-                          ).format(invoice.issueDate),
-                          invoiceId: invoice.invoiceId,
-                          currency: companyInfo.currency,
-                          amount: invoice.total.toStringAsFixed(2),
-                          dueDate: DateFormat(
-                            'MM/dd/yyyy',
-                          ).format(invoice.dueDate),
-                          status: invoice.status,
-                          paidDate: invoice.paidDate,
+                      // Scrollable content area
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              // Top section with invoice header
+                              Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: InvoiceHeader(
+                                  clientName: invoice.client.name,
+                                  issueDate: DateFormat(
+                                    'MM/dd/yyyy',
+                                  ).format(invoice.issueDate),
+                                  invoiceId: invoice.invoiceId,
+                                  currency: companyInfo.currency,
+                                  amount: invoice.total.toStringAsFixed(2),
+                                  dueDate: DateFormat(
+                                    'MM/dd/yyyy',
+                                  ).format(invoice.dueDate),
+                                  status: invoice.status,
+                                  paidDate: invoice.paidDate,
+                                ),
+                              ),
+
+                              // Delete and Mark as Paid buttons
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                  vertical: 0.0,
+                                ),
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  height: 56,
+                                  child:
+                                      invoice.status == InvoiceStatus.paid
+                                          ? // For paid invoices, center the delete button
+                                          Center(
+                                            child: InkWell(
+                                              onTap: handleDeleteInvoice,
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      vertical: 16,
+                                                      horizontal: 24,
+                                                    ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    SvgPicture.asset(
+                                                      'assets/icons/delete.svg',
+                                                      width: 24,
+                                                      height: 24,
+                                                      colorFilter:
+                                                          const ColorFilter.mode(
+                                                            Color(0xFFD61443),
+                                                            BlendMode.srcIn,
+                                                          ),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    const Text(
+                                                      'DELETE INVOICE',
+                                                      style: TextStyle(
+                                                        color: Color(
+                                                          0xFFD61443,
+                                                        ),
+                                                        fontSize: 14,
+                                                        fontFamily:
+                                                            'Victor Mono',
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                          : // For unpaid invoices, show both buttons with borders
+                                          Row(
+                                            mainAxisSize: MainAxisSize.max,
+                                            children: [
+                                              // DELETE INVOICE Button
+                                              Expanded(
+                                                child: GestureDetector(
+                                                  onTap: handleDeleteInvoice,
+                                                  child: CustomPaint(
+                                                    painter:
+                                                        DashedBorderPainter(
+                                                          sides: const {
+                                                            BorderSide.top,
+                                                            BorderSide.bottom,
+                                                            BorderSide.left,
+                                                            BorderSide.right,
+                                                          },
+                                                        ),
+                                                    child: Container(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            vertical: 16,
+                                                          ),
+                                                      child: Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          SvgPicture.asset(
+                                                            'assets/icons/delete.svg',
+                                                            width: 24,
+                                                            height: 24,
+                                                            colorFilter:
+                                                                const ColorFilter.mode(
+                                                                  Color(
+                                                                    0xFFD61443,
+                                                                  ),
+                                                                  BlendMode
+                                                                      .srcIn,
+                                                                ),
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 4,
+                                                          ),
+                                                          const Text(
+                                                            'DELETE INVOICE',
+                                                            style: TextStyle(
+                                                              color: Color(
+                                                                0xFFD61443,
+                                                              ),
+                                                              fontSize: 14,
+                                                              fontFamily:
+                                                                  'Victor Mono',
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+
+                                              // MARK AS PAID Button
+                                              Expanded(
+                                                child: GestureDetector(
+                                                  onTap: handleMarkAsPaid,
+                                                  child: CustomPaint(
+                                                    painter:
+                                                        DashedBorderPainter(
+                                                          sides: const {
+                                                            BorderSide.top,
+                                                            BorderSide.bottom,
+                                                            BorderSide.right,
+                                                          },
+                                                        ),
+                                                    child: Container(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            vertical: 16,
+                                                          ),
+                                                      child: Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          SvgPicture.asset(
+                                                            'assets/icons/paid-mark.svg',
+                                                            width: 24,
+                                                            height: 24,
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 4,
+                                                          ),
+                                                          const Text(
+                                                            'MARK AS PAID',
+                                                            style: TextStyle(
+                                                              color: Color(
+                                                                0xFF13AF5B,
+                                                              ),
+                                                              fontSize: 14,
+                                                              fontFamily:
+                                                                  'Victor Mono',
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                ),
+                              ),
+
+                              // PDF Preview - Fixed size instead of expanding
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                  vertical: 16.0,
+                                ),
+                                child: Center(
+                                  child: AspectRatio(
+                                    aspectRatio:
+                                        1 /
+                                        1.414, // A4 aspect ratio (210×297 mm)
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color.fromRGBO(
+                                              128,
+                                              128,
+                                              128,
+                                              0.08,
+                                            ),
+                                            blurRadius: 0,
+                                            spreadRadius: 1,
+                                            offset: const Offset(0, 0),
+                                          ),
+                                          BoxShadow(
+                                            color: const Color.fromRGBO(
+                                              128,
+                                              128,
+                                              128,
+                                              0.08,
+                                            ),
+                                            blurRadius: 1,
+                                            spreadRadius: 0,
+                                            offset: const Offset(0, 1),
+                                          ),
+                                          BoxShadow(
+                                            color: const Color.fromRGBO(
+                                              128,
+                                              128,
+                                              128,
+                                              0.08,
+                                            ),
+                                            blurRadius: 2,
+                                            spreadRadius: 0,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                          BoxShadow(
+                                            color: const Color.fromRGBO(
+                                              128,
+                                              128,
+                                              128,
+                                              0.08,
+                                            ),
+                                            blurRadius: 4,
+                                            spreadRadius: 0,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: ClipRect(
+                                        child: Material(
+                                          color:
+                                              backgroundColor, // Use the template background color
+                                          child: MediaQuery(
+                                            data: MediaQuery.of(
+                                              context,
+                                            ).copyWith(
+                                              padding: EdgeInsets.zero,
+                                            ),
+                                            child: PdfPreview(
+                                              key: UniqueKey(),
+                                              build:
+                                                  (
+                                                    format,
+                                                  ) => PdfService.previewPdf(
+                                                    invoice,
+                                                    companyInfo,
+                                                    logoPath: logoPath,
+                                                    template:
+                                                        template, // Pass the template
+                                                  ),
+                                              allowPrinting: false,
+                                              allowSharing: false,
+                                              canChangeOrientation: false,
+                                              canChangePageFormat: false,
+                                              canDebug: false,
+                                              useActions: false,
+                                              padding: EdgeInsets.zero,
+                                              previewPageMargin:
+                                                  EdgeInsets.zero,
+                                              pdfPreviewPageDecoration: null,
+                                              scrollViewDecoration:
+                                                  const BoxDecoration(
+                                                    color: Colors.transparent,
+                                                  ),
+                                              maxPageWidth:
+                                                  double
+                                                      .infinity, // Take available width in aspect ratio
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Add bottom padding to ensure space after PDF preview when scrolling
+                              const SizedBox(height: 16),
+                            ],
+                          ),
                         ),
                       ),
 
-                      // Action buttons - moved to top of PDF preview
+                      // Action buttons - fixed at bottom
                       Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16.0,
-                          vertical: 0.0,
+                        padding: EdgeInsets.only(
+                          left: 16.0,
+                          right: 16.0,
+                          top: 16.0,
+                          bottom: MediaQuery.of(context).padding.bottom + 16.0,
                         ),
                         child: InvoiceActionButtons(
                           onEditPressed: () {
@@ -392,183 +690,7 @@ class InvoicePreviewSheet extends StatelessWidget {
                               template: template, // Pass the template
                             );
                           },
-                        ),
-                      ),
-
-                      // PDF Preview - Use Expanded to take remaining space
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                          child: Center(
-                            child: AspectRatio(
-                              aspectRatio:
-                                  1 / 1.414, // A4 aspect ratio (210×297 mm)
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color.fromRGBO(
-                                        128,
-                                        128,
-                                        128,
-                                        0.08,
-                                      ),
-                                      blurRadius: 0,
-                                      spreadRadius: 1,
-                                      offset: const Offset(0, 0),
-                                    ),
-                                    BoxShadow(
-                                      color: const Color.fromRGBO(
-                                        128,
-                                        128,
-                                        128,
-                                        0.08,
-                                      ),
-                                      blurRadius: 1,
-                                      spreadRadius: 0,
-                                      offset: const Offset(0, 1),
-                                    ),
-                                    BoxShadow(
-                                      color: const Color.fromRGBO(
-                                        128,
-                                        128,
-                                        128,
-                                        0.08,
-                                      ),
-                                      blurRadius: 2,
-                                      spreadRadius: 0,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                    BoxShadow(
-                                      color: const Color.fromRGBO(
-                                        128,
-                                        128,
-                                        128,
-                                        0.08,
-                                      ),
-                                      blurRadius: 4,
-                                      spreadRadius: 0,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: ClipRect(
-                                  child: Material(
-                                    color:
-                                        backgroundColor, // Use the template background color
-                                    child: MediaQuery(
-                                      data: MediaQuery.of(
-                                        context,
-                                      ).copyWith(padding: EdgeInsets.zero),
-                                      child: PdfPreview(
-                                        key: UniqueKey(),
-                                        build:
-                                            (format) => PdfService.previewPdf(
-                                              invoice,
-                                              companyInfo,
-                                              logoPath: logoPath,
-                                              template:
-                                                  template, // Pass the template
-                                            ),
-                                        allowPrinting: false,
-                                        allowSharing: false,
-                                        canChangeOrientation: false,
-                                        canChangePageFormat: false,
-                                        canDebug: false,
-                                        useActions: false,
-                                        padding: EdgeInsets.zero,
-                                        previewPageMargin: EdgeInsets.zero,
-                                        pdfPreviewPageDecoration: null,
-                                        scrollViewDecoration:
-                                            const BoxDecoration(
-                                              color: Colors.transparent,
-                                            ),
-                                        maxPageWidth:
-                                            double
-                                                .infinity, // Take available width in aspect ratio
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Both buttons in a single row
-                      Padding(
-                        padding: EdgeInsets.only(
-                          left: 16.0,
-                          right: 16.0,
-                          top: 16.0,
-                          bottom: MediaQuery.of(context).padding.bottom + 16.0,
-                        ),
-                        child: Row(
-                          // If invoice is paid, center the single delete button
-                          // If not paid, space the two buttons evenly
-                          mainAxisAlignment:
-                              invoice.status == InvoiceStatus.paid
-                                  ? MainAxisAlignment.center
-                                  : MainAxisAlignment.spaceEvenly,
-                          children: [
-                            // DELETE INVOICE Button
-                            InkWell(
-                              onTap: handleDeleteInvoice,
-                              borderRadius: BorderRadius.circular(4),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SvgPicture.asset(
-                                    'assets/icons/delete.svg',
-                                    width: 24,
-                                    height: 24,
-                                    colorFilter: const ColorFilter.mode(
-                                      Color(0xFFD61443),
-                                      BlendMode.srcIn,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Text(
-                                    'DELETE INVOICE',
-                                    style: TextStyle(
-                                      color: Color(0xFFD61443),
-                                      fontSize: 14,
-                                      fontFamily: 'Victor Mono',
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // MARK AS PAID Button (only shown for non-paid invoices)
-                            if (invoice.status != InvoiceStatus.paid)
-                              InkWell(
-                                onTap: handleMarkAsPaid,
-                                borderRadius: BorderRadius.circular(4),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SvgPicture.asset(
-                                      'assets/icons/paid-mark.svg',
-                                      width: 24,
-                                      height: 24,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    const Text(
-                                      'MARK AS PAID',
-                                      style: TextStyle(
-                                        color: Color(0xFF13AF5B),
-                                        fontSize: 14,
-                                        fontFamily: 'Victor Mono',
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
+                          showEditButton: invoice.status != InvoiceStatus.paid,
                         ),
                       ),
                     ],
@@ -748,12 +870,14 @@ class InvoiceActionButtons extends StatelessWidget {
   final VoidCallback onEditPressed;
   final VoidCallback onDownloadPressed;
   final VoidCallback onSharePressed;
+  final bool showEditButton;
 
   const InvoiceActionButtons({
     super.key,
     required this.onEditPressed,
     required this.onDownloadPressed,
     required this.onSharePressed,
+    this.showEditButton = true, // Default to showing edit button
   });
 
   @override
@@ -764,48 +888,49 @@ class InvoiceActionButtons extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.max,
         children: [
-          // EDIT BUTTON
-          Expanded(
-            child: GestureDetector(
-              onTap: onEditPressed,
-              child: CustomPaint(
-                painter: DashedBorderPainter(
-                  sides: const {
-                    BorderSide.top,
-                    BorderSide.bottom,
-                    BorderSide.left,
-                  },
-                ),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SvgPicture.asset(
-                        'assets/icons/edit-box.svg',
-                        width: 24,
-                        height: 24,
-                        colorFilter: const ColorFilter.mode(
-                          Color(0xFFF05022),
-                          BlendMode.srcIn,
+          // EDIT BUTTON - only show if showEditButton is true
+          if (showEditButton)
+            Expanded(
+              child: GestureDetector(
+                onTap: onEditPressed,
+                child: CustomPaint(
+                  painter: DashedBorderPainter(
+                    sides: const {
+                      BorderSide.top,
+                      BorderSide.bottom,
+                      BorderSide.left,
+                    },
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SvgPicture.asset(
+                          'assets/icons/edit-box.svg',
+                          width: 24,
+                          height: 24,
+                          colorFilter: const ColorFilter.mode(
+                            Color(0xFFF05022),
+                            BlendMode.srcIn,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Text(
-                        'EDIT',
-                        style: TextStyle(
-                          color: Color(0xFFF05022),
-                          fontFamily: 'Victor Mono',
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                        const SizedBox(width: 4),
+                        const Text(
+                          'EDIT',
+                          style: TextStyle(
+                            color: Color(0xFFF05022),
+                            fontFamily: 'Victor Mono',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
 
           // DOWNLOAD BUTTON
           Expanded(
@@ -813,12 +938,20 @@ class InvoiceActionButtons extends StatelessWidget {
               onTap: onDownloadPressed,
               child: CustomPaint(
                 painter: DashedBorderPainter(
-                  sides: const {
-                    BorderSide.top,
-                    BorderSide.bottom,
-                    BorderSide.left,
-                    BorderSide.right,
-                  },
+                  sides:
+                      showEditButton
+                          ? const {
+                            BorderSide.top,
+                            BorderSide.bottom,
+                            BorderSide.left,
+                            BorderSide.right,
+                          }
+                          : const {
+                            BorderSide.top,
+                            BorderSide.bottom,
+                            BorderSide.left,
+                            BorderSide.right,
+                          },
                 ),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 16),

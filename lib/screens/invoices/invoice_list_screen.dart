@@ -531,7 +531,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       final bottomNavHeight = 80.0;
       // Dynamically determine the PressWidget height based on invoice status
       final pressWidgetHeight =
-          invoice.status == InvoiceStatus.paid ? 112.0 : 168.0;
+          invoice.status == InvoiceStatus.paid ? 56.0 : 168.0;
 
       // Calculate space available below the card
       final bottomSpace =
@@ -576,7 +576,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       final screenHeight = MediaQuery.of(context).size.height;
       final bottomNavHeight = 80.0; // Approximate height of bottom navigation
       final pressWidgetHeight =
-          _selectedInvoice?.status == InvoiceStatus.paid ? 112.0 : 168.0;
+          _selectedInvoice?.status == InvoiceStatus.paid ? 56.0 : 168.0;
 
       // Calculate space available below the card
       final bottomSpace =
@@ -1022,8 +1022,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                               ? _selectedItemPosition.dy -
                                   (_selectedInvoice?.status ==
                                           InvoiceStatus.paid
-                                      ? 112.0
-                                      : 168.0) // Adjust height based on whether Mark as Paid is shown
+                                      ? 56.0 // Only DELETE option for paid invoices
+                                      : 168.0) // All options for non-paid invoices
                               : _selectedItemPosition.dy +
                                   _selectedItemSize.height +
                                   8.0, // Below the card with 8px spacing
@@ -1036,6 +1036,9 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                           onMarkAsPaid: _handleMarkAsPaidTapped,
                           // Only show for non-paid invoices
                           showMarkAsPaid:
+                              _selectedInvoice?.status != InvoiceStatus.paid,
+                          // Don't show Edit for paid invoices
+                          showEdit:
                               _selectedInvoice?.status != InvoiceStatus.paid,
                         ),
                       ),

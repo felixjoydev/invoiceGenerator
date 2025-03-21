@@ -6,6 +6,7 @@ class PressWidget extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback? onMarkAsPaid;
   final bool showMarkAsPaid;
+  final bool showEdit;
 
   const PressWidget({
     super.key,
@@ -13,6 +14,7 @@ class PressWidget extends StatelessWidget {
     required this.onDelete,
     this.onMarkAsPaid,
     this.showMarkAsPaid = false,
+    this.showEdit = true,
   });
 
   @override
@@ -29,41 +31,44 @@ class PressWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          GestureDetector(
-            onTap: onEdit,
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'EDIT',
-                    style: TextStyle(
-                      color: Color(0xFFF05022),
-                      fontSize: 14,
-                      fontFamily: 'Victor Mono',
-                      fontWeight: FontWeight.bold,
+          // Edit option
+          if (showEdit) ...[
+            GestureDetector(
+              onTap: onEdit,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'EDIT',
+                      style: TextStyle(
+                        color: Color(0xFFF05022),
+                        fontSize: 14,
+                        fontFamily: 'Victor Mono',
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  SvgPicture.asset(
-                    'assets/icons/edit-box.svg',
-                    width: 24,
-                    height: 24,
-                    colorFilter: const ColorFilter.mode(
-                      Color(0xFFF05022),
-                      BlendMode.srcIn,
+                    SvgPicture.asset(
+                      'assets/icons/edit-box.svg',
+                      width: 24,
+                      height: 24,
+                      colorFilter: const ColorFilter.mode(
+                        Color(0xFFF05022),
+                        BlendMode.srcIn,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
 
-          // Line divider
-          const SizedBox(height: 10),
-          Container(height: 1, color: const Color(0xFFCAD5D2)),
-          const SizedBox(height: 10),
+            // Line divider after Edit
+            const SizedBox(height: 10),
+            Container(height: 1, color: const Color(0xFFCAD5D2)),
+            const SizedBox(height: 10),
+          ],
 
           // Mark as Paid option
           if (showMarkAsPaid) ...[
@@ -94,7 +99,7 @@ class PressWidget extends StatelessWidget {
               ),
             ),
 
-            // Line divider
+            // Line divider after Mark as Paid
             const SizedBox(height: 10),
             Container(height: 1, color: const Color(0xFFCAD5D2)),
             const SizedBox(height: 10),
