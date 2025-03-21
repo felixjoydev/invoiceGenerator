@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/theme/app_theme.dart';
-import 'package:invoicegenerator/screens/auth/auth_screen.dart';
+import 'package:invoicegenerator/screens/auth/get-started.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -30,10 +31,25 @@ class _SplashScreenState extends State<SplashScreen>
 
     _animationController.forward();
 
-    // Navigate to the authentication screen after a delay
+    // Navigate to the get started screen after a delay with fade transition
     Timer(const Duration(seconds: 3), () {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const AuthScreen()),
+        PageRouteBuilder(
+          pageBuilder:
+              (context, animation, secondaryAnimation) =>
+                  const GetStartedScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            const begin = 0.0;
+            const end = 1.0;
+            var curve = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOut,
+            );
+            var fade = Tween(begin: begin, end: end).animate(curve);
+            return FadeTransition(opacity: fade, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 800),
+        ),
       );
     });
   }
@@ -48,48 +64,13 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: AppTheme.screenPadding,
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Logo placeholder
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor,
-                      shape: BoxShape.rectangle,
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'LOGO',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontFamily: 'Victor Mono',
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Text(
-                    'Invoice Generator',
-                    style: Theme.of(context).textTheme.displayMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Manage your invoices effortlessly',
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                ],
-              ),
-            ),
+      body: Center(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SvgPicture.asset(
+            'assets/icons/logo.svg',
+            width: 100, // Width set to 100
+            height: 125, // Height adjusted proportionally (5:4 ratio)
           ),
         ),
       ),
