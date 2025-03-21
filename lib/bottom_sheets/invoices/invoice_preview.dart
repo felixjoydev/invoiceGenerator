@@ -17,6 +17,7 @@ void showInvoicePreviewSheet({
   required CompanyInfo companyInfo,
   String? logoPath,
   required int currentTabIndex,
+  bool isFromHomeScreen = false,
 }) {
   showModalBottomSheet(
     context: context,
@@ -28,6 +29,7 @@ void showInvoicePreviewSheet({
         companyInfo: companyInfo,
         logoPath: logoPath,
         currentTabIndex: currentTabIndex,
+        isFromHomeScreen: isFromHomeScreen,
       );
     },
   );
@@ -38,6 +40,7 @@ class InvoicePreviewSheet extends StatelessWidget {
   final CompanyInfo companyInfo;
   final String? logoPath;
   final int currentTabIndex;
+  final bool isFromHomeScreen;
 
   const InvoicePreviewSheet({
     super.key,
@@ -45,6 +48,7 @@ class InvoicePreviewSheet extends StatelessWidget {
     required this.companyInfo,
     this.logoPath,
     required this.currentTabIndex,
+    this.isFromHomeScreen = false,
   });
 
   // Helper method to get template by name
@@ -177,13 +181,7 @@ class InvoicePreviewSheet extends StatelessWidget {
                             // Close the bottom sheet
                             Navigator.of(context).pop();
 
-                            // Save scroll position before navigating
-                            InvoiceListScreen.saveScrollPositionForCurrentTab(
-                              context,
-                              currentTabIndex,
-                            );
-
-                            // Navigate back to invoice list and show message
+                            // Show message
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
@@ -193,15 +191,24 @@ class InvoicePreviewSheet extends StatelessWidget {
                               ),
                             );
 
-                            // Return to invoice list with correct tab
-                            InvoiceListScreen.navigateWithTab(
-                              context,
-                              tabIndex: currentTabIndex,
-                              invoiceIdToAnimate:
-                                  null, // No animation for deleted invoice
-                              saveCurrentPosition:
-                                  false, // We already saved it above
-                            );
+                            // Only navigate to invoice list screen if not from home screen
+                            if (!isFromHomeScreen) {
+                              // Save scroll position before navigating
+                              InvoiceListScreen.saveScrollPositionForCurrentTab(
+                                context,
+                                currentTabIndex,
+                              );
+
+                              // Return to invoice list with correct tab
+                              InvoiceListScreen.navigateWithTab(
+                                context,
+                                tabIndex: currentTabIndex,
+                                invoiceIdToAnimate:
+                                    null, // No animation for deleted invoice
+                                saveCurrentPosition:
+                                    false, // We already saved it above
+                              );
+                            }
                           },
                           borderRadius: BorderRadius.circular(4),
                           child: Row(
@@ -251,12 +258,6 @@ class InvoicePreviewSheet extends StatelessWidget {
       // Close the bottom sheet
       Navigator.of(context).pop();
 
-      // Save scroll position before navigating
-      InvoiceListScreen.saveScrollPositionForCurrentTab(
-        context,
-        currentTabIndex,
-      );
-
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -265,13 +266,22 @@ class InvoicePreviewSheet extends StatelessWidget {
         ),
       );
 
-      // Return to invoice list with correct tab and animation
-      InvoiceListScreen.navigateWithTab(
-        context,
-        tabIndex: currentTabIndex,
-        invoiceIdToAnimate: invoice.invoiceId,
-        saveCurrentPosition: false, // We already saved it above
-      );
+      // Only navigate to invoice list screen if not from home screen
+      if (!isFromHomeScreen) {
+        // Save scroll position before navigating
+        InvoiceListScreen.saveScrollPositionForCurrentTab(
+          context,
+          currentTabIndex,
+        );
+
+        // Return to invoice list with correct tab and animation
+        InvoiceListScreen.navigateWithTab(
+          context,
+          tabIndex: currentTabIndex,
+          invoiceIdToAnimate: invoice.invoiceId,
+          saveCurrentPosition: false, // We already saved it above
+        );
+      }
     }
 
     return Column(

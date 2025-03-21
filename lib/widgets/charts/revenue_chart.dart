@@ -1,38 +1,33 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:invoicegenerator/services/revenue_service.dart';
+import 'package:provider/provider.dart';
 
 class RevenueChart extends StatelessWidget {
   const RevenueChart({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final revenueService = Provider.of<RevenueService>(context);
+    final chartData = revenueService.getChartData();
+
     return SizedBox(
       height: 124,
       child: Row(
         children: [
-          _buildBarChartColumn('Jan', 83, false, false),
-          SizedBox(width: 10),
-          _buildBarChartColumn('Feb', 83, false, false),
-          SizedBox(width: 10),
-          _buildBarChartColumn('Mar', 66, false, false),
-          SizedBox(width: 10),
-          _buildBarChartColumn('Apr', 77, false, false),
-          SizedBox(width: 10),
-          _buildBarChartColumn('May', 105, false, false),
-          SizedBox(width: 10),
-          _buildBarChartColumn('Jun', 96, false, false),
-          SizedBox(width: 10),
-          _buildBarChartColumn('Jul', 87, true, false),
-          SizedBox(width: 10),
-          _buildBarChartColumn('Aug', 77, false, true),
-          SizedBox(width: 10),
-          _buildBarChartColumn('Sep', 83, false, true),
-          SizedBox(width: 10),
-          _buildBarChartColumn('Oct', 96, false, true),
-          SizedBox(width: 10),
-          _buildBarChartColumn('Nov', 83, false, true),
-          SizedBox(width: 10),
-          _buildBarChartColumn('Dec', 101, false, true),
+          for (var data in chartData) ...[
+            _buildBarChartColumn(
+              revenueService.getMonthName(data.month.month),
+              data.height,
+              data.isSelected,
+              data.isFutureMonth,
+              () {
+                // Handle tap on month column
+                revenueService.setSelectedMonth(data.month);
+              },
+            ),
+            if (data != chartData.last) const SizedBox(width: 10),
+          ],
         ],
       ),
     );
@@ -43,41 +38,56 @@ class RevenueChart extends StatelessWidget {
     double height,
     bool isHighlighted,
     bool isOutlined,
+    VoidCallback onTap,
   ) {
+    // Constrain height to avoid overflow
+    final constrainedHeight = math.min(height, 100.0);
+
     return Expanded(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          isOutlined
-              ? SizedBox(
-                height: height,
-                width: 18,
-                child: CustomPaint(
-                  painter: DashedRectanglePainter(
-                    color: const Color(0xFFB7C2BF),
-                  ),
-                ),
-              )
-              : Container(
-                height: height,
-                width: 18,
-                decoration: BoxDecoration(
-                  color:
-                      isHighlighted
-                          ? const Color(0xFFF05022)
-                          : const Color(0xFFB7C2BF),
-                ),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            // Bar container with fixed height
+            SizedBox(
+              height: constrainedHeight,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child:
+                    isOutlined
+                        ? SizedBox(
+                          height: constrainedHeight,
+                          width: 18,
+                          child: CustomPaint(
+                            painter: DashedRectanglePainter(
+                              color: const Color(0xFFB7C2BF),
+                            ),
+                          ),
+                        )
+                        : Container(
+                          height: constrainedHeight,
+                          width: 18,
+                          decoration: BoxDecoration(
+                            color:
+                                isHighlighted
+                                    ? const Color(0xFFF05022)
+                                    : const Color(0xFFB7C2BF),
+                          ),
+                        ),
               ),
-          SizedBox(height: 3),
-          Text(
-            month,
-            style: TextStyle(
-              fontFamily: 'Aeonik',
-              fontSize: 10,
-              color: isHighlighted ? Color(0xFFF05022) : Color(0xFF8B9199),
             ),
-          ),
-        ],
+            SizedBox(height: 3),
+            Text(
+              month,
+              style: TextStyle(
+                fontFamily: 'Aeonik',
+                fontSize: 10,
+                color: isHighlighted ? Color(0xFFF05022) : Color(0xFF8B9199),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
