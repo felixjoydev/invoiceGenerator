@@ -6,7 +6,6 @@ import 'package:invoicegenerator/widgets/inputs/utils/dashed_line_painter.dart';
 import 'package:invoicegenerator/services/image_service.dart';
 import 'package:invoicegenerator/widgets/display/app_icon.dart';
 import 'package:invoicegenerator/widgets/display/MainHeading.dart';
-import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 class UploadLogoSection extends StatefulWidget {
@@ -84,9 +83,6 @@ class _UploadLogoSectionState extends State<UploadLogoSection> {
     }
   }
 
-  Future<void> _pickImage() async {
-    _showImagePickerSheet();
-  }
 
   void _showImagePickerSheet() {
     showModalBottomSheet(

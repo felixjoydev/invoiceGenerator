@@ -94,7 +94,7 @@ class UploadLogoSectionImproved extends StatelessWidget {
           ),
           SizedBox(height: 16),
           // Replace solid divider with dashed divider
-          Container(
+          SizedBox(
             height: 1,
             child: CustomPaint(
               painter: DashedLinePainter(),

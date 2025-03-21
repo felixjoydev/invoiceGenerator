@@ -60,7 +60,7 @@ class _InvoiceSettingsSheetState extends State<InvoiceSettingsSheet> {
 
     setState(() {
       _selectedIdFormat = _invoiceSettingsService.idFormat;
-      _notesController.text = _invoiceSettingsService.customNotes ?? '';
+      _notesController.text = _invoiceSettingsService.customNotes;
 
       // If auto-generate is selected, show a preview of the ID format
       if (_invoiceSettingsService.isAutoGenerate) {
@@ -82,12 +82,6 @@ class _InvoiceSettingsSheetState extends State<InvoiceSettingsSheet> {
   }
 
   // Handle ID format selection
-  void _handleIdFormatSelected(String format) {
-    setState(() {
-      _selectedIdFormat = format;
-      _markFormModified();
-    });
-  }
 
   @override
   void dispose() {

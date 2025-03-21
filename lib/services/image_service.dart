@@ -1,11 +1,11 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+// ignore: depend_on_referenced_packages
 import 'package:path/path.dart' as path;
 
 class ImageService {
@@ -332,10 +332,8 @@ class ImageService {
         if (shouldDelete) {
           await file.delete();
           _logError('Logo file deleted: $logoPath');
+        // ignore: dead_code
         } else {
-          _logError(
-            'Logo file not deleted as it may still be in use: $logoPath',
-          );
         }
       }
     } catch (e) {

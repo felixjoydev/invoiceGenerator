@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:invoicegenerator/widgets/display/SmallHeading.dart';
 import 'package:invoicegenerator/bottom_sheets/invoices/new_item.dart';
 import 'package:invoicegenerator/widgets/inputs/text_input.dart';
 import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
@@ -70,12 +69,11 @@ class _InvoiceIdSheetState extends State<InvoiceIdSheet> {
     if (mounted) {
       setState(() {
         // Check if auto generate is enabled in settings
-        _isAutoGenerate = _invoiceSettingsService.isAutoGenerate ?? true;
+        _isAutoGenerate = _invoiceSettingsService.isAutoGenerate;
 
         // Set prefix - if available in settings or generate from company name
-        if (_invoiceSettingsService.idPrefix != null &&
-            _invoiceSettingsService.idPrefix!.isNotEmpty) {
-          _prefixController.text = _invoiceSettingsService.idPrefix!;
+        if (_invoiceSettingsService.idPrefix.isNotEmpty) {
+          _prefixController.text = _invoiceSettingsService.idPrefix;
         } else {
           // Get first 3 letters of company name
           final companyInfo = _companyService.companyInfo;

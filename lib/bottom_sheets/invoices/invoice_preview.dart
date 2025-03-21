@@ -8,6 +8,7 @@ import 'package:invoicegenerator/screens/invoices/invoice_create_screen.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:invoicegenerator/screens/invoices/invoice_list_screen.dart';
+import 'package:invoicegenerator/services/invoice_service.dart';
 
 /// Shows a bottom sheet with a preview of the invoice and actions
 void showInvoicePreviewSheet({
@@ -36,11 +37,11 @@ class InvoicePreviewSheet extends StatelessWidget {
   final String? logoPath;
 
   const InvoicePreviewSheet({
-    Key? key,
+    super.key,
     required this.invoice,
     required this.companyInfo,
     this.logoPath,
-  }) : super(key: key);
+  });
 
   // Helper method to get template by name
   PdfTemplate _getTemplateByName(String name) {
@@ -76,6 +77,186 @@ class InvoicePreviewSheet extends StatelessWidget {
     // Calculate the height to be almost full screen
     final screenHeight = MediaQuery.of(context).size.height;
     final bottomSheetHeight = screenHeight * 0.9;
+
+    // Get invoice service
+    final invoiceService = InvoiceService();
+
+    // Define handlers for delete and mark as paid
+    void handleDeleteInvoice() {
+      // Show confirmation dialog
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withOpacity(0.5),
+        builder:
+            (context) => Dialog(
+              backgroundColor: const Color(
+                0xFFDAE4E1,
+              ), // Background color from theme
+              insetPadding: const EdgeInsets.all(20),
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.zero, // No rounded corners
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title with MainHeading style
+                    const Text(
+                      'Delete Invoice',
+                      style: TextStyle(
+                        color: Color(0xFF373C3A),
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Helvetica Now Display',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      height: 4,
+                      width: double.infinity,
+                      color: const Color(0xFFCAD5D2),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Content text
+                    const Text(
+                      'Are you sure you want to delete this invoice?',
+                      style: TextStyle(
+                        fontFamily: 'Helvetica Now Display',
+                        fontSize: 16,
+                        fontWeight: FontWeight.normal,
+                        color: Color(0xFF373C3A),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // Actions row
+                    Row(
+                      mainAxisAlignment:
+                          MainAxisAlignment.end, // Align to the end
+                      children: [
+                        // Cancel button - text only
+                        InkWell(
+                          onTap: () => Navigator.of(context).pop(),
+                          borderRadius: BorderRadius.circular(4),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                              vertical: 8.0,
+                              horizontal: 16.0,
+                            ),
+                            child: Text(
+                              'CANCEL',
+                              style: TextStyle(
+                                color: Color(0xFF373C3A),
+                                fontSize: 14,
+                                fontFamily: 'Victor Mono',
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // Add fixed spacing between buttons
+                        const SizedBox(width: 24),
+
+                        // Delete button - secondary button style with icon
+                        InkWell(
+                          onTap: () {
+                            // Delete the invoice
+                            invoiceService.deleteInvoice(invoice.invoiceId);
+
+                            // Close the dialog
+                            Navigator.of(context).pop();
+
+                            // Close the bottom sheet
+                            Navigator.of(context).pop();
+
+                            // Navigate back to invoice list and show message
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Invoice ${invoice.invoiceId} deleted',
+                                ),
+                                backgroundColor: const Color(0xFFD61443),
+                              ),
+                            );
+
+                            // Replace current screen with invoice list
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                builder: (context) => const InvoiceListScreen(),
+                              ),
+                              (route) => false,
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(4),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SvgPicture.asset(
+                                'assets/icons/delete.svg',
+                                width: 24,
+                                height: 24,
+                                colorFilter: const ColorFilter.mode(
+                                  Color(0xFFD61443),
+                                  BlendMode.srcIn,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Text(
+                                'DELETE',
+                                style: TextStyle(
+                                  color: Color(0xFFD61443),
+                                  fontSize: 14,
+                                  fontFamily: 'Victor Mono',
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+      );
+    }
+
+    void handleMarkAsPaid() {
+      // Create updated invoice with paid status
+      final updatedInvoice = invoice.copyWith(
+        status: InvoiceStatus.paid,
+        paidDate: DateTime.now(), // Set paid date to current date
+      );
+
+      // Update the invoice
+      invoiceService.updateInvoice(updatedInvoice);
+
+      // Close the bottom sheet
+      Navigator.of(context).pop();
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Invoice ${invoice.invoiceId} marked as paid'),
+          backgroundColor: const Color(0xFF13AF5B),
+        ),
+      );
+
+      // Return to invoice list with animation
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder:
+              (context) =>
+                  InvoiceListScreen(invoiceIdToAnimate: invoice.invoiceId),
+        ),
+        (route) => false,
+      );
+    }
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -118,6 +299,74 @@ class InvoicePreviewSheet extends StatelessWidget {
                           dueDate: DateFormat(
                             'MM/dd/yyyy',
                           ).format(invoice.dueDate),
+                          status: invoice.status,
+                          paidDate: invoice.paidDate,
+                        ),
+                      ),
+
+                      // Action buttons - moved to top of PDF preview
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 0.0,
+                        ),
+                        child: InvoiceActionButtons(
+                          onEditPressed: () {
+                            // Close bottom sheet first
+                            Navigator.pop(context);
+
+                            // Then navigate to edit screen with invoice data
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (context) => InvoiceCreateScreen(
+                                      invoiceToEdit: invoice,
+                                    ),
+                              ),
+                            ).then((_) {
+                              // After returning from edit, pass the invoice ID to animate
+                              ScaffoldMessenger.of(context).clearSnackBars();
+                              Navigator.of(context).pushAndRemoveUntil(
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) => InvoiceListScreen(
+                                        invoiceIdToAnimate: invoice.invoiceId,
+                                      ),
+                                ),
+                                (route) => false,
+                              );
+                            });
+                          },
+                          onDownloadPressed: () async {
+                            final path = await PdfService.savePdf(
+                              invoice,
+                              companyInfo,
+                              logoPath: logoPath,
+                              template: template, // Pass the template
+                            );
+                            if (path != null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Invoice saved to $path'),
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Failed to save invoice'),
+                                ),
+                              );
+                            }
+                          },
+                          onSharePressed: () async {
+                            await PdfService.sharePdf(
+                              invoice,
+                              companyInfo,
+                              logoPath: logoPath,
+                              template: template, // Pass the template
+                            );
+                          },
                         ),
                       ),
 
@@ -222,7 +471,7 @@ class InvoicePreviewSheet extends StatelessWidget {
                         ),
                       ),
 
-                      // Action buttons
+                      // Both buttons in a single row
                       Padding(
                         padding: EdgeInsets.only(
                           left: 16.0,
@@ -230,63 +479,71 @@ class InvoicePreviewSheet extends StatelessWidget {
                           top: 16.0,
                           bottom: MediaQuery.of(context).padding.bottom + 16.0,
                         ),
-                        child: InvoiceActionButtons(
-                          onEditPressed: () {
-                            // Close bottom sheet first
-                            Navigator.pop(context);
-
-                            // Then navigate to edit screen with invoice data
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (context) => InvoiceCreateScreen(
-                                      invoiceToEdit: invoice,
+                        child: Row(
+                          // If invoice is paid, center the single delete button
+                          // If not paid, space the two buttons evenly
+                          mainAxisAlignment:
+                              invoice.status == InvoiceStatus.paid
+                                  ? MainAxisAlignment.center
+                                  : MainAxisAlignment.spaceEvenly,
+                          children: [
+                            // DELETE INVOICE Button
+                            InkWell(
+                              onTap: handleDeleteInvoice,
+                              borderRadius: BorderRadius.circular(4),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SvgPicture.asset(
+                                    'assets/icons/delete.svg',
+                                    width: 24,
+                                    height: 24,
+                                    colorFilter: const ColorFilter.mode(
+                                      Color(0xFFD61443),
+                                      BlendMode.srcIn,
                                     ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    'DELETE INVOICE',
+                                    style: TextStyle(
+                                      color: Color(0xFFD61443),
+                                      fontSize: 14,
+                                      fontFamily: 'Victor Mono',
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ).then((_) {
-                              // After returning from edit, pass the invoice ID to animate
-                              ScaffoldMessenger.of(context).clearSnackBars();
-                              Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(
-                                  builder:
-                                      (context) => InvoiceListScreen(
-                                        invoiceIdToAnimate: invoice.invoiceId,
+                            ),
+
+                            // MARK AS PAID Button (only shown for non-paid invoices)
+                            if (invoice.status != InvoiceStatus.paid)
+                              InkWell(
+                                onTap: handleMarkAsPaid,
+                                borderRadius: BorderRadius.circular(4),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SvgPicture.asset(
+                                      'assets/icons/paid-mark.svg',
+                                      width: 24,
+                                      height: 24,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      'MARK AS PAID',
+                                      style: TextStyle(
+                                        color: Color(0xFF13AF5B),
+                                        fontSize: 14,
+                                        fontFamily: 'Victor Mono',
+                                        fontWeight: FontWeight.bold,
                                       ),
+                                    ),
+                                  ],
                                 ),
-                                (route) => false,
-                              );
-                            });
-                          },
-                          onDownloadPressed: () async {
-                            final path = await PdfService.savePdf(
-                              invoice,
-                              companyInfo,
-                              logoPath: logoPath,
-                              template: template, // Pass the template
-                            );
-                            if (path != null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Invoice saved to $path'),
-                                ),
-                              );
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Failed to save invoice'),
-                                ),
-                              );
-                            }
-                          },
-                          onSharePressed: () async {
-                            await PdfService.sharePdf(
-                              invoice,
-                              companyInfo,
-                              logoPath: logoPath,
-                              template: template, // Pass the template
-                            );
-                          },
+                              ),
+                          ],
                         ),
                       ),
                     ],
@@ -309,19 +566,48 @@ class InvoiceHeader extends StatelessWidget {
   final String currency;
   final String amount;
   final String dueDate;
+  final InvoiceStatus status;
+  final DateTime? paidDate;
 
   const InvoiceHeader({
-    Key? key,
+    super.key,
     required this.clientName,
     required this.issueDate,
     required this.invoiceId,
     required this.currency,
     required this.amount,
     required this.dueDate,
-  }) : super(key: key);
+    required this.status,
+    this.paidDate,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final dateFormat = DateFormat('MM/dd/yyyy');
+
+    // Determine status text and color based on invoice status
+    String statusText;
+    Color statusColor;
+
+    switch (status) {
+      case InvoiceStatus.paid:
+        final displayDate =
+            paidDate != null
+                ? dateFormat.format(paidDate!)
+                : issueDate; // Use the issueDate string directly
+        statusText = 'PAID ON $displayDate';
+        statusColor = const Color(0xFF13AF5B);
+        break;
+      case InvoiceStatus.overdue:
+        statusText = 'DUE ON $dueDate';
+        statusColor = const Color(0xFFD61443);
+        break;
+      case InvoiceStatus.outstanding:
+        statusText = 'DUE ON $dueDate';
+        statusColor = const Color(0xFF778682);
+        break;
+    }
+
     return SizedBox(
       width: double.infinity,
       child: Row(
@@ -416,12 +702,12 @@ class InvoiceHeader extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'DUE ON $dueDate',
-                style: const TextStyle(
+                statusText,
+                style: TextStyle(
                   fontFamily: 'Victor Mono',
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
-                  color: Color(0xFF778682),
+                  color: statusColor,
                 ),
               ),
             ],
@@ -439,11 +725,11 @@ class InvoiceActionButtons extends StatelessWidget {
   final VoidCallback onSharePressed;
 
   const InvoiceActionButtons({
-    Key? key,
+    super.key,
     required this.onEditPressed,
     required this.onDownloadPressed,
     required this.onSharePressed,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

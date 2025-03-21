@@ -26,7 +26,7 @@ class _CompanyAddressScreenState extends State<CompanyAddressScreen> {
   final TextEditingController _zipController = TextEditingController();
 
   // Selected country (default to US)
-  String _selectedCountry = 'US';
+  final String _selectedCountry = 'US';
 
   // Validation state and message
   bool _isZipValid = true;
@@ -87,11 +87,6 @@ class _CompanyAddressScreenState extends State<CompanyAddressScreen> {
   }
 
   // Handle country selection
-  void _handleCountrySelected(String country) {
-    setState(() {
-      _selectedCountry = country;
-    });
-  }
 
   // Store ZIP value without showing error
   void _handleZipChange(String value) {

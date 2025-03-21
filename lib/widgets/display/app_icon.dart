@@ -71,6 +71,10 @@ class AppIcon extends StatelessWidget {
         return 'assets/icons/add-item.svg';
       case IconType.editBox:
         return 'assets/icons/edit-box.svg';
+      case IconType.trash:
+        return 'assets/icons/delete.svg';
+      case IconType.checkmark:
+        return 'assets/icons/paid-mark.svg';
     }
   }
 }
@@ -84,4 +88,6 @@ enum IconType {
   catalog,
   addItem,
   editBox,
+  trash, // For delete invoice button
+  checkmark, // For mark as paid button
 }

@@ -16,6 +16,7 @@ class Invoice {
   final String? notes;
   final InvoiceStatus status;
   final String templateName; // Store the template name
+  final DateTime? paidDate; // Date when invoice was marked as paid
 
   Invoice({
     required this.invoiceId,
@@ -30,6 +31,7 @@ class Invoice {
     this.notes,
     this.status = InvoiceStatus.outstanding,
     this.templateName = 'Orange', // Default to Orange template
+    this.paidDate,
   });
 
   // Create a copy with updated fields
@@ -46,6 +48,7 @@ class Invoice {
     String? notes,
     InvoiceStatus? status,
     String? templateName,
+    DateTime? paidDate,
   }) {
     return Invoice(
       invoiceId: invoiceId ?? this.invoiceId,
@@ -60,6 +63,7 @@ class Invoice {
       notes: notes ?? this.notes,
       status: status ?? this.status,
       templateName: templateName ?? this.templateName,
+      paidDate: paidDate ?? this.paidDate,
     );
   }
 
@@ -78,6 +82,7 @@ class Invoice {
       'notes': notes,
       'status': status.index,
       'templateName': templateName,
+      'paidDate': paidDate?.millisecondsSinceEpoch,
     };
   }
 
@@ -100,6 +105,10 @@ class Invoice {
       status: InvoiceStatus.values[map['status']],
       templateName:
           map['templateName'] ?? 'Orange', // Default to Orange if not present
+      paidDate:
+          map['paidDate'] != null
+              ? DateTime.fromMillisecondsSinceEpoch(map['paidDate'])
+              : null,
     );
   }
 }

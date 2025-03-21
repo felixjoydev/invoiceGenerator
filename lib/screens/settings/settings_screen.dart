@@ -3,8 +3,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/widgets/display/MainHeading.dart';
 import 'package:invoicegenerator/bottom_sheets/settings/business_details.dart';
 import 'package:invoicegenerator/bottom_sheets/settings/invoice_settings.dart';
-import 'package:invoicegenerator/bottom_sheets/settings/client_settings.dart';
-import 'dart:math' as Math;
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -162,11 +160,11 @@ class LinksWidget extends StatelessWidget {
   final VoidCallback onTap;
 
   const LinksWidget({
-    Key? key,
+    super.key,
     this.iconPath,
     required this.title,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -230,11 +228,11 @@ class LinksWidget extends StatelessWidget {
 }
 
 class BuildingsIcon extends StatelessWidget {
-  const BuildingsIcon({Key? key}) : super(key: key);
+  const BuildingsIcon({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: 24,
       height: 24,
       child: CustomPaint(painter: BuildingsPainter()),
@@ -343,11 +341,11 @@ class DashedDivider extends StatelessWidget {
 }
 
 class LogoutSection extends StatelessWidget {
-  const LogoutSection({Key? key}) : super(key: key);
+  const LogoutSection({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: 362,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -398,15 +396,15 @@ class CustomLogoutIcon extends StatelessWidget {
   final Color color;
 
   const CustomLogoutIcon({
-    Key? key,
+    super.key,
     required this.width,
     required this.height,
     required this.color,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: width,
       height: height,
       child: CustomPaint(painter: LogoutIconPainter(color: color)),

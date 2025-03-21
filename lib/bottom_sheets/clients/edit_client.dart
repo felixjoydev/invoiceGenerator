@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
 import 'package:invoicegenerator/widgets/buttons/secondary_button.dart';
 import 'package:invoicegenerator/widgets/display/SmallHeading.dart';
@@ -173,9 +172,6 @@ class _EditClientSheetState extends State<EditClientSheet> {
   }
 
   // Handle back button press
-  void _handleBackPressed() {
-    Navigator.pop(context);
-  }
 
   // Validate form to enable/disable primary button
   void _validateForm() {

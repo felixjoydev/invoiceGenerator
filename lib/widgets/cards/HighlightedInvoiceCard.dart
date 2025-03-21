@@ -162,7 +162,12 @@ class HighlightedInvoiceCard extends StatelessWidget {
         final difference = invoice.dueDate.difference(now).inDays;
         return 'DUE IN $difference DAYS';
       case InvoiceStatus.paid:
-        return 'PAID';
+        final dateFormat = DateFormat('MM/dd/yyyy');
+        final displayDate =
+            invoice.paidDate != null
+                ? dateFormat.format(invoice.paidDate!)
+                : dateFormat.format(invoice.issueDate);
+        return 'PAID ON $displayDate';
     }
   }
 

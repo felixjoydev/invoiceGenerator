@@ -224,8 +224,21 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         InvoiceStatus.paid,
       );
 
-      // Sort by issue date (no special sorting for newest first like in "All" tab)
-      paidInvoices.sort((a, b) => b.issueDate.compareTo(a.issueDate));
+      // Sort by paid date (newest first), fallback to issue date if paidDate is null
+      paidInvoices.sort((a, b) {
+        // If both have paid dates, compare them
+        if (a.paidDate != null && b.paidDate != null) {
+          return b.paidDate!.compareTo(a.paidDate!);
+        }
+        // If only one has paid date, it comes first
+        else if (a.paidDate != null) {
+          return -1;
+        } else if (b.paidDate != null) {
+          return 1;
+        }
+        // If neither has paid date, sort by issue date
+        return b.issueDate.compareTo(a.issueDate);
+      });
 
       if (_searchQuery.isEmpty) {
         return paidInvoices;
@@ -474,6 +487,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       // Create updated invoice with paid status
       final updatedInvoice = _selectedInvoice!.copyWith(
         status: InvoiceStatus.paid,
+        paidDate: DateTime.now(), // Set paid date to current date
       );
 
       // Update the invoice
@@ -503,31 +517,128 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     // Show confirmation dialog
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
       builder:
-          (context) => AlertDialog(
-            title: const Text('Delete Invoice'),
-            content: Text('Are you sure you want to delete this invoice?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () {
-                  // Delete the invoice
-                  _invoiceService.deleteInvoice(_selectedInvoice!.invoiceId);
+          (context) => Dialog(
+            backgroundColor: const Color(
+              0xFFDAE4E1,
+            ), // Background color from theme
+            insetPadding: const EdgeInsets.all(20),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.zero, // No rounded corners
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title with MainHeading style
+                  const Text(
+                    'Delete Invoice',
+                    style: TextStyle(
+                      color: Color(0xFF373C3A),
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Helvetica Now Display',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    height: 4,
+                    width: double.infinity,
+                    color: const Color(0xFFCAD5D2),
+                  ),
+                  const SizedBox(height: 24),
 
-                  // Clear the selection
-                  setState(() {
-                    _selectedInvoice = null;
-                  });
+                  // Content text
+                  const Text(
+                    'Are you sure you want to delete this invoice?',
+                    style: TextStyle(
+                      fontFamily: 'Helvetica Now Display',
+                      fontSize: 16,
+                      fontWeight: FontWeight.normal,
+                      color: Color(0xFF373C3A),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
 
-                  // Close the dialog
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Delete'),
+                  // Actions row
+                  Row(
+                    mainAxisAlignment:
+                        MainAxisAlignment.end, // Align to the end
+                    children: [
+                      // Cancel button - text only
+                      InkWell(
+                        onTap: () => Navigator.of(context).pop(),
+                        borderRadius: BorderRadius.circular(4),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(
+                            vertical: 8.0,
+                            horizontal: 16.0,
+                          ),
+                          child: Text(
+                            'CANCEL',
+                            style: TextStyle(
+                              color: Color(0xFF373C3A),
+                              fontSize: 14,
+                              fontFamily: 'Victor Mono',
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Add fixed spacing between buttons
+                      const SizedBox(width: 24),
+
+                      // Delete button - secondary button style with icon
+                      InkWell(
+                        onTap: () {
+                          // Delete the invoice
+                          _invoiceService.deleteInvoice(
+                            _selectedInvoice!.invoiceId,
+                          );
+
+                          // Clear the selection
+                          setState(() {
+                            _selectedInvoice = null;
+                          });
+
+                          // Close the dialog
+                          Navigator.of(context).pop();
+                        },
+                        borderRadius: BorderRadius.circular(4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SvgPicture.asset(
+                              'assets/icons/delete.svg',
+                              width: 24,
+                              height: 24,
+                              colorFilter: const ColorFilter.mode(
+                                Color(0xFFD61443),
+                                BlendMode.srcIn,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Text(
+                              'DELETE',
+                              style: TextStyle(
+                                color: Color(0xFFD61443),
+                                fontSize: 14,
+                                fontFamily: 'Victor Mono',
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
     );
   }
@@ -833,9 +944,9 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                 key: itemKey,
                 child: AnimatedInvoiceCard(
                   companyName: invoice.client.name,
-                  date: dateFormat.format(invoice.dueDate),
+                  date: dateFormat.format(invoice.issueDate),
                   invoiceNumber: invoice.invoiceId,
-                  amount: '${invoice.total.toStringAsFixed(2)}',
+                  amount: invoice.total.toStringAsFixed(2),
                   daysText: daysText,
                   daysColor: const Color(0xFFD61443),
                   onTap: () => _handleInvoiceTapped(invoice),
@@ -850,9 +961,9 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
               key: itemKey,
               child: DueCard(
                 companyName: invoice.client.name,
-                date: dateFormat.format(invoice.dueDate),
+                date: dateFormat.format(invoice.issueDate),
                 invoiceNumber: invoice.invoiceId,
-                amount: '${invoice.total.toStringAsFixed(2)}',
+                amount: invoice.total.toStringAsFixed(2),
                 daysText: daysText,
                 daysColor: const Color(0xFFD61443),
                 onTap: () => _handleInvoiceTapped(invoice),
@@ -871,9 +982,9 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                 key: itemKey,
                 child: AnimatedOutstandingCard(
                   companyName: invoice.client.name,
-                  date: dateFormat.format(invoice.dueDate),
+                  date: dateFormat.format(invoice.issueDate),
                   invoiceNumber: invoice.invoiceId,
-                  amount: '${invoice.total.toStringAsFixed(2)}',
+                  amount: invoice.total.toStringAsFixed(2),
                   daysText: daysText,
                   daysColor: const Color(0xFFD68814),
                   onTap: () => _handleInvoiceTapped(invoice),
@@ -888,9 +999,9 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
               key: itemKey,
               child: Outstanding.DueCard(
                 companyName: invoice.client.name,
-                date: dateFormat.format(invoice.dueDate),
+                date: dateFormat.format(invoice.issueDate),
                 invoiceNumber: invoice.invoiceId,
-                amount: '${invoice.total.toStringAsFixed(2)}',
+                amount: invoice.total.toStringAsFixed(2),
                 daysText: daysText,
                 daysColor: const Color(0xFFD68814),
                 onTap: () => _handleInvoiceTapped(invoice),
@@ -899,6 +1010,13 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
             );
           } else {
             // Paid
+            // Get formatted paid date or fallback to issue date
+            final displayDate =
+                invoice.paidDate != null
+                    ? dateFormat.format(invoice.paidDate!)
+                    : dateFormat.format(invoice.issueDate);
+            final daysText = 'PAID ON $displayDate';
+
             // Use animated card for newly added invoices
             if (isNewlyAdded) {
               return KeyedSubtree(
@@ -907,8 +1025,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                   companyName: invoice.client.name,
                   date: dateFormat.format(invoice.issueDate),
                   invoiceNumber: invoice.invoiceId,
-                  amount: '${invoice.total.toStringAsFixed(2)}',
-                  daysText: 'PAID',
+                  amount: invoice.total.toStringAsFixed(2),
+                  daysText: daysText,
                   daysColor: const Color(0xFF13AF5B),
                   onTap: () => _handleInvoiceTapped(invoice),
                   onAnimationComplete:
@@ -924,8 +1042,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                 companyName: invoice.client.name,
                 date: dateFormat.format(invoice.issueDate),
                 invoiceNumber: invoice.invoiceId,
-                amount: '${invoice.total.toStringAsFixed(2)}',
-                daysText: 'PAID',
+                amount: invoice.total.toStringAsFixed(2),
+                daysText: daysText,
                 daysColor: const Color(0xFF13AF5B),
                 onTap: () => _handleInvoiceTapped(invoice),
                 onLongPress: () => _handleLongPress(invoice, itemKey),
@@ -990,9 +1108,9 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
               key: itemKey,
               child: AnimatedInvoiceCard(
                 companyName: invoice.client.name,
-                date: dateFormat.format(invoice.dueDate),
+                date: dateFormat.format(invoice.issueDate),
                 invoiceNumber: invoice.invoiceId,
-                amount: '${invoice.total.toStringAsFixed(2)}',
+                amount: invoice.total.toStringAsFixed(2),
                 daysText: daysText,
                 daysColor: const Color(0xFFD61443),
                 onTap: () => _handleInvoiceTapped(invoice),
@@ -1007,9 +1125,9 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
             key: itemKey,
             child: DueCard(
               companyName: invoice.client.name,
-              date: dateFormat.format(invoice.dueDate),
+              date: dateFormat.format(invoice.issueDate),
               invoiceNumber: invoice.invoiceId,
-              amount: '${invoice.total.toStringAsFixed(2)}',
+              amount: invoice.total.toStringAsFixed(2),
               daysText: daysText,
               daysColor: const Color(0xFFD61443),
               onTap: () => _handleInvoiceTapped(invoice),
@@ -1074,9 +1192,9 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
               key: itemKey,
               child: AnimatedOutstandingCard(
                 companyName: invoice.client.name,
-                date: dateFormat.format(invoice.dueDate),
+                date: dateFormat.format(invoice.issueDate),
                 invoiceNumber: invoice.invoiceId,
-                amount: '${invoice.total.toStringAsFixed(2)}',
+                amount: invoice.total.toStringAsFixed(2),
                 daysText: daysText,
                 daysColor: const Color(0xFFD68814),
                 onTap: () => _handleInvoiceTapped(invoice),
@@ -1091,9 +1209,9 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
             key: itemKey,
             child: Outstanding.DueCard(
               companyName: invoice.client.name,
-              date: dateFormat.format(invoice.dueDate),
+              date: dateFormat.format(invoice.issueDate),
               invoiceNumber: invoice.invoiceId,
-              amount: '${invoice.total.toStringAsFixed(2)}',
+              amount: invoice.total.toStringAsFixed(2),
               daysText: daysText,
               daysColor: const Color(0xFFD68814),
               onTap: () => _handleInvoiceTapped(invoice),
@@ -1147,6 +1265,13 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
           );
           final itemKey = GlobalKey();
 
+          // Get formatted paid date or fallback to issue date
+          final displayDate =
+              invoice.paidDate != null
+                  ? dateFormat.format(invoice.paidDate!)
+                  : dateFormat.format(invoice.issueDate);
+          final daysText = 'PAID ON $displayDate';
+
           // Use animated card for newly added invoices
           if (isNewlyAdded) {
             return KeyedSubtree(
@@ -1155,8 +1280,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                 companyName: invoice.client.name,
                 date: dateFormat.format(invoice.issueDate),
                 invoiceNumber: invoice.invoiceId,
-                amount: '${invoice.total.toStringAsFixed(2)}',
-                daysText: 'PAID',
+                amount: invoice.total.toStringAsFixed(2),
+                daysText: daysText,
                 daysColor: const Color(0xFF13AF5B),
                 onTap: () => _handleInvoiceTapped(invoice),
                 onAnimationComplete:
@@ -1172,8 +1297,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
               companyName: invoice.client.name,
               date: dateFormat.format(invoice.issueDate),
               invoiceNumber: invoice.invoiceId,
-              amount: '${invoice.total.toStringAsFixed(2)}',
-              daysText: 'PAID',
+              amount: invoice.total.toStringAsFixed(2),
+              daysText: daysText,
               daysColor: const Color(0xFF13AF5B),
               onTap: () => _handleInvoiceTapped(invoice),
               onLongPress: () => _handleLongPress(invoice, itemKey),
