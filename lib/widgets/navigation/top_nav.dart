@@ -25,12 +25,14 @@ class TopNav extends StatelessWidget {
   final VoidCallback? onLogoPressed;
   final VoidCallback? onSettingsPressed;
   final bool showLogo;
+  final bool hideSettings;
 
   const TopNav({
     super.key,
     this.onLogoPressed,
     this.onSettingsPressed,
     this.showLogo = true,
+    this.hideSettings = false,
   });
 
   @override
@@ -53,18 +55,19 @@ class TopNav extends StatelessWidget {
           else
             const SizedBox(width: 32), // Empty space when logo is hidden
           // Settings icon on the right (clickable for settings)
-          GestureDetector(
-            onTap: onSettingsPressed,
-            child: SvgPicture.asset(
-              'assets/icons/settings.svg',
-              width: 24,
-              height: 24,
-              colorFilter: ColorFilter.mode(
-                const Color(0xFF373C3A), // Icon primary color from docs
-                BlendMode.srcIn,
+          if (!hideSettings)
+            GestureDetector(
+              onTap: onSettingsPressed,
+              child: SvgPicture.asset(
+                'assets/icons/settings.svg',
+                width: 24,
+                height: 24,
+                colorFilter: ColorFilter.mode(
+                  const Color(0xFF373C3A), // Icon primary color from docs
+                  BlendMode.srcIn,
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
