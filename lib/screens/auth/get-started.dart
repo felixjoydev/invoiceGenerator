@@ -5,7 +5,7 @@ import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
 import 'package:invoicegenerator/screens/auth/auth_screen.dart';
 
 class GetStartedScreen extends StatelessWidget {
-  const GetStartedScreen({Key? key}) : super(key: key);
+  const GetStartedScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +38,7 @@ class GetStartedScreen extends StatelessWidget {
 }
 
 class GetStartedContent extends StatelessWidget {
-  const GetStartedContent({Key? key}) : super(key: key);
+  const GetStartedContent({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -10,6 +10,8 @@ import 'package:invoicegenerator/screens/onboarding/company_address_screen.dart'
 import 'package:invoicegenerator/widgets/utils/slide_page_route.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:invoicegenerator/screens/home/home_screen.dart';
 
 class CompanyBasicDetailsScreen extends StatefulWidget {
   const CompanyBasicDetailsScreen({super.key});
@@ -30,6 +32,7 @@ class _CompanyBasicDetailsScreenState extends State<CompanyBasicDetailsScreen> {
   void initState() {
     super.initState();
     _loadSavedData();
+    _checkIfUserHasProfile();
   }
 
   @override
@@ -116,6 +119,55 @@ class _CompanyBasicDetailsScreenState extends State<CompanyBasicDetailsScreen> {
     setState(() {
       _logoPath = path;
     });
+  }
+
+  // Check if the user already has a profile, and if so navigate to home screen
+  Future<void> _checkIfUserHasProfile() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+
+      if (user == null) {
+        debugPrint('No authenticated user found in onboarding');
+        return;
+      }
+
+      debugPrint('Checking if user ${user.email} has an existing profile');
+
+      try {
+        final response =
+            await supabase
+                .from('profiles')
+                .select('id, business_name, updated_at')
+                .eq('id', user.id)
+                .maybeSingle();
+
+        debugPrint('Profile check response: $response');
+
+        // Check if we have a valid profile with a business name
+        if (response != null &&
+            response['business_name'] != null &&
+            response['business_name'].toString().isNotEmpty) {
+          debugPrint(
+            'User already has profile with business name: ${response['business_name']}, redirecting to home',
+          );
+
+          if (!mounted) return;
+
+          // Navigate to home screen
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        } else {
+          debugPrint('No complete profile found, staying on onboarding screen');
+        }
+      } catch (e) {
+        debugPrint('Error querying profiles: $e');
+        // Check if the error is just that no profile exists - we'll stay on onboarding screen
+      }
+    } catch (e) {
+      debugPrint('Error checking user profile: $e');
+    }
   }
 
   @override
@@ -234,6 +286,9 @@ class _CompanyBasicDetailsScreenState extends State<CompanyBasicDetailsScreen> {
                   // Save data temporarily
                   await _saveDataTemporarily();
 
+                  // Save profile data to Supabase
+                  await _saveProfileToSupabase();
+
                   // Navigate to next screen with a smooth slide-right transition
                   if (mounted) {
                     Navigator.of(context).push(
@@ -250,5 +305,94 @@ class _CompanyBasicDetailsScreenState extends State<CompanyBasicDetailsScreen> {
         ),
       ),
     );
+  }
+
+  // Add a new method to save profile to Supabase
+  Future<void> _saveProfileToSupabase() async {
+    try {
+      debugPrint('Starting to save profile to Supabase');
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+
+      if (user == null) {
+        debugPrint('No user found, cannot save profile');
+        return;
+      }
+      debugPrint('User found: ${user.email}');
+
+      // Upload logo to storage if available
+      String? logoUrl;
+      if (_logoPath != null) {
+        final file = File(_logoPath!);
+        if (await file.exists()) {
+          debugPrint('Logo file exists, uploading to storage');
+          final fileExtension = _logoPath!.split('.').last;
+          final fileName = '${user.id}/logo.$fileExtension';
+          try {
+            await supabase.storage
+                .from('logos')
+                .upload(
+                  fileName,
+                  file,
+                  fileOptions: const FileOptions(
+                    cacheControl: '3600',
+                    upsert: true,
+                  ),
+                );
+
+            // Get public URL
+            logoUrl = supabase.storage.from('logos').getPublicUrl(fileName);
+            debugPrint('Logo uploaded successfully: $logoUrl');
+          } catch (e) {
+            debugPrint('Error uploading logo: $e');
+            // Continue without logo
+          }
+        }
+      }
+
+      // Create profile data
+      final profileData = {
+        'id': user.id,
+        'business_name': _businessNameController.text,
+        'logo_url': logoUrl,
+        'currency': _selectedCurrency,
+        'tax_enabled': _isTaxEnabled,
+        'tax_rate':
+            _isTaxEnabled && _taxController.text.isNotEmpty
+                ? double.tryParse(_taxController.text) ?? 0.0
+                : 0.0,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      debugPrint('Preparing to upsert profile data: $profileData');
+
+      // Insert or update profile in database
+      final response =
+          await supabase.from('profiles').upsert(profileData).select();
+
+      debugPrint('Profile upsert response: $response');
+
+      // Explicitly check the database for the profile to be sure it was saved
+      await Future.delayed(const Duration(milliseconds: 500));
+      final checkResponse =
+          await supabase
+              .from('profiles')
+              .select()
+              .eq('id', user.id)
+              .maybeSingle();
+
+      if (checkResponse != null) {
+        debugPrint(
+          'Profile verified in database: ${checkResponse['business_name']}',
+        );
+      } else {
+        debugPrint('WARNING: Could not verify profile was saved properly');
+      }
+
+      debugPrint('Profile saved to Supabase successfully');
+    } catch (e) {
+      debugPrint('Error saving profile to Supabase: $e');
+      // Continue anyway, we'll try again later
+    }
   }
 }

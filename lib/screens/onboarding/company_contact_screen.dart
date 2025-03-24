@@ -11,6 +11,7 @@ import 'package:invoicegenerator/screens/home/first_time_home_screen.dart';
 import 'package:invoicegenerator/services/company_service.dart';
 import 'package:invoicegenerator/models/company_info.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import 'dart:io';
 
 class CompanyContactScreen extends StatefulWidget {
@@ -158,6 +159,7 @@ class _CompanyContactScreenState extends State<CompanyContactScreen> {
 
       // Create company info object
       final companyInfo = CompanyInfo(
+        id: const Uuid().v4(),
         businessName: businessName,
         logoPath:
             logoPath != null && File(logoPath).existsSync() ? logoPath : null,

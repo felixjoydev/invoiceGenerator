@@ -319,7 +319,7 @@ class _NewClientSheetState extends State<NewClientSheet> {
   }
 
   // Save client data
-  void _saveClient() {
+  void _saveClient() async {
     // Validate fields before saving (only name is required)
     if (_organizationNameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -365,6 +365,14 @@ class _NewClientSheetState extends State<NewClientSheet> {
       return;
     }
 
+    // Show loading indicator
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Adding client...'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+
     // Create client object - only name and clientId are absolutely required
     // along with a type which is derived from the selected tab
     final client = Client(
@@ -386,23 +394,56 @@ class _NewClientSheetState extends State<NewClientSheet> {
       type: _selectedTabIndex == 0 ? 'organization' : 'person',
     );
 
-    // Add client to the service
-    _clientService.addClient(client);
+    try {
+      // Add client to the service
+      await _clientService.addClient(client);
 
-    // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Client added successfully'),
-        backgroundColor: Colors.green,
-      ),
-    );
+      // Force a re-initialization of client service to ensure data is in sync
+      await Future.delayed(const Duration(milliseconds: 500));
 
-    // Close the bottom sheet and pass the client back to the parent
-    Navigator.pop(context);
+      // Explicitly save clients to ensure persistence
+      await _clientService.saveClients();
+      debugPrint('Explicitly called saveClients() to ensure persistence');
 
-    // Call the callback if it exists
-    if (widget.onClientAdded != null) {
-      widget.onClientAdded!(client);
+      await _clientService.init();
+
+      // Verify the client was properly saved
+      final clients = _clientService.clients;
+      final savedClient = clients.firstWhere(
+        (c) => c.clientId == client.clientId,
+        orElse: () => client,
+      );
+
+      debugPrint(
+        'Saved client: ${savedClient.name}, ID: ${savedClient.clientId}',
+      );
+      if (savedClient.id != null) {
+        debugPrint('Supabase ID: ${savedClient.id}');
+      }
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Client added successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Close the bottom sheet and pass the client back to the parent
+      Navigator.pop(context);
+
+      // Call the callback if it exists
+      if (widget.onClientAdded != null) {
+        widget.onClientAdded!(savedClient);
+      }
+    } catch (e) {
+      debugPrint('Error saving client: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error adding client: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 

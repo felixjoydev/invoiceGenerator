@@ -1,0 +1,35 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Databse Rules
+
+Implement Supabase backend for my Flutter invoice app. I need:
+
+1. Set up database tables with proper relationships for users, organizations, clients, catalog items, and invoices
+
+2. Implement Row Level Security (RLS) policies that:
+   - Restrict data access to authenticated users only
+   - Ensure users can only see their own data
+   - Apply proper security for all database operations
+
+3. Create Dart models that map to the database schema
+
+4. Develop repository pattern services that:
+   - Handle all CRUD operations
+   - Use proper error handling
+   - Leverage the authenticated user context
+   - Return typed data with appropriate models
+
+5. Create a data migration service to:
+   - Move local storage data to Supabase
+   - Preserve relationships between entities
+   - Handle migration errors gracefully
+
+Follow Flutter best practices with proper null safety, async handling, and error management.
+
+Links to the documentation:
+https://supabase.com/docs/guides/database/overview
+https://supabase.com/docs/guides/storage

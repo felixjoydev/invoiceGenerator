@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Other keys -->
+    <key>CFBundleIdentifier</key>
+    <string>io.supabase.invoicegenerator</string>
+    
+    <!-- URL Types for Auth Callbacks -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <!-- Deep link for Supabase auth -->
+                <string>io.supabase.invoicegenerator</string>
+                
+                <!-- Replace with your actual reversed client ID from Google Cloud Console -->
+                <string>com.googleusercontent.apps.YOUR_GOOGLE_CLIENT_ID</string>
+            </array>
+        </dict>
+    </array>
+    
+    <!-- Sign In with Apple Capability -->
+    <key>com.apple.developer.applesignin</key>
+    <array>
+        <string>Default</string>
+    </array>
+    
+    <!-- Other required permissions for your app -->
+    <key>NSCameraUsageDescription</key>
+    <string>We need camera access to scan documents.</string>
+    
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>We need photo library access to add images to invoices.</string>
+    
+    <!-- LSApplicationQueriesSchemes for opening URLs -->
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+        <string>https</string>
+        <string>http</string>
+    </array>
+</dict>
+</plist> 

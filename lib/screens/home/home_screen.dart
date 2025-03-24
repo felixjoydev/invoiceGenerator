@@ -15,6 +15,7 @@ import 'package:invoicegenerator/screens/settings/settings_screen.dart';
 import 'package:invoicegenerator/services/revenue_service.dart';
 import 'package:invoicegenerator/services/invoice_service.dart';
 import 'package:provider/provider.dart';
+import 'package:invoicegenerator/screens/auth/get-started.dart'; // For fallback
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,17 +31,37 @@ class _HomeScreenState extends State<HomeScreen> {
   // Services
   final RevenueService _revenueService = RevenueService();
   final InvoiceService _invoiceService = InvoiceService();
+  bool _servicesInitialized = false;
+  bool _initializingError = false;
 
   @override
   void initState() {
     super.initState();
+    debugPrint('🏠 HomeScreen - initState');
     _initializeServices();
   }
 
   // Initialize services
   Future<void> _initializeServices() async {
-    await _invoiceService.init();
-    await _revenueService.init();
+    debugPrint('🏠 HomeScreen - initializing services');
+    try {
+      await _invoiceService.init();
+      await _revenueService.init();
+      debugPrint('✅ HomeScreen - services initialized successfully');
+
+      if (mounted) {
+        setState(() {
+          _servicesInitialized = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ HomeScreen - Error initializing services: $e');
+      if (mounted) {
+        setState(() {
+          _initializingError = true;
+        });
+      }
+    }
   }
 
   // Handle bottom navigation item selection
@@ -129,84 +150,180 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider.value(value: _revenueService),
-        ChangeNotifierProvider.value(value: _invoiceService),
-      ],
-      child: Scaffold(
+    debugPrint('🏠 HomeScreen - build');
+
+    // Display a loading indicator while services are initializing
+    if (!_servicesInitialized) {
+      return Scaffold(
         backgroundColor: AppTheme.background,
-        body: Column(
-          children: [
-            // Top navigation with SafeArea
-            SafeArea(
-              bottom: false,
-              child: HomeTopNav(
-                onThemeToggle: () {
-                  // Navigate to first_time_home_screen for testing
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => const FirstTimeHomeScreen(),
-                    ),
-                  );
-                },
-                onSettingsPressed: () {
-                  SettingsScreen.show(context);
-                },
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading your dashboard...', style: TextStyle(fontSize: 16)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Display error screen if there was an issue initializing
+    if (_initializingError) {
+      return Scaffold(
+        backgroundColor: AppTheme.background,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: Colors.red),
+              SizedBox(height: 16),
+              Text(
+                'Error loading dashboard data',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-            ),
+              SizedBox(height: 8),
+              Text('Please try again later', style: TextStyle(fontSize: 16)),
+              SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _initializingError = false;
+                    _servicesInitialized = false;
+                  });
+                  _initializeServices();
+                },
+                child: Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
-            // Scrollable content area with slide transition
-            Expanded(
-              child: ContentSlideTransition(
-                slideFromRight: false, // Not applicable for initial screen load
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      // 32px spacing after TopNav
-                      const SizedBox(height: 32),
-
-                      // Revenue Card
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16.0),
-                        child: RevenueCard(),
+    // Build the actual home screen if everything is ready
+    try {
+      return MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: _revenueService),
+          ChangeNotifierProvider.value(value: _invoiceService),
+        ],
+        child: Scaffold(
+          backgroundColor: AppTheme.background,
+          body: Column(
+            children: [
+              // Top navigation with SafeArea
+              SafeArea(
+                bottom: false,
+                child: HomeTopNav(
+                  onThemeToggle: () {
+                    // Navigate to first_time_home_screen for testing
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (context) => const FirstTimeHomeScreen(),
                       ),
+                    );
+                  },
+                  onSettingsPressed: () {
+                    SettingsScreen.show(context);
+                  },
+                ),
+              ),
 
-                      // 32px spacing after RevenueCard
-                      const SizedBox(height: 32),
+              // Scrollable content area with slide transition
+              Expanded(
+                child: ContentSlideTransition(
+                  slideFromRight:
+                      false, // Not applicable for initial screen load
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        // 32px spacing after TopNav
+                        const SizedBox(height: 32),
 
-                      // Overview Card
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16.0),
-                        child: OverviewCard(),
-                      ),
+                        // Revenue Card
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16.0),
+                          child: RevenueCard(),
+                        ),
 
-                      // 32px spacing after OverviewCard
-                      const SizedBox(height: 32),
+                        // 32px spacing after RevenueCard
+                        const SizedBox(height: 32),
 
-                      // Top Clients Card
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16.0),
-                        child: TopClients(),
-                      ),
+                        // Overview Card
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16.0),
+                          child: OverviewCard(),
+                        ),
 
-                      // Add some bottom padding to ensure content doesn't get cut off
-                      const SizedBox(height: 16),
-                    ],
+                        // 32px spacing after OverviewCard
+                        const SizedBox(height: 32),
+
+                        // Top Clients Card
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16.0),
+                          child: TopClients(),
+                        ),
+
+                        // Add some bottom padding to ensure content doesn't get cut off
+                        const SizedBox(height: 16),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            // Bottom navigation
-            BottomNav(
-              activeItem: _activeNavItem,
-              onItemSelected: _handleNavItemSelected,
-              onAddTapped: _handleAddTapped,
+              // Bottom navigation
+              BottomNav(
+                activeItem: _activeNavItem,
+                onItemSelected: _handleNavItemSelected,
+                onAddTapped: _handleAddTapped,
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('❌ HomeScreen - Error in build: $e');
+      // Fallback UI in case of rendering errors
+      return Scaffold(
+        backgroundColor: AppTheme.background,
+        appBar: AppBar(
+          title: Text('Dashboard Error'),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.refresh),
+              onPressed: () {
+                setState(() {});
+              },
             ),
           ],
         ),
-      ),
-    );
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.warning_amber_rounded, size: 48, color: Colors.orange),
+              SizedBox(height: 16),
+              Text(
+                'Something went wrong',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => GetStartedScreen()),
+                  );
+                },
+                child: Text('Go to Start Screen'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
   }
 }

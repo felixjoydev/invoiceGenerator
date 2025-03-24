@@ -6,6 +6,8 @@ import 'package:invoicegenerator/models/client.dart';
 import 'package:invoicegenerator/services/client_service.dart';
 import 'package:invoicegenerator/services/catalog_service.dart';
 import 'package:invoicegenerator/models/catalog_item.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:invoicegenerator/services/repository/invoice_repository.dart';
 
 class InvoiceService with ChangeNotifier {
   // Singleton pattern
@@ -23,21 +25,127 @@ class InvoiceService with ChangeNotifier {
   // In-memory storage for invoices
   List<Invoice> _invoices = [];
 
+  // Repository for Supabase interaction
+  final InvoiceRepository _invoiceRepository = InvoiceRepository();
+
   List<Invoice> get invoices => _invoices;
+
+  // Initialization flags to prevent recursive init
+  bool _isInitializing = false;
+  bool _isInitialized = false;
 
   // Initialize the service and load data
   Future<void> init() async {
+    // Skip if already initialized or initializing
+    if (_isInitialized) return;
+    if (_isInitializing) {
+      debugPrint(
+        'InvoiceService - Already initializing, skipping duplicate init call',
+      );
+      return;
+    }
+
+    _isInitializing = true;
     try {
-      await _loadInvoices();
+      // Check if user is authenticated
+      final currentUser = Supabase.instance.client.auth.currentUser;
+
+      if (currentUser != null) {
+        // User is authenticated, try to load from Supabase first
+        debugPrint('User authenticated, loading invoices from Supabase');
+        await _loadInvoicesFromSupabase();
+      } else {
+        // User not authenticated, load from local storage
+        debugPrint(
+          'No authenticated user, loading invoices from local storage',
+        );
+        await _loadInvoices();
+      }
+
+      // If there are invoices but no authenticated user, clear them
+      if (currentUser == null && _invoices.isNotEmpty) {
+        debugPrint(
+          'No authenticated user but found invoices - clearing local data',
+        );
+        _invoices = [];
+        await _saveInvoices();
+      }
+
       // Don't trigger statistics update on every initialization
       // Only schedule it if needed (first time or after data change)
       if (_invoices.isNotEmpty) {
         _updateStatisticsInBackground();
       }
-      return;
+      _isInitialized = true;
     } catch (e) {
       debugPrint('Error initializing invoice service: $e');
-      _invoices = [];
+      // Still try to load from local storage as fallback
+      await _loadInvoices();
+    } finally {
+      _isInitializing = false;
+    }
+  }
+
+  // Load invoices from Supabase
+  Future<void> _loadInvoicesFromSupabase() async {
+    try {
+      debugPrint('Loading invoices from Supabase');
+      final invoicesFromSupabase = await _invoiceRepository.getAllWithItems();
+
+      if (invoicesFromSupabase.isNotEmpty) {
+        debugPrint('Found ${invoicesFromSupabase.length} invoices in Supabase');
+        _invoices = invoicesFromSupabase;
+
+        // Save to local storage for offline access
+        await _saveInvoices();
+        notifyListeners();
+        return;
+      } else {
+        debugPrint('No invoices found in Supabase, checking local storage');
+        // If no invoices in Supabase, try loading from local
+        await _loadInvoices();
+
+        // If we have local invoices, sync them to Supabase
+        if (_invoices.isNotEmpty) {
+          debugPrint('Found local invoices, syncing to Supabase');
+          await _syncInvoicesToSupabase();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading invoices from Supabase: $e');
+      // Fallback to local storage
+      await _loadInvoices();
+    }
+  }
+
+  // Sync all local invoices to Supabase
+  Future<void> _syncInvoicesToSupabase() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) {
+        debugPrint('No authenticated user, skipping Supabase sync');
+        return;
+      }
+
+      debugPrint('Syncing ${_invoices.length} invoices to Supabase');
+
+      // For each invoice in memory, create or update in Supabase
+      for (final invoice in _invoices) {
+        try {
+          // Ensure invoice has user_id set to current user
+          invoice.toMap()['user_id'] = user.id;
+
+          // Create invoice in Supabase with items
+          await _invoiceRepository.createWithItems(invoice);
+          debugPrint('Invoice ${invoice.invoiceId} synced to Supabase');
+        } catch (e) {
+          debugPrint('Error syncing invoice ${invoice.invoiceId}: $e');
+        }
+      }
+
+      debugPrint('Finished syncing invoices to Supabase');
+    } catch (e) {
+      debugPrint('Error syncing invoices to Supabase: $e');
     }
   }
 
@@ -48,12 +156,12 @@ class InvoiceService with ChangeNotifier {
       final String? invoicesJson = prefs.getString(_storageKey);
 
       if (invoicesJson != null) {
-        final List<dynamic> decodedList = jsonDecode(invoicesJson);
-        _invoices = decodedList.map((item) => Invoice.fromMap(item)).toList();
+        final List<dynamic> decoded = jsonDecode(invoicesJson);
+        _invoices = decoded.map((item) => Invoice.fromMap(item)).toList();
+        notifyListeners();
       }
     } catch (e) {
       debugPrint('Error loading invoices: $e');
-      _invoices = [];
     }
   }
 
@@ -61,25 +169,98 @@ class InvoiceService with ChangeNotifier {
   Future<void> _saveInvoices() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String invoicesJson = jsonEncode(
-        _invoices.map((i) => i.toMap()).toList(),
-      );
-      await prefs.setString(_storageKey, invoicesJson);
+      final List<Map<String, dynamic>> invoicesData =
+          _invoices.map((invoice) => invoice.toMap()).toList();
+      await prefs.setString(_storageKey, jsonEncode(invoicesData));
     } catch (e) {
       debugPrint('Error saving invoices: $e');
     }
   }
 
+  // Public method to save invoices (allows external access)
+  Future<void> saveInvoices() async {
+    try {
+      debugPrint(
+        'Manual saveInvoices() called - saving ${_invoices.length} invoices',
+      );
+      await _saveInvoices();
+      debugPrint('Manual saveInvoices() completed successfully');
+    } catch (e) {
+      debugPrint('Error in manual saveInvoices(): $e');
+    }
+  }
+
+  // Get all invoices
+  List<Invoice> getAllInvoices() {
+    return List.unmodifiable(_invoices);
+  }
+
+  // Get invoices by status
+  List<Invoice> getInvoicesByStatus(InvoiceStatus status) {
+    return _invoices.where((i) => i.status == status).toList();
+  }
+
+  // Get invoice by ID
+  Invoice? getInvoiceById(String invoiceId) {
+    try {
+      return _invoices.firstWhere((invoice) => invoice.invoiceId == invoiceId);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Generate a new invoice ID
+  String generateInvoiceId() {
+    // Check if there's an authenticated user first
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    bool isAuthenticated = currentUser != null;
+
+    // Always start from 1 if no authenticated user or no existing invoices
+    int highestNumber = 0;
+
+    // Only use existing numbers if authenticated to prevent ID conflicts between users
+    if (isAuthenticated && _invoices.isNotEmpty) {
+      for (var invoice in _invoices) {
+        if (invoice.invoiceId.startsWith('inv-')) {
+          try {
+            final int num = int.parse(invoice.invoiceId.substring(4));
+            if (num > highestNumber) {
+              highestNumber = num;
+            }
+          } catch (_) {}
+        }
+      }
+    }
+
+    return 'inv-${(highestNumber + 1).toString().padLeft(3, '0')}';
+  }
+
   // Add a new invoice
   Future<bool> addInvoice(Invoice invoice) async {
     try {
-      _invoices.add(invoice);
+      // Add invoice to the beginning of the list for sorting (newest first)
+      _invoices.insert(0, invoice);
       await _saveInvoices();
 
-      // Update statistics in the background
-      _updateStatisticsForInvoiceChangesInBackground(invoice);
+      // Save to Supabase if user is authenticated
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        try {
+          // Create invoice in Supabase with items
+          await _invoiceRepository.createWithItems(invoice);
+          debugPrint('Invoice ${invoice.invoiceId} created in Supabase');
+        } catch (e) {
+          debugPrint('Error creating invoice in Supabase: $e');
+        }
+      }
 
       notifyListeners();
+
+      // Schedule statistics update for affected entities
+      _updateSelectiveStatistics([
+        invoice.client.clientId,
+      ], invoice.items.map((item) => item.title).toList());
+
       return true;
     } catch (e) {
       debugPrint('Error adding invoice: $e');
@@ -88,26 +269,62 @@ class InvoiceService with ChangeNotifier {
   }
 
   // Update an existing invoice
-  Future<bool> updateInvoice(Invoice invoice) async {
+  Future<bool> updateInvoice(Invoice updatedInvoice) async {
     try {
-      final index = _invoices.indexWhere(
-        (i) => i.invoiceId == invoice.invoiceId,
+      // Find the index of the invoice to update
+      final invoiceIndex = _invoices.indexWhere(
+        (invoice) => invoice.invoiceId == updatedInvoice.invoiceId,
       );
-      if (index >= 0) {
-        // Get old invoice for reference
-        final oldInvoice = _invoices[index];
 
-        // Update the invoice
-        _invoices[index] = invoice;
+      if (invoiceIndex != -1) {
+        // Replace the old invoice with the updated one
+        _invoices[invoiceIndex] = updatedInvoice;
         await _saveInvoices();
 
-        // Update statistics in the background
-        _updateStatisticsForInvoiceChangesInBackground(
-          invoice,
-          oldInvoice: oldInvoice,
-        );
+        // Update in Supabase if user is authenticated
+        final user = Supabase.instance.client.auth.currentUser;
+        if (user != null) {
+          try {
+            // Find the Supabase ID
+            final supabaseInvoices = await _invoiceRepository.getAllWithItems();
+            final supabaseInvoice = supabaseInvoices.firstWhere(
+              (i) => i.invoiceId == updatedInvoice.invoiceId,
+              orElse: () => updatedInvoice,
+            );
+
+            if (supabaseInvoice.id != null) {
+              // Update invoice in Supabase with items
+              await _invoiceRepository.updateWithItems(
+                supabaseInvoice.id!,
+                updatedInvoice,
+              );
+              debugPrint(
+                'Invoice ${updatedInvoice.invoiceId} updated in Supabase',
+              );
+            } else {
+              // Create if not found
+              await _invoiceRepository.createWithItems(updatedInvoice);
+              debugPrint(
+                'Invoice ${updatedInvoice.invoiceId} created in Supabase (update)',
+              );
+            }
+          } catch (e) {
+            debugPrint('Error updating invoice in Supabase: $e');
+          }
+        }
 
         notifyListeners();
+
+        // Schedule statistics update for affected entities
+        final oldInvoice = _invoices[invoiceIndex];
+        _updateSelectiveStatistics(
+          [oldInvoice.client.clientId, updatedInvoice.client.clientId],
+          [
+            ...oldInvoice.items.map((item) => item.title),
+            ...updatedInvoice.items.map((item) => item.title),
+          ].toList(),
+        );
+
         return true;
       }
       return false;
@@ -118,164 +335,174 @@ class InvoiceService with ChangeNotifier {
   }
 
   // Delete an invoice
-  Future<bool> deleteInvoice(String invoiceId) async {
-    try {
-      // Find the invoice index
-      final index = _invoices.indexWhere((i) => i.invoiceId == invoiceId);
+  Future<void> deleteInvoice(String invoiceId) async {
+    // Find the invoice to delete first to get its data
+    final invoiceToDelete = getInvoiceById(invoiceId);
+    if (invoiceToDelete == null) return;
 
-      // If found, get invoice before removing
-      if (index >= 0) {
-        final invoiceToDelete = _invoices[index];
+    // Delete from Supabase if user is authenticated
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      try {
+        // Find the Supabase ID
+        final supabaseInvoices = await _invoiceRepository.getAllWithItems();
+        final supabaseInvoice = supabaseInvoices.firstWhere(
+          (i) => i.invoiceId == invoiceId,
+          orElse: () => invoiceToDelete,
+        );
 
-        // Remove the invoice
-        _invoices.removeAt(index);
-        await _saveInvoices();
-
-        // Update statistics in the background
-        _updateStatisticsForDeletedInvoiceInBackground(invoiceToDelete);
-
-        notifyListeners();
-        return true;
+        if (supabaseInvoice.id != null) {
+          // Delete invoice in Supabase
+          await _invoiceRepository.delete(supabaseInvoice.id!);
+          debugPrint('Invoice deleted from Supabase');
+        }
+      } catch (e) {
+        debugPrint('Error deleting invoice from Supabase: $e');
       }
-
-      return false;
-    } catch (e) {
-      debugPrint('Error deleting invoice: $e');
-      return false;
     }
+
+    // Remove the invoice from the list
+    _invoices.removeWhere((invoice) => invoice.invoiceId == invoiceId);
+    await _saveInvoices();
+    notifyListeners();
+
+    // Schedule statistics update for affected entities
+    _updateSelectiveStatistics([
+      invoiceToDelete.client.clientId,
+    ], invoiceToDelete.items.map((item) => item.title).toList());
   }
 
-  // Get invoices by status
-  List<Invoice> getInvoicesByStatus(InvoiceStatus status) {
-    return _invoices.where((i) => i.status == status).toList();
-  }
-
-  // Search invoices
-  List<Invoice> searchInvoices(String query) {
-    if (query.isEmpty) return _invoices;
-
-    final String searchQuery = query.toLowerCase();
-    return _invoices.where((invoice) {
-      return invoice.client.name.toLowerCase().contains(searchQuery) ||
-          invoice.invoiceId.toLowerCase().contains(searchQuery);
-    }).toList();
-  }
-
-  // Update client information in all invoices referencing this client
+  // Update client information in all invoices when a client is updated
   Future<void> updateClientInInvoices(
     String clientId,
     Client updatedClient,
   ) async {
-    // Don't update if client ID is empty
-    if (clientId.isEmpty) return;
-
     bool anyUpdated = false;
 
-    // Loop through all invoices to find ones with matching client ID
-    List<Invoice> updatedInvoices = [];
-
+    // Update client in all invoices that use this client
     for (int i = 0; i < _invoices.length; i++) {
-      if (_invoices[i].client.clientId == clientId) {
-        // Create a new invoice with updated client information
-        final updatedInvoice = _invoices[i].copyWith(client: updatedClient);
-        updatedInvoices.add(updatedInvoice);
+      final invoice = _invoices[i];
+      if (invoice.client.clientId == clientId) {
+        // Create updated invoice with new client info
+        final updatedInvoice = invoice.copyWith(client: updatedClient);
+        _invoices[i] = updatedInvoice;
         anyUpdated = true;
-      } else {
-        updatedInvoices.add(_invoices[i]);
+
+        // Update in Supabase if user is authenticated
+        final user = Supabase.instance.client.auth.currentUser;
+        if (user != null) {
+          try {
+            // Find the Supabase ID - don't wait for this to complete
+            _invoiceRepository
+                .getAllWithItems()
+                .then((supabaseInvoices) {
+                  final supabaseInvoice = supabaseInvoices.firstWhere(
+                    (i) => i.invoiceId == invoice.invoiceId,
+                    orElse: () => updatedInvoice,
+                  );
+
+                  if (supabaseInvoice.id != null) {
+                    // Update invoice in Supabase with items
+                    _invoiceRepository
+                        .updateWithItems(supabaseInvoice.id!, updatedInvoice)
+                        .then((_) {
+                          debugPrint('Invoice client info updated in Supabase');
+                        })
+                        .catchError((e) {
+                          debugPrint('Error updating invoice client info: $e');
+                        });
+                  }
+                })
+                .catchError((e) {
+                  debugPrint('Error finding invoice in Supabase: $e');
+                });
+          } catch (e) {
+            debugPrint('Error updating invoice client in Supabase: $e');
+          }
+        }
       }
     }
 
-    // Save invoices if any were updated
+    // Save changes if any invoices were updated
     if (anyUpdated) {
-      _invoices = updatedInvoices;
       await _saveInvoices();
       notifyListeners();
     }
   }
 
-  // Generate a new invoice ID
-  String generateInvoiceId() {
-    // Simple implementation - can be enhanced
-    int highestNumber = 0;
-
-    for (var invoice in _invoices) {
-      if (invoice.invoiceId.startsWith('inv-')) {
-        try {
-          final int num = int.parse(invoice.invoiceId.substring(4));
-          if (num > highestNumber) {
-            highestNumber = num;
-          }
-        } catch (_) {}
-      }
-    }
-
-    return 'inv-${(highestNumber + 1).toString().padLeft(3, '0')}';
-  }
-
-  // Handle deleted catalog item
+  // Handle a deleted catalog item
   Future<void> handleDeletedCatalogItem(String itemTitle) async {
     bool anyUpdated = false;
 
-    // Loop through all invoices to remove the deleted catalog item
+    // Loop through all invoices
     for (int i = 0; i < _invoices.length; i++) {
       final invoice = _invoices[i];
-      final originalItems = invoice.items;
+      bool invoiceUpdated = false;
 
       // Filter out the deleted item
       final updatedItems =
-          originalItems.where((item) => item.title != itemTitle).toList();
+          invoice.items.where((item) => item.title != itemTitle).toList();
 
-      // If items were removed, update the invoice
-      if (updatedItems.length != originalItems.length) {
-        // Recalculate invoice totals
-        double subtotal = updatedItems.fold(
-          0,
-          (sum, item) =>
-              sum + (double.tryParse(item.amount) ?? 0) * item.quantity,
-        );
-        double taxAmount = subtotal * (invoice.taxRate / 100);
-        double total = subtotal + taxAmount;
-
-        // Create updated invoice
-        final updatedInvoice = invoice.copyWith(
-          items: updatedItems,
-          subtotal: subtotal,
-          taxAmount: taxAmount,
-          total: total,
-        );
-
-        // Update the invoice in the list
+      // Check if the item list changed
+      if (updatedItems.length != invoice.items.length) {
+        // Create a new invoice with the updated items
+        final updatedInvoice = invoice.copyWith(items: updatedItems);
         _invoices[i] = updatedInvoice;
+        invoiceUpdated = true;
         anyUpdated = true;
+
+        // Update in Supabase if user is authenticated
+        final user = Supabase.instance.client.auth.currentUser;
+        if (user != null) {
+          try {
+            // Find the Supabase ID - don't wait for this to complete
+            _invoiceRepository
+                .getAllWithItems()
+                .then((supabaseInvoices) {
+                  final supabaseInvoice = supabaseInvoices.firstWhere(
+                    (i) => i.invoiceId == invoice.invoiceId,
+                    orElse: () => updatedInvoice,
+                  );
+
+                  if (supabaseInvoice.id != null) {
+                    // Update invoice in Supabase with items
+                    _invoiceRepository
+                        .updateWithItems(supabaseInvoice.id!, updatedInvoice)
+                        .then((_) {
+                          debugPrint(
+                            'Invoice items updated in Supabase (removed item)',
+                          );
+                        })
+                        .catchError((e) {
+                          debugPrint('Error updating invoice items: $e');
+                        });
+                  }
+                })
+                .catchError((e) {
+                  debugPrint('Error finding invoice in Supabase: $e');
+                });
+          } catch (e) {
+            debugPrint('Error updating invoice items in Supabase: $e');
+          }
+        }
       }
     }
 
-    // Save invoices if any were updated
+    // Save changes if any invoices were updated
     if (anyUpdated) {
       await _saveInvoices();
       notifyListeners();
     }
   }
 
-  // Get all invoices
-  List<Invoice> getAllInvoices() {
-    return List<Invoice>.from(_invoices);
-  }
-
-  // Update statistics in the background
+  // Background update statistics for clients and catalog items
   void _updateStatisticsInBackground() {
-    // Use a longer delay to prevent UI freezing
-    Future<void>.delayed(const Duration(seconds: 2), () async {
-      try {
-        // Add a guard flag to prevent concurrent updates
-        await updateAllStatistics();
-      } catch (e) {
-        debugPrint('Background statistics update error: $e');
-      }
+    Future.delayed(const Duration(seconds: 1), () {
+      updateAllStatistics();
     });
   }
 
-  // Update statistics for all clients and catalog items
+  // Update all statistics for clients and catalog items
   Future<void> updateAllStatistics() async {
     try {
       // Load services but don't wait for them to initialize their data
@@ -332,52 +559,42 @@ class InvoiceService with ChangeNotifier {
     ClientService clientService,
   ) async {
     try {
-      // Skip if no clients to update
-      if (clientInvoicesMap.isEmpty) return;
-
-      // Get clients only once - with empty fallback
-      final clients = clientService.clients;
-      if (clients.isEmpty) return;
-
+      // Get all clients from service
+      final allClients = clientService.clients;
       final List<Client> updatedClients = [];
-      final Set<String> updatedClientIds = {};
 
-      // Process each client
-      for (var entry in clientInvoicesMap.entries) {
-        final clientId = entry.key;
-        if (clientId.isEmpty) continue;
-
-        final clientInvoices = entry.value;
-        if (clientInvoices.isEmpty) continue;
-
-        // Find client
-        final clientIndex = clients.indexWhere((c) => c.clientId == clientId);
-        if (clientIndex < 0 || updatedClientIds.contains(clientId)) continue;
-
-        final client = clients[clientIndex];
-        updatedClientIds.add(clientId);
+      // Update statistics for each client
+      for (var client in allClients) {
+        final clientId = client.clientId;
+        final clientInvoices = clientInvoicesMap[clientId] ?? [];
 
         // Calculate statistics
         final invoiceCount = clientInvoices.length;
+
         double totalAmount = 0;
         double outstandingAmount = 0;
         double dueAmount = 0;
-        bool hasOutstanding = false;
-        bool hasDue = false;
 
         for (var invoice in clientInvoices) {
-          totalAmount += invoice.total;
+          final total = invoice.total;
+          totalAmount += total;
 
+          // Calculate outstanding amount (not paid in full)
           if (invoice.status == InvoiceStatus.outstanding) {
-            outstandingAmount += invoice.total;
-            hasOutstanding = true;
-          } else if (invoice.status == InvoiceStatus.overdue) {
-            dueAmount += invoice.total;
-            hasDue = true;
+            outstandingAmount += total;
+          }
+
+          // Calculate due amount (past due date and not paid in full)
+          if (invoice.status == InvoiceStatus.overdue) {
+            dueAmount += total;
           }
         }
 
-        // Create updated client
+        // Check flags
+        final hasOutstanding = outstandingAmount > 0;
+        final hasDue = dueAmount > 0;
+
+        // Create updated client with new statistics
         final updatedClient = Client(
           name: client.name,
           clientId: client.clientId,
@@ -420,108 +637,33 @@ class InvoiceService with ChangeNotifier {
     CatalogService catalogService,
   ) async {
     try {
-      // Skip if no items to update
-      if (catalogItemUsageMap.isEmpty) return;
-
-      // Get all items at once - with empty fallback
+      // Get all catalog items
       final allItems = catalogService.getAllItems();
-      if (allItems.isEmpty) return;
 
-      final List<CatalogItem> updatedItems = [];
+      // Update each item with usage info
+      for (var item in allItems) {
+        final usageCount = catalogItemUsageMap[item.title] ?? 0;
+        final usageInfo = 'USED IN $usageCount INVOICES';
+        final isNew = usageCount == 0;
 
-      // Process each item
-      for (var entry in catalogItemUsageMap.entries) {
-        final title = entry.key;
-        if (title.isEmpty) continue;
+        // Create updated item with new usage info
+        final updatedItem = item.copyWith(usageInfo: usageInfo, isNew: isNew);
 
-        final usageCount = entry.value;
-
-        // Find item
-        final itemIndex = allItems.indexWhere((item) => item.title == title);
-        if (itemIndex < 0) continue;
-
-        final item = allItems[itemIndex];
-        final updatedItem = item.copyWith(
-          usageInfo: 'USED IN $usageCount INVOICES',
-        );
-
-        updatedItems.add(updatedItem);
-      }
-
-      // Update all items but avoid triggering circular updates
-      for (var item in updatedItems) {
-        // Use internal update to avoid circular dependency
-        await catalogService.updateItemSilently(item);
+        // Only update if the usage info changed
+        if (updatedItem.usageInfo != item.usageInfo ||
+            updatedItem.isNew != item.isNew) {
+          await catalogService.updateItem(updatedItem);
+        }
       }
     } catch (e) {
       debugPrint('Error updating catalog items batch: $e');
     }
   }
 
-  // Update statistics for invoice changes in the background
-  void _updateStatisticsForInvoiceChangesInBackground(
-    Invoice invoice, {
-    Invoice? oldInvoice,
-  }) {
-    // Schedule after a delay to avoid blocking UI
-    Future.delayed(const Duration(milliseconds: 500), () async {
-      try {
-        // Get clients and items to update
-        final Set<String> clientIds = {invoice.client.clientId};
-        if (oldInvoice != null &&
-            oldInvoice.client.clientId != invoice.client.clientId) {
-          clientIds.add(oldInvoice.client.clientId);
-        }
-
-        final Set<String> itemTitles = {};
-        for (var item in invoice.items) {
-          if (item.title.isNotEmpty) {
-            itemTitles.add(item.title);
-          }
-        }
-
-        if (oldInvoice != null) {
-          for (var item in oldInvoice.items) {
-            if (item.title.isNotEmpty) {
-              itemTitles.add(item.title);
-            }
-          }
-        }
-
-        // Perform a minimal update with only affected clients and items
-        await _updateSelectiveStatistics(clientIds, itemTitles);
-      } catch (e) {
-        debugPrint('Error in background invoice changes update: $e');
-      }
-    });
-  }
-
-  // Update statistics for deleted invoice in the background
-  void _updateStatisticsForDeletedInvoiceInBackground(Invoice deletedInvoice) {
-    // Schedule after a delay to avoid blocking UI
-    Future.delayed(const Duration(milliseconds: 500), () async {
-      try {
-        final Set<String> clientIds = {deletedInvoice.client.clientId};
-
-        final Set<String> itemTitles = {};
-        for (var item in deletedInvoice.items) {
-          if (item.title.isNotEmpty) {
-            itemTitles.add(item.title);
-          }
-        }
-
-        // Update only affected data
-        await _updateSelectiveStatistics(clientIds, itemTitles);
-      } catch (e) {
-        debugPrint('Error in background deleted invoice update: $e');
-      }
-    });
-  }
-
-  // Update only specific clients and items
+  // Update statistics selectively for specific clients and items
   Future<void> _updateSelectiveStatistics(
-    Set<String> clientIds,
-    Set<String> itemTitles,
+    List<String> clientIds,
+    List<String> itemTitles,
   ) async {
     try {
       // Get services

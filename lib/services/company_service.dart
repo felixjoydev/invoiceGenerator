@@ -5,17 +5,36 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:invoicegenerator/models/company_info.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:invoicegenerator/services/repository/company_repository.dart';
 
 class CompanyService {
   static const String _storageKey = 'company_info';
 
   CompanyInfo? _companyInfo;
+  final CompanyRepository _companyRepository = CompanyRepository();
+
+  // Private initialization flag
+  bool _isInitializing = false;
 
   CompanyInfo? get companyInfo => _companyInfo;
 
-  // Initialize the service and load data
+  // Initialize the service
   Future<void> init() async {
-    await _loadCompanyInfo();
+    if (_isInitializing) {
+      debugPrint(
+        'CompanyService - Already initializing, skipping duplicate init call',
+      );
+      return;
+    }
+
+    _isInitializing = true;
+    try {
+      await _loadCompanyInfo();
+    } finally {
+      _isInitializing = false;
+    }
   }
 
   // Force a fresh reload from storage
@@ -28,6 +47,26 @@ class CompanyService {
   // Load company info from local storage
   Future<void> _loadCompanyInfo() async {
     try {
+      // First try to load from Supabase
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        debugPrint('Attempting to load company info from Supabase');
+        final supabaseCompanyInfo = await _companyRepository.getCompanyInfo();
+        if (supabaseCompanyInfo != null) {
+          debugPrint('Successfully loaded company info from Supabase');
+          _companyInfo = supabaseCompanyInfo;
+
+          // Save to local storage for offline access
+          final prefs = await SharedPreferences.getInstance();
+          final String companyJson = jsonEncode(_companyInfo!.toMap());
+          await prefs.setString(_storageKey, companyJson);
+
+          return;
+        }
+      }
+
+      // If not found in Supabase, load from local storage
+      debugPrint('Loading company info from local storage');
       final prefs = await SharedPreferences.getInstance();
       final String? companyJson = prefs.getString(_storageKey);
 
@@ -51,10 +90,88 @@ class CompanyService {
             await saveCompanyInfo(_companyInfo!);
           }
         }
+
+        // If user is logged in, sync to Supabase
+        if (user != null && _companyInfo != null) {
+          // Update id to match user id for Supabase
+          _companyInfo = _companyInfo!.copyWith(id: user.id);
+          await _syncToSupabase(_companyInfo!);
+        }
       }
     } catch (e) {
       debugPrint('Error loading company info: $e');
       _companyInfo = null;
+    }
+  }
+
+  // Sync company info to Supabase
+  Future<void> _syncToSupabase(CompanyInfo info) async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) {
+        debugPrint('No user authenticated, skipping Supabase sync');
+        return;
+      }
+
+      debugPrint('Syncing company info to Supabase');
+
+      // Make sure the ID matches the user ID
+      CompanyInfo infoToSync = info.copyWith(id: user.id);
+      String? logoUrl;
+
+      // Upload logo to Supabase storage if needed
+      if (infoToSync.logoPath != null) {
+        try {
+          final logoFile = File(infoToSync.logoPath!);
+          if (await logoFile.exists()) {
+            debugPrint(
+              'Logo file exists at path: ${infoToSync.logoPath}, uploading to Supabase',
+            );
+
+            // Try to upload the logo and get the URL
+            logoUrl = await _companyRepository.uploadLogo(logoFile);
+
+            if (logoUrl != null) {
+              debugPrint(
+                'Logo uploaded successfully to Supabase, URL: $logoUrl',
+              );
+
+              // Important: We DON'T update the local logo_path because we need to keep
+              // the local file reference for offline use, but we'll use the logo_url
+              // when sending to Supabase in the next steps
+            } else {
+              debugPrint('Failed to get logo URL after upload');
+            }
+          } else {
+            debugPrint(
+              'Logo file does not exist at path: ${infoToSync.logoPath}',
+            );
+          }
+        } catch (e) {
+          debugPrint('Error uploading logo to Supabase: $e');
+          // Continue without logo
+        }
+      } else {
+        debugPrint('No logo path provided');
+      }
+
+      // If we successfully uploaded a logo, create a special version of the company info
+      // that includes the Supabase logo URL for the database
+      if (logoUrl != null) {
+        // Create data map manually to include logoUrl in correct field
+        var data = infoToSync.toMap();
+        data['logo_url'] = logoUrl;
+
+        debugPrint('Adding logo_url to profile data: $logoUrl');
+        await _companyRepository.createInitialProfile(infoToSync);
+      } else {
+        // Just use the regular info
+        await _companyRepository.createInitialProfile(infoToSync);
+      }
+
+      debugPrint('Company info successfully synced to Supabase');
+    } catch (e) {
+      debugPrint('Error syncing to Supabase: $e');
     }
   }
 
@@ -131,6 +248,17 @@ class CompanyService {
           debugPrint('Verified logo exists after saving: $logoExists');
         }
       }
+
+      // Sync to Supabase if user is authenticated
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        debugPrint('User authenticated, syncing to Supabase');
+        // Update id to match user id for Supabase
+        infoToSave = infoToSave.copyWith(id: user.id);
+        await _syncToSupabase(infoToSave);
+      } else {
+        debugPrint('No user authenticated, skipping Supabase sync');
+      }
     } catch (e) {
       debugPrint('Error saving company info: $e');
     }
@@ -200,7 +328,17 @@ class CompanyService {
     String? email,
     String? website,
   }) async {
+    // Use current user ID if available, otherwise generate one
+    String id;
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      id = user.id;
+    } else {
+      id = const Uuid().v4();
+    }
+
     final companyInfo = CompanyInfo(
+      id: id,
       businessName: businessName,
       logoPath: logoPath,
       currency: currency,

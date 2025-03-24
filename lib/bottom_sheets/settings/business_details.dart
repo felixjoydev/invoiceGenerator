@@ -9,6 +9,7 @@ import 'package:invoicegenerator/models/company_info.dart';
 import 'package:invoicegenerator/services/company_service.dart';
 import 'package:invoicegenerator/screens/settings/settings_screen.dart';
 import 'dart:io';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class BusinessDetailsSheet extends StatefulWidget {
   const BusinessDetailsSheet({super.key});
@@ -435,8 +436,37 @@ class _BusinessDetailsSheetState extends State<BusinessDetailsSheet> {
       }
     }
 
+    // Show loading indicator
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              CircularProgressIndicator(color: Colors.white),
+              SizedBox(width: 16),
+              Text('Saving changes...'),
+            ],
+          ),
+          duration: Duration(seconds: 5),
+        ),
+      );
+    }
+
+    // Get current user ID from Supabase or use existing ID
+    String companyId = _companyService.companyInfo!.id;
+    try {
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      if (currentUser != null) {
+        companyId = currentUser.id;
+        debugPrint('Using Supabase user ID: $companyId');
+      }
+    } catch (e) {
+      debugPrint('Error getting current user: $e');
+    }
+
     // Create updated company info
     final companyInfo = CompanyInfo(
+      id: companyId,
       businessName: _businessNameController.text,
       logoPath: _logoPath,
       currency: _selectedCurrency,
@@ -464,39 +494,52 @@ class _BusinessDetailsSheetState extends State<BusinessDetailsSheet> {
 
     debugPrint('Saving company info with logo path: ${companyInfo.logoPath}');
 
-    // Save to service
-    await _companyService.saveCompanyInfo(companyInfo);
+    try {
+      // Save to service (now handles both local and Supabase saving)
+      await _companyService.saveCompanyInfo(companyInfo);
 
-    // Verify that the company info was saved properly
-    await _companyService.refresh();
-    final savedInfo = _companyService.companyInfo;
-    debugPrint(
-      'Verified saved company info with logo path: ${savedInfo?.logoPath}',
-    );
-
-    if (savedInfo?.logoPath != null) {
-      final logoFile = File(savedInfo!.logoPath!);
-      final exists = logoFile.existsSync();
-      debugPrint('Verified saved logo file exists: $exists');
-    }
-
-    // Show success message
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Changes saved successfully'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
+      // Verify that the company info was saved properly
+      await _companyService.refresh();
+      final savedInfo = _companyService.companyInfo;
+      debugPrint(
+        'Verified saved company info with logo path: ${savedInfo?.logoPath}',
       );
 
-      // Reset form modified state
-      setState(() {
-        _isFormModified = false;
-      });
+      if (savedInfo?.logoPath != null) {
+        final logoFile = File(savedInfo!.logoPath!);
+        final exists = logoFile.existsSync();
+        debugPrint('Verified saved logo file exists: $exists');
+      }
 
-      // Navigate back to settings screen
-      _handleBackPressed();
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Changes saved successfully'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        // Reset form modified state
+        setState(() {
+          _isFormModified = false;
+        });
+
+        // Navigate back to settings screen
+        _handleBackPressed();
+      }
+    } catch (e) {
+      debugPrint('Error saving company info: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving changes: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 

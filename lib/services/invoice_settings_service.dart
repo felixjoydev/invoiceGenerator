@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 class InvoiceSettingsService {
   static const String _prefsKeyInvoiceSettings = 'invoice_settings';
@@ -30,6 +32,24 @@ class InvoiceSettingsService {
     if (_isInitialized) return;
 
     try {
+      final user = Supabase.instance.client.auth.currentUser;
+
+      if (user != null) {
+        // Try to load from Supabase
+        final settings = await _loadSettingsFromSupabase();
+        if (settings != null) {
+          _idFormat = settings['idFormat'] ?? '001';
+          _customNotes = settings['customNotes'] ?? '';
+          _isAutoGenerate = settings['isAutoGenerate'] ?? true;
+          _idPrefix = settings['idPrefix'] ?? 'INV';
+          _lastInvoiceNumber = settings['lastInvoiceNumber'] ?? 0;
+
+          _isInitialized = true;
+          return;
+        }
+      }
+
+      // If not authenticated or no settings in Supabase, load from SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       final String? settingsJson = prefs.getString(_prefsKeyInvoiceSettings);
 
@@ -40,11 +60,87 @@ class InvoiceSettingsService {
         _isAutoGenerate = settings['isAutoGenerate'] ?? true;
         _idPrefix = settings['idPrefix'] ?? 'INV';
         _lastInvoiceNumber = settings['lastInvoiceNumber'] ?? 0;
+
+        // If the user is authenticated, sync settings to Supabase
+        if (user != null) {
+          await _saveSettingsToSupabase();
+        }
       }
 
       _isInitialized = true;
     } catch (e) {
-      print('Error initializing InvoiceSettingsService: $e');
+      debugPrint('Error initializing InvoiceSettingsService: $e');
+    }
+  }
+
+  // Load settings from Supabase
+  Future<Map<String, dynamic>?> _loadSettingsFromSupabase() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return null;
+
+      final response =
+          await Supabase.instance.client
+              .from('invoice_settings')
+              .select()
+              .eq('user_id', user.id)
+              .maybeSingle();
+
+      if (response == null) return null;
+
+      return {
+        'idFormat': response['id_format'],
+        'customNotes': response['custom_notes'],
+        'isAutoGenerate': response['auto_generate'],
+        'idPrefix': response['id_prefix'],
+        'lastInvoiceNumber': response['last_invoice_number'],
+      };
+    } catch (e) {
+      debugPrint('Error loading invoice settings from Supabase: $e');
+      return null;
+    }
+  }
+
+  // Save settings to Supabase
+  Future<bool> _saveSettingsToSupabase() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return false;
+
+      // Check if settings already exist
+      final existing =
+          await Supabase.instance.client
+              .from('invoice_settings')
+              .select('id')
+              .eq('user_id', user.id)
+              .maybeSingle();
+
+      final data = {
+        'user_id': user.id,
+        'id_format': _idFormat,
+        'custom_notes': _customNotes,
+        'auto_generate': _isAutoGenerate,
+        'id_prefix': _idPrefix,
+        'last_invoice_number': _lastInvoiceNumber,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      if (existing != null) {
+        // Update existing record
+        await Supabase.instance.client
+            .from('invoice_settings')
+            .update(data)
+            .eq('id', existing['id']);
+      } else {
+        // Create new record
+        data['created_at'] = DateTime.now().toIso8601String();
+        await Supabase.instance.client.from('invoice_settings').insert(data);
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error saving invoice settings to Supabase: $e');
+      return false;
     }
   }
 
@@ -61,9 +157,17 @@ class InvoiceSettingsService {
       if (customNotes != null) _customNotes = customNotes;
 
       // Save to shared preferences
-      return await _saveToPrefs();
+      final saveLocal = await _saveToPrefs();
+
+      // Save to Supabase if user is authenticated
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        await _saveSettingsToSupabase();
+      }
+
+      return saveLocal;
     } catch (e) {
-      print('Error saving invoice settings: $e');
+      debugPrint('Error saving invoice settings: $e');
       return false;
     }
   }
@@ -81,9 +185,17 @@ class InvoiceSettingsService {
       if (idPrefix != null) _idPrefix = idPrefix;
 
       // Save to shared preferences
-      return await _saveToPrefs();
+      final saveLocal = await _saveToPrefs();
+
+      // Save to Supabase if user is authenticated
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        await _saveSettingsToSupabase();
+      }
+
+      return saveLocal;
     } catch (e) {
-      print('Error saving invoice ID settings: $e');
+      debugPrint('Error saving invoice ID settings: $e');
       return false;
     }
   }
@@ -93,9 +205,19 @@ class InvoiceSettingsService {
     try {
       await init(); // Ensure service is initialized
       _lastInvoiceNumber++;
-      return await _saveToPrefs();
+
+      // Save to shared preferences
+      final saveLocal = await _saveToPrefs();
+
+      // Save to Supabase if user is authenticated
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        await _saveSettingsToSupabase();
+      }
+
+      return saveLocal;
     } catch (e) {
-      print('Error updating last invoice number: $e');
+      debugPrint('Error updating last invoice number: $e');
       return false;
     }
   }
@@ -124,11 +246,12 @@ class InvoiceSettingsService {
         'idPrefix': _idPrefix,
         'lastInvoiceNumber': _lastInvoiceNumber,
       };
-
-      await prefs.setString(_prefsKeyInvoiceSettings, jsonEncode(settings));
-      return true;
+      return await prefs.setString(
+        _prefsKeyInvoiceSettings,
+        jsonEncode(settings),
+      );
     } catch (e) {
-      print('Error saving to preferences: $e');
+      debugPrint('Error saving to SharedPreferences: $e');
       return false;
     }
   }

@@ -61,5 +61,48 @@
 	<true/>
 	<key>NSFileProviderDomainUsageDescription</key>
 	<string>This app needs access to files to allow you to select logo images from the Files app</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.55430732527-0hkpq6hl24q0qb8149s2duda8rses8iu</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>io.supabase.invoicegenerator</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>io.supabase.invoicegenerator</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>login-callback</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>io.supabase.invoicegenerator.login-callback</string>
+			</array>
+		</dict>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>https</string>
+		<string>http</string>
+		<string>googlechrome</string>
+		<string>googlechromes</string>
+		<string>safari</string>
+	</array>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:lmhwjvkwzekiibxqanec.supabase.co</string>
+	</array>
 </dict>
 </plist>

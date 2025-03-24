@@ -1,9 +1,13 @@
 import Flutter
 import UIKit
 import MobileCoreServices
+import SafariServices  // Import for SFSafariViewController
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
+  // Auth method channel for communication with Flutter
+  private var authMethodChannel: FlutterMethodChannel?
+  
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -19,6 +23,11 @@ import MobileCoreServices
       name: "com.invoicegenerator/document_picker",
       binaryMessenger: controller!.binaryMessenger)
     
+    // Set up auth method channel
+    authMethodChannel = FlutterMethodChannel(
+      name: "com.invoicegenerator/auth",
+      binaryMessenger: controller!.binaryMessenger)
+    
     documentPickerChannel.setMethodCallHandler { [weak self] (call, result) in
       guard let self = self else { return }
       
@@ -29,7 +38,57 @@ import MobileCoreServices
       }
     }
     
+    // Listen for application activation notifications - helps with auth flows when Safari crashes
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleApplicationDidBecomeActive),
+      name: UIApplication.didBecomeActiveNotification,
+      object: nil
+    )
+    
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+  
+  // Called when app becomes active - can happen after Safari crashes during OAuth
+  @objc func handleApplicationDidBecomeActive(_ notification: Notification) {
+    print("AppDelegate: application did become active - might be returning from OAuth")
+    
+    // Use method channel to notify Flutter about potential Safari crash
+    authMethodChannel?.invokeMethod("checkAuthAfterSafariCrash", arguments: nil, result: { (result) in
+      if let error = result as? FlutterError {
+        print("Error invoking Flutter method: \(error.message ?? "unknown error")")
+      } else if let methodResult = result as? Bool, methodResult {
+        print("Flutter auth check successfully initiated")
+      }
+    })
+  }
+  
+  // Handle URL scheme callbacks for OAuth authentication
+  override func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+    print("AppDelegate: received URL callback: \(url)")
+    
+    // Let FlutterAppDelegate handle the URL first (handles plugin callbacks)
+    let handled = super.application(app, open: url, options: options)
+    
+    // Log whether the URL was handled
+    print("URL handled by Flutter plugins: \(handled)")
+    
+    return handled
+  }
+  
+  // Handle universal links (alternative to URL schemes)
+  override func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
+    print("AppDelegate: handling universal link")
+    
+    // Handle universal links for authentication
+    if userActivity.activityType == NSUserActivityTypeBrowsingWeb,
+       let incomingURL = userActivity.webpageURL {
+      print("Universal link received: \(incomingURL)")
+      // Let FlutterAppDelegate handle the URL
+      return super.application(application, continue: userActivity, restorationHandler: restorationHandler)
+    }
+    
+    return false
   }
   
   // Present a document picker to open the Files app

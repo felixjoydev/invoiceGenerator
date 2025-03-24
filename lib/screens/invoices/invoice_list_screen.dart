@@ -27,7 +27,6 @@ import 'package:invoicegenerator/widgets/cards/HighlightedInvoiceCard.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
-import 'package:flutter/rendering.dart';
 
 class InvoiceListScreen extends StatefulWidget {
   final String? invoiceIdToAnimate;
@@ -144,6 +143,9 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
   Size _selectedItemSize = Size.zero;
   bool _showPressWidgetAbove = false;
 
+  // Last time the update was handled
+  DateTime? _lastUpdateTime;
+
   @override
   void initState() {
     super.initState();
@@ -229,7 +231,24 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
   // Handle invoice service updates
   void _handleInvoiceUpdates() {
+    final now = DateTime.now();
+
+    // Throttle updates to prevent excessive refreshes
+    if (_lastUpdateTime != null &&
+        now.difference(_lastUpdateTime!).inMilliseconds < 500) {
+      debugPrint(
+        'Skipping invoice update - last update was ${now.difference(_lastUpdateTime!).inMilliseconds}ms ago',
+      );
+      return;
+    }
+
+    _lastUpdateTime = now;
+
     if (mounted) {
+      debugPrint('InvoiceListScreen - Handling invoice update notification');
+      final invoiceCount = _invoiceService.getAllInvoices().length;
+      debugPrint('Invoice count in service: $invoiceCount');
+
       setState(() {
         // Just trigger a rebuild - invoices are obtained from service
       });
@@ -289,7 +308,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
   List<Invoice> get _filteredAllInvoices {
     try {
       // Get all invoices from the service
-      final allInvoices = _invoiceService.getAllInvoices();
+      final allInvoices = List<Invoice>.from(_invoiceService.getAllInvoices());
 
       // Sort by issueDate (most recent first)
       // This ensures newly created invoices appear at the top of the "All" tab
@@ -319,8 +338,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
   List<Invoice> get _filteredOverdueInvoices {
     try {
-      final overdueInvoices = _invoiceService.getInvoicesByStatus(
-        InvoiceStatus.overdue,
+      final overdueInvoices = List<Invoice>.from(
+        _invoiceService.getInvoicesByStatus(InvoiceStatus.overdue),
       );
 
       // Sort by due date (most overdue first)
@@ -343,8 +362,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
   List<Invoice> get _filteredOutstandingInvoices {
     try {
-      final outstandingInvoices = _invoiceService.getInvoicesByStatus(
-        InvoiceStatus.outstanding,
+      final outstandingInvoices = List<Invoice>.from(
+        _invoiceService.getInvoicesByStatus(InvoiceStatus.outstanding),
       );
 
       // Sort by due date (closest due date first)
@@ -367,8 +386,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
   List<Invoice> get _filteredPaidInvoices {
     try {
-      final paidInvoices = _invoiceService.getInvoicesByStatus(
-        InvoiceStatus.paid,
+      final paidInvoices = List<Invoice>.from(
+        _invoiceService.getInvoicesByStatus(InvoiceStatus.paid),
       );
 
       // Sort by paid date (newest first), fallback to issue date if paidDate is null
@@ -829,7 +848,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         body: PageStorage(
           bucket: _bucket,
           child: Stack(
-            key: ValueKey('invoice-list-stack-${_selectedTabIndex}'),
+            key: ValueKey('invoice-list-stack-$_selectedTabIndex'),
             children: [
               Column(
                 children: [
@@ -950,7 +969,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                   // Main content area with cards based on selected tab
                   Expanded(
                     child: ContentSlideTransition(
-                      key: ValueKey('content-slide-${_selectedTabIndex}'),
+                      key: ValueKey('content-slide-$_selectedTabIndex'),
                       // Direction determination happens in the route
                       slideFromRight:
                           ModalRoute.of(context)?.settings.arguments

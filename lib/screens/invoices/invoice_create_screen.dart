@@ -28,6 +28,7 @@ import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
 import 'package:invoicegenerator/services/pdf_service.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class InvoiceCreateScreen extends StatefulWidget {
   final Invoice? invoiceToEdit;
@@ -1075,40 +1076,83 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     }
 
     try {
+      debugPrint('=== INVOICE CREATION STARTED ===');
+
       // Parse dates
       final dateFormat = DateFormat('dd/MM/yyyy');
       final issueDate = dateFormat.parse(_issueDateController.text);
       final dueDate = dateFormat.parse(_dueDateController.text);
+      debugPrint('Dates parsed - Issue date: $issueDate, Due date: $dueDate');
 
       // Get company info for tax rate
       final companyService = CompanyService();
       await companyService.init();
+      debugPrint('Company service initialized');
 
       final companyInfo = companyService.companyInfo;
       if (companyInfo == null) {
+        debugPrint('ERROR: Company information not set');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Company information not set')),
         );
         return;
       }
+      debugPrint('Company info found: ${companyInfo.businessName}');
 
       // Get tax rate from the UI or company settings
       double taxRate = 0.0;
       if (_isTaxEnabled) {
         taxRate = double.tryParse(_taxPercentController.text) ?? 0.0;
       }
+      debugPrint('Tax rate: $taxRate');
 
-      // Initialize invoice service and generate ID
+      // Initialize invoice service
       final invoiceService = InvoiceService();
       await invoiceService.init();
+      debugPrint('Invoice service initialized');
 
-      // Use custom invoice ID or generate a new one
-      String invoiceId =
-          _isEditMode
-              ? _invoiceIdController.text
-              : (_invoiceIdController.text.isNotEmpty
-                  ? _invoiceIdController.text
-                  : invoiceService.generateInvoiceId());
+      // Clear saved invoice IDs to ensure fresh start
+      if (!_isEditMode) {
+        // Get the current SharedPreferences instance
+        final prefs = await SharedPreferences.getInstance();
+        // Check if we're using a new account without existing invoices
+        final String? invoicesJson = prefs.getString('invoices');
+        if (invoicesJson == null ||
+            invoicesJson.isEmpty ||
+            invoicesJson == '[]') {
+          debugPrint(
+            'No existing invoices found - resetting invoice ID counter',
+          );
+          // Reset the invoice settings service counter
+          await _invoiceSettingsService.init();
+          await prefs.remove('invoice_settings');
+          await _invoiceSettingsService.saveInvoiceIdSettings(
+            isAutoGenerate: true,
+            idPrefix: 'INV',
+          );
+        }
+      }
+
+      // Generate or use an invoice ID
+      String invoiceId;
+      if (_isEditMode) {
+        invoiceId = _invoiceIdController.text;
+        debugPrint('Using existing invoice ID for edit: $invoiceId');
+      } else {
+        // Initialize invoice settings again to ensure latest state
+        await _invoiceSettingsService.init();
+
+        // If user entered a custom ID, use it, otherwise generate one
+        if (_invoiceIdController.text.isNotEmpty) {
+          invoiceId = _invoiceIdController.text;
+          debugPrint('Using user-provided invoice ID: $invoiceId');
+        } else {
+          // Force regenerate ID to ensure it's fresh
+          invoiceId = invoiceService.generateInvoiceId();
+          _invoiceIdController.text = invoiceId;
+          debugPrint('Generated new invoice ID: $invoiceId');
+        }
+      }
 
       // Create the invoice object
       final invoice = Invoice(
@@ -1135,25 +1179,54 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
         templateName: _selectedTemplate, // Set the selected template
       );
 
-      // Save the invoice
-      bool success =
-          _isEditMode
-              ? await invoiceService.updateInvoice(invoice)
-              : await invoiceService.addInvoice(invoice);
+      debugPrint(
+        'Invoice object created with ID: ${invoice.invoiceId}, Client: ${invoice.client.name}, Total: ${invoice.total}',
+      );
+      debugPrint('Invoice contains ${invoice.items.length} items');
+
+      // Try to save the invoice
+      debugPrint('Attempting to save invoice: ${invoice.invoiceId}');
+      bool success = false;
+
+      if (_isEditMode) {
+        debugPrint('Updating existing invoice');
+        success = await invoiceService.updateInvoice(invoice);
+      } else {
+        debugPrint('Creating new invoice');
+        success = await invoiceService.addInvoice(invoice);
+      }
+
+      // Verify invoice was saved by checking if it exists in loaded invoices
+      final allInvoices = invoiceService.getAllInvoices();
+      final bool invoiceExists = allInvoices.any(
+        (inv) => inv.invoiceId == invoice.invoiceId,
+      );
+      debugPrint(
+        'Invoice service returned success=$success, invoice exists in data: $invoiceExists',
+      );
+      debugPrint('Total invoices in service after save: ${allInvoices.length}');
+
+      if (allInvoices.isNotEmpty) {
+        debugPrint(
+          'First few invoice IDs: ${allInvoices.take(3).map((i) => i.invoiceId).join(', ')}',
+        );
+      }
 
       if (success) {
-        // If auto-generate is enabled, increment the last invoice number
+        debugPrint('Invoice saved successfully: ${invoice.invoiceId}');
+
         if (!_isEditMode && _invoiceSettingsService.isAutoGenerate) {
           await _invoiceSettingsService.incrementInvoiceNumber();
+          debugPrint('Incremented invoice number in settings');
         }
 
         // Navigate to the preview screen
         if (mounted) {
           final logoPath = companyInfo.logoPath;
-
           debugPrint(
             'InvoiceCreateScreen - Opening preview with logo path: $logoPath',
           );
+
           if (logoPath != null) {
             final logoFile = File(logoPath);
             final exists = logoFile.existsSync();
@@ -1162,10 +1235,12 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
             );
           }
 
-          // Get template object from template name
-          _getTemplateByName(_selectedTemplate);
+          // Force another save of invoices to ensure persistence
+          await invoiceService.saveInvoices();
+          debugPrint('Forced another save of invoices to ensure persistence');
 
           // After successful save, navigate to invoice preview
+          debugPrint('Navigating to InvoicePreview screen');
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -1180,11 +1255,13 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
           );
         }
       } else {
+        debugPrint('ERROR: Failed to save invoice');
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Failed to save invoice')));
       }
     } catch (e) {
+      debugPrint('ERROR: Exception during invoice creation: $e');
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error creating invoice: $e')));

@@ -3,6 +3,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/widgets/display/MainHeading.dart';
 import 'package:invoicegenerator/bottom_sheets/settings/business_details.dart';
 import 'package:invoicegenerator/bottom_sheets/settings/invoice_settings.dart';
+import 'package:invoicegenerator/services/auth_provider.dart';
+import 'package:invoicegenerator/screens/auth/get-started.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -41,10 +43,43 @@ class SettingsScreen extends StatelessWidget {
   }
 
   // Handle logout
-  void _handleLogout(BuildContext context) {
-    // Close bottom sheet
-    Navigator.pop(context);
-    // TODO: Implement logout functionality
+  void _handleLogout(BuildContext context) async {
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const Center(child: CircularProgressIndicator());
+      },
+    );
+
+    try {
+      // Close bottom sheet
+      Navigator.pop(context);
+
+      // Call signOut method from AuthProvider
+      await AuthProvider.of(context).signOut();
+
+      // Close loading dialog
+      Navigator.pop(context);
+
+      // Navigate to login screen
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const GetStartedScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      // Close loading dialog
+      Navigator.pop(context);
+
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error signing out: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override

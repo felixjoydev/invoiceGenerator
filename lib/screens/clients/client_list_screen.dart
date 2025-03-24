@@ -62,6 +62,9 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
   // Track newly added clients that should be animated
   final Set<String> _newlyAddedClientIds = {};
 
+  // Last time the client update was handled
+  DateTime? _lastClientUpdateTime;
+
   @override
   void initState() {
     super.initState();
@@ -106,10 +109,8 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
         _clients = _clientService.clients;
       });
 
-      // If no clients, add a sample one
-      if (_clients.isEmpty) {
-        _addSampleClient();
-      }
+      // REMOVED: Automatic sample client creation
+      // Let users create clients themselves
     } catch (e) {
       debugPrint('Error loading clients: $e');
       // Initialize with empty list if there's an error
@@ -125,7 +126,7 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
             label: 'Clear Data',
             onPressed: () {
               _clientService.clearAllClients();
-              _addSampleClient();
+              // REMOVED: Don't auto-add sample client after clearing
             },
           ),
         ),
@@ -133,30 +134,26 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
     }
   }
 
-  // Add a sample client for first-time use
-  Future<void> _addSampleClient() async {
-    // Create a sample client - only name is required
-    final client = Client(
-      name: 'Acuro',
-      clientId: 'CL001',
-      type: 'organization',
-      // Optional fields for a better sample
-      addressLine1: '123 Main St',
-      email: 'contact@acuro.com',
-      invoiceCount: 2,
-      currency: 'USD',
-      amount: 4500.00,
-      outstandingAmount: 1000.00,
-      hasOutstanding: true,
-    );
-
-    // Add to service
-    await _clientService.addClient(client);
-  }
-
-  // Update _onClientDataChanged to no longer detect new clients for animation
+  // Update _onClientDataChanged to throttle updates
   void _onClientDataChanged() {
+    final now = DateTime.now();
+
+    // Throttle updates to prevent excessive refreshes
+    if (_lastClientUpdateTime != null &&
+        now.difference(_lastClientUpdateTime!).inMilliseconds < 500) {
+      debugPrint(
+        'Skipping client update - last update was ${now.difference(_lastClientUpdateTime!).inMilliseconds}ms ago',
+      );
+      return;
+    }
+
+    _lastClientUpdateTime = now;
+
     if (mounted) {
+      debugPrint('ClientListScreen - Handling client data change notification');
+      final clientCount = _clientService.clients.length;
+      debugPrint('Client count in service: $clientCount');
+
       setState(() {
         _clients = _clientService.clients;
       });
