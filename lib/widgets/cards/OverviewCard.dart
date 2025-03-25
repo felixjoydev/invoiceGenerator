@@ -73,7 +73,7 @@ class _OverviewCardState extends State<OverviewCard>
       await Future.wait([_invoiceService.init(), _companyService.init()]);
 
       // Update the data
-      _updateInvoiceData();
+      await _updateInvoiceData();
     } catch (e) {
       debugPrint('Error loading invoice data: $e');
       // Set loading to false even if there's an error
@@ -91,12 +91,12 @@ class _OverviewCardState extends State<OverviewCard>
     }
   }
 
-  void _updateInvoiceData() {
+  Future<void> _updateInvoiceData() async {
     // Calculate totals
-    _calculateTotals();
+    await _calculateTotals();
 
     // Get filtered lists for each tab
-    _getFilteredLists();
+    await _getFilteredLists();
 
     // Update UI
     if (mounted) {
@@ -106,12 +106,12 @@ class _OverviewCardState extends State<OverviewCard>
     }
   }
 
-  void _calculateTotals() {
+  Future<void> _calculateTotals() async {
     _overdueTotal = 0.0;
     _outstandingTotal = 0.0;
     _paidTotal = 0.0;
 
-    final allInvoices = _invoiceService.getAllInvoices();
+    final allInvoices = await _invoiceService.getAllInvoices();
 
     debugPrint('Found ${allInvoices.length} invoices');
 
@@ -134,11 +134,12 @@ class _OverviewCardState extends State<OverviewCard>
     );
   }
 
-  void _getFilteredLists() {
+  Future<void> _getFilteredLists() async {
     // Get overdue invoices sorted by most days overdue
-    _overdueInvoices = _invoiceService.getInvoicesByStatus(
+    final overdueInvoices = await _invoiceService.getInvoicesByStatus(
       InvoiceStatus.overdue,
     );
+    _overdueInvoices = overdueInvoices;
     _overdueInvoices.sort((a, b) {
       final aDaysOverdue = DateTime.now().difference(a.dueDate).inDays;
       final bDaysOverdue = DateTime.now().difference(b.dueDate).inDays;
@@ -151,9 +152,10 @@ class _OverviewCardState extends State<OverviewCard>
     }
 
     // Get outstanding invoices sorted by closest to due date
-    _outstandingInvoices = _invoiceService.getInvoicesByStatus(
+    final outstandingInvoices = await _invoiceService.getInvoicesByStatus(
       InvoiceStatus.outstanding,
     );
+    _outstandingInvoices = outstandingInvoices;
     _outstandingInvoices.sort((a, b) {
       return a.dueDate.compareTo(b.dueDate); // Closest due date first
     });
@@ -164,7 +166,10 @@ class _OverviewCardState extends State<OverviewCard>
     }
 
     // Get paid invoices sorted by most recently paid
-    _paidInvoices = _invoiceService.getInvoicesByStatus(InvoiceStatus.paid);
+    final paidInvoices = await _invoiceService.getInvoicesByStatus(
+      InvoiceStatus.paid,
+    );
+    _paidInvoices = paidInvoices;
     _paidInvoices.sort((a, b) {
       // Sort by paid date if available, otherwise use issue date
       final aDate = a.paidDate ?? a.issueDate;

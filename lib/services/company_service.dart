@@ -1,21 +1,35 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:invoicegenerator/models/company_info.dart';
+import 'package:invoicegenerator/services/mcp/storage_service_factory.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
-class CompanyService {
-  static const String _storageKey = 'company_info';
-
+class CompanyService with ChangeNotifier {
+  // In-memory company info
   CompanyInfo? _companyInfo;
-
   CompanyInfo? get companyInfo => _companyInfo;
+
+  // Storage service factory
+  final _storageFactory = StorageServiceFactory();
+
+  // Singleton pattern
+  static final CompanyService _instance = CompanyService._internal();
+  factory CompanyService() => _instance;
+  CompanyService._internal();
 
   // Initialize the service and load data
   Future<void> init() async {
     await _loadCompanyInfo();
+  }
+
+  // Get company info, loading if needed
+  Future<CompanyInfo?> getCompanyInfo() async {
+    if (_companyInfo == null) {
+      await _loadCompanyInfo();
+    }
+    return _companyInfo;
   }
 
   // Force a fresh reload from storage
@@ -25,31 +39,24 @@ class CompanyService {
     await _loadCompanyInfo();
   }
 
-  // Load company info from local storage
+  // Load company info from storage
   Future<void> _loadCompanyInfo() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? companyJson = prefs.getString(_storageKey);
+      // Get company info from the appropriate storage service
+      await _storageFactory.init();
+      _companyInfo = await _storageFactory.service.getCompanyInfo();
 
-      if (companyJson != null) {
-        final Map<String, dynamic> decoded = jsonDecode(companyJson);
-        _companyInfo = CompanyInfo.fromMap(decoded);
-        debugPrint(
-          'Loaded company info with logo path: ${_companyInfo?.logoPath}',
-        );
+      // Verify that the logo file exists
+      if (_companyInfo?.logoPath != null) {
+        final logoFile = File(_companyInfo!.logoPath!);
+        final exists = await logoFile.exists();
+        debugPrint('Logo file exists: $exists');
 
-        // Verify that the logo file exists
-        if (_companyInfo?.logoPath != null) {
-          final logoFile = File(_companyInfo!.logoPath!);
-          final exists = await logoFile.exists();
-          debugPrint('Logo file exists: $exists');
-
-          // If the file doesn't exist, clear the logo path
-          if (!exists) {
-            debugPrint('Logo file does not exist, clearing logo path');
-            _companyInfo = _companyInfo!.copyWith(logoPath: null);
-            await saveCompanyInfo(_companyInfo!);
-          }
+        // If the file doesn't exist, clear the logo path
+        if (!exists) {
+          debugPrint('Logo file does not exist, clearing logo path');
+          _companyInfo = _companyInfo!.copyWith(logoPath: null);
+          await saveCompanyInfo(_companyInfo!);
         }
       }
     } catch (e) {
@@ -58,11 +65,9 @@ class CompanyService {
     }
   }
 
-  // Save company info to local storage
+  // Save company info to storage
   Future<void> saveCompanyInfo(CompanyInfo info) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-
       // Verify that the logo file exists before saving
       CompanyInfo infoToSave = info;
       if (info.logoPath != null) {
@@ -113,75 +118,54 @@ class CompanyService {
         }
       }
 
-      debugPrint('Saving company info with logo path: ${infoToSave.logoPath}');
-      final String companyJson = jsonEncode(infoToSave.toMap());
-      await prefs.setString(_storageKey, companyJson);
+      // Save to appropriate storage service
+      await _storageFactory.service.updateCompanyInfo(infoToSave);
       _companyInfo = infoToSave;
-
-      // Verify the data was saved
-      final savedJson = prefs.getString(_storageKey);
-      if (savedJson != null) {
-        final Map<String, dynamic> decoded = jsonDecode(savedJson);
-        final savedLogoPath = decoded['logoPath'];
-        debugPrint('Verified saved logo path: $savedLogoPath');
-
-        // Double check file existence after saving
-        if (savedLogoPath != null) {
-          final logoExists = await File(savedLogoPath).exists();
-          debugPrint('Verified logo exists after saving: $logoExists');
-        }
-      }
     } catch (e) {
       debugPrint('Error saving company info: $e');
     }
   }
 
   // Update company info
-  Future<void> updateCompanyInfo({
-    String? businessName,
-    String? logoPath,
-    String? currency,
-    double? taxRate,
-    bool? enableTax,
-    String? country,
-    String? addressLine1,
-    String? addressLine2,
-    String? city,
-    String? zip,
-    String? phone,
-    String? email,
-    String? website,
-    String? bankName,
-    String? accountHolder,
-    String? accountNumber,
-    String? ifscCode,
-  }) async {
-    if (_companyInfo == null) {
-      debugPrint('Cannot update company info. It is not initialized.');
-      return;
+  Future<void> updateCompanyInfo(CompanyInfo updatedInfo) async {
+    try {
+      // Handle logo path separately to avoid overwriting it if it's not changed
+      final currentInfo = await getCompanyInfo();
+      if (currentInfo != null &&
+          updatedInfo.logoPath == null &&
+          currentInfo.logoPath != null) {
+        // Keep the existing logo path if not being updated
+        updatedInfo = updatedInfo.copyWith(logoPath: currentInfo.logoPath);
+      }
+
+      // Verify logo file exists before saving
+      if (updatedInfo.logoPath != null) {
+        try {
+          final file = File(updatedInfo.logoPath!);
+          final exists = await file.exists();
+          debugPrint(
+            'Verifying logo file exists before saving: $exists (${updatedInfo.logoPath})',
+          );
+
+          if (!exists) {
+            debugPrint(
+              'Logo file does not exist, clearing logo path before saving',
+            );
+            updatedInfo = updatedInfo.copyWith(logoPath: null);
+          }
+        } catch (e) {
+          debugPrint('Error verifying logo file: $e');
+          // Clear logo path if there's an error
+          updatedInfo = updatedInfo.copyWith(logoPath: null);
+        }
+      }
+
+      await _storageFactory.service.updateCompanyInfo(updatedInfo);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error updating company info: $e');
+      // Optionally rethrow or handle the error as appropriate
     }
-
-    final updatedInfo = _companyInfo!.copyWith(
-      businessName: businessName,
-      logoPath: logoPath,
-      currency: currency,
-      taxRate: taxRate,
-      enableTax: enableTax,
-      country: country,
-      addressLine1: addressLine1,
-      addressLine2: addressLine2,
-      city: city,
-      zip: zip,
-      phone: phone,
-      email: email,
-      website: website,
-      bankName: bankName,
-      accountHolder: accountHolder,
-      accountNumber: accountNumber,
-      ifscCode: ifscCode,
-    );
-
-    await saveCompanyInfo(updatedInfo);
   }
 
   // Save company info from onboarding

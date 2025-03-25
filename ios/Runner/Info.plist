@@ -22,6 +22,22 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.55430732527-jbp1occlhb07s2iai6kb4q3f15u3u1jq</string>
+				<string>felix.invoicegenerator</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>felix.invoicegenerator</string>
+			<key>CFBundleURLPathPrefix</key>
+			<string>login-callback</string>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>

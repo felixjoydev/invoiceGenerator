@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "55430732527",
+    "project_id": "invoice-generator-app-405900",
+    "storage_bucket": "invoice-generator-app-405900.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:55430732527:android:f9d57eb1f5c69d51bdd30d",
+        "android_client_info": {
+          "package_name": "com.invo.invoicegenerator"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "55430732527-jbp1occlhb07s2iai6kb4q3f15u3u1jq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDRhPnzyL4WDQXiFc-0qBaRCXwO5wLzh3A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "55430732527-jbp1occlhb07s2iai6kb4q3f15u3u1jq.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "55430732527-jbp1occlhb07s2iai6kb4q3f15u3u1jq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.invo.invoicegenerator"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+} 

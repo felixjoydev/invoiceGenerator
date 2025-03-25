@@ -1,8 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:invoicegenerator/models/client.dart';
-import 'package:invoicegenerator/services/invoice_service.dart';
+import 'package:invoicegenerator/services/mcp/storage_service_factory.dart';
 
 class ClientService with ChangeNotifier {
   // Singleton pattern
@@ -14,11 +13,11 @@ class ClientService with ChangeNotifier {
 
   ClientService._internal();
 
-  // Local storage key
-  static const String _storageKey = 'clients';
-
   // In-memory list of clients
   List<Client> _clients = [];
+
+  // Storage service factory
+  final _storageFactory = StorageServiceFactory();
 
   // Get all clients
   List<Client> get clients => List.unmodifiable(_clients);
@@ -28,95 +27,51 @@ class ClientService with ChangeNotifier {
     await _loadClients();
   }
 
-  // Load clients from shared preferences
+  // Load clients from storage
   Future<void> _loadClients() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? clientsJson = prefs.getString(_storageKey);
-
-      if (clientsJson != null) {
-        final List<dynamic> clientsData = jsonDecode(clientsJson);
-
-        // Clear existing clients
-        _clients = [];
-
-        // Convert each item to a Client object
-        for (var clientData in clientsData) {
-          try {
-            // Make sure clientData is a Map<String, dynamic>
-            if (clientData is Map) {
-              final Map<String, dynamic> clientMap = Map<String, dynamic>.from(
-                clientData,
-              );
-
-              // Ensure required fields for Client constructor are available
-              if (!clientMap.containsKey('clientName') ||
-                  clientMap['clientName'] == null) {
-                clientMap['clientName'] = '';
-              }
-              if (!clientMap.containsKey('clientId') ||
-                  clientMap['clientId'] == null) {
-                clientMap['clientId'] = generateClientId();
-              }
-              if (!clientMap.containsKey('type') || clientMap['type'] == null) {
-                clientMap['type'] = 'organization';
-              }
-
-              // Create and add the Client object
-              _clients.add(Client.fromMap(clientMap));
-            }
-          } catch (e) {
-            debugPrint('Error converting client data: $e');
-          }
-        }
-      }
+      await _storageFactory.init();
+      _clients = await _storageFactory.service.getClients();
+      notifyListeners();
     } catch (e) {
       debugPrint('Error loading clients: $e');
-      // Initialize with empty list if there's an error
       _clients = [];
-    }
-
-    // Notify listeners about the updated data
-    notifyListeners();
-  }
-
-  // Save clients to shared preferences
-  Future<void> _saveClients() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final List<Map<String, dynamic>> clientsData =
-          _clients.map((client) => client.toMap()).toList();
-      await prefs.setString(_storageKey, jsonEncode(clientsData));
-    } catch (e) {
-      debugPrint('Error saving clients: $e');
+      notifyListeners();
     }
   }
 
   // Add a client to the list
   Future<void> addClient(Client client) async {
-    // Add to beginning of list for newest clients to appear at top
-    _clients.insert(0, client);
+    try {
+      debugPrint(
+        'ClientService: Adding client ${client.name} (${client.clientId})',
+      );
+      debugPrint(
+        'ClientService: Storage type: ${_storageFactory.currentStorageType}',
+      );
 
-    // Save to storage
-    await _saveClients();
+      await _storageFactory.service.createClient(client);
+      debugPrint('ClientService: Client added to storage service');
 
-    // Notify listeners that data has changed
-    notifyListeners();
+      // Refresh client list from storage to ensure consistency
+      await _loadClients();
+      debugPrint(
+        'ClientService: Client list refreshed, new count: ${_clients.length}',
+      );
+    } catch (e) {
+      debugPrint('Error adding client: $e');
+    }
   }
 
   // Update an existing client
   Future<void> updateClient(String clientId, Client updatedClient) async {
-    final index = _clients.indexWhere((client) => client.clientId == clientId);
-    if (index != -1) {
-      _clients[index] = updatedClient;
-      await _saveClients();
+    try {
+      await _storageFactory.service.updateClient(clientId, updatedClient);
 
-      // Update this client in all invoices
-      final invoiceService = InvoiceService();
-      await invoiceService.init();
-      await invoiceService.updateClientInInvoices(clientId, updatedClient);
-
-      notifyListeners();
+      // Refresh client list to get updated data
+      await _loadClients();
+    } catch (e) {
+      debugPrint('Error updating client: $e');
     }
   }
 
@@ -125,47 +80,57 @@ class ClientService with ChangeNotifier {
     String clientId,
     Client updatedClient,
   ) async {
-    final index = _clients.indexWhere((client) => client.clientId == clientId);
-    if (index != -1) {
-      _clients[index] = updatedClient;
-      await _saveClients();
-      notifyListeners();
+    try {
+      // Find client in memory
+      final index = _clients.indexWhere(
+        (client) => client.clientId == clientId,
+      );
+      if (index != -1) {
+        _clients[index] = updatedClient;
+        notifyListeners();
+
+        // Update in storage without triggering cascading updates
+        await _storageFactory.service.updateClient(clientId, updatedClient);
+      }
+    } catch (e) {
+      debugPrint('Error updating client silently: $e');
     }
   }
 
   // Delete a client
   Future<void> deleteClient(String clientId) async {
-    _clients.removeWhere((client) => client.clientId == clientId);
-    await _saveClients();
-    notifyListeners();
+    try {
+      final success = await _storageFactory.service.deleteClient(clientId);
+
+      if (success) {
+        // Remove from in-memory list
+        _clients.removeWhere((client) => client.clientId == clientId);
+        notifyListeners();
+      } else {
+        debugPrint('Could not delete client with ID: $clientId');
+      }
+    } catch (e) {
+      debugPrint('Error deleting client: $e');
+    }
   }
 
   // Generate a new client ID
-  String generateClientId() {
-    // Find the highest existing client ID number
-    int highestIdNumber = 0;
+  Future<String> generateClientId() async {
+    return await _storageFactory.service.generateClientId();
+  }
 
-    for (var client in _clients) {
-      // Extract the numeric part from clientId format "CLxxx"
-      final idMatch = RegExp(r'CL(\d+)').firstMatch(client.clientId);
-      if (idMatch != null) {
-        final idNumber = int.tryParse(idMatch.group(1) ?? '0') ?? 0;
-        if (idNumber > highestIdNumber) {
-          highestIdNumber = idNumber;
-        }
-      }
-    }
-
-    // Create a new ID by incrementing the highest number
-    final newIdNumber = highestIdNumber + 1;
-    return 'CL${newIdNumber.toString().padLeft(3, '0')}';
+  // Check if a client can be deleted (no associated invoices)
+  Future<bool> canDeleteClient(String clientId) async {
+    return await _storageFactory.service.canDeleteClient(clientId);
   }
 
   // Clear all clients data (for testing/debugging)
   Future<void> clearAllClients() async {
-    _clients = [];
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_storageKey);
-    notifyListeners();
+    // This is a destructive operation that only affects local storage
+    // We don't provide this for remote storage for safety
+    if (_storageFactory.currentStorageType == StorageType.local) {
+      _clients = [];
+      notifyListeners();
+    }
   }
 }

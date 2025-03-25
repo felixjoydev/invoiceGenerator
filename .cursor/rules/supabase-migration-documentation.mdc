@@ -1,0 +1,1074 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# In depth documentation for Supabase migration from local SharedPreference
+
+Current Application Structure
+The Invoice Generator app currently uses SharedPreferences for local data storage with four primary models:
+1. Company Info (singleton model)
+2. Clients (collection)
+3. Invoices (collection)
+4. Catalog Items (collection)
+5. Invoice Settings (configuration)
+Current Model Analysis
+1. Company Info Model
+* File Location: lib/models/company_info.dart
+* Structure: Singleton model (no explicit ID)
+* Key Fields:
+    * businessName (required)
+    * currency (required)
+    * enableTax (required)
+    * taxRate (optional)
+    * Address fields (country, addressLine1, city are required)
+    * Contact fields (phone, email, website are optional)
+    * Bank details (all optional)
+    * logoPath (for company logo)
+* Storage: JSON object in SharedPreferences with key 'company_info'
+* Special Handling: Logo files are backed up to "logos_backup" in app documents directory
+2. Client Model
+* File Location: lib/models/client.dart
+* ID Structure: clientId in format "CLxxx" (e.g., "CL001")
+* ID Generation: Generated in ClientService.generateClientId() by finding highest existing ID and incrementing
+* Key Fields:
+    * name (required)
+    * clientId (required)
+    * type (required, 'organization' or 'person')
+    * Contact and address fields (mostly optional)
+    * Financial fields (currency, amount, outstandingAmount, dueAmount, etc.)
+* Storage: Array of JSON objects in SharedPreferences with key 'clients'
+* Current Limitations:
+    * No check for existing invoices before client deletion
+    * No explicit validation when directly setting client IDs
+3. Catalog Item Model
+* File Location: lib/models/catalog_item.dart
+* ID Structure: Uses title as unique identifier
+* Key Fields:
+    * title (required, serves as ID)
+    * amount (required)
+    * quantity (required)
+    * currency (default "USD")
+    * usageInfo (tracks usage in invoices)
+* Storage: Array of JSON objects in SharedPreferences with key 'catalog_items'
+* Current Limitations:
+    * No explicit check to prevent duplicate catalog item titles
+    * Relies on title as unique identifier without enforcing uniqueness
+4. Invoice Model
+* File Location: lib/models/invoice.dart
+* ID Structure: invoiceId in format "inv-xxx" (e.g., "inv-001")
+* ID Generation: InvoiceService.generateInvoiceId() finds highest existing ID and increments
+* Alternative ID: Supports custom ID formats through InvoiceSettingsService
+* Key Fields:
+    * invoiceId (required)
+    * client (required, embedded Client object)
+    * items (required, array of CatalogItem objects)
+    * issueDate and dueDate (required)
+    * status (enum: overdue, outstanding, paid)
+    * Financial fields (subtotal, taxRate, taxAmount, total)
+    * templateName (default "Orange")
+* Storage: Array of JSON objects in SharedPreferences with key 'invoices'
+5. Invoice Settings
+* File Location: lib/services/invoice_settings_service.dart
+* Key Fields:
+    * idFormat
+    * customNotes
+    * isAutoGenerate
+    * idPrefix (default "INV")
+    * lastInvoiceNumber
+* Storage: JSON object in SharedPreferences with key 'invoice_settings'
+Current Data Relationships and Integrity
+1. Client to Invoice Relationship
+* Type: One-to-many (one client can have many invoices)
+* Reference Mechanism: Invoices contain full embedded Client object
+* Data Integrity:
+    * When client is updated, ClientService.updateClient() calls InvoiceService.updateClientInInvoices()
+    * Client statistics are updated based on related invoices
+* Current Limitations:
+    * No check for existing invoices before client deletion
+    * Client deletion can leave orphaned invoices
+2. Catalog Item to Invoice Relationship
+* Type: Many-to-many (multiple catalog items in multiple invoices)
+* Reference Mechanism: Invoices contain embedded CatalogItem objects
+* Data Integrity:
+    * When catalog item is updated, CatalogService.updateItem() calls _updateCatalogItemInInvoices()
+    * When catalog item is deleted, CatalogService.deleteItem() calls InvoiceService.handleDeletedCatalogItem()
+    * Items are automatically removed from invoices with recalculation of totals (CASCADE behavior)
+    * CatalogItem usage statistics are updated based on invoice references
+3. Statistics and Background Updates
+* Mechanism: Background processes for statistics updates
+* Methods:
+    * InvoiceService._updateStatisticsInBackground()
+    * InvoiceService._updateStatisticsForInvoiceChangesInBackground()
+    * InvoiceService._updateStatisticsForDeletedInvoiceInBackground()
+* Circular Updates Prevention: Methods like updateClientSilently() and updateItemSilently() prevent circular update cascades
+4. Transaction Handling and Error Recovery
+* Current Implementation:
+    * Try-catch blocks simulate transaction rollback on error
+    * No atomic guarantees for operations spanning multiple entities
+    * Sequential operations update primary entity first, then related entities
+    * Risk of inconsistent state if operations fail partially
+5. Performance Considerations
+* Current Lookups:
+    * O(n) linear scans for client lookups
+    * O(n) filtering of invoices by status
+    * No indexing for searches or filtering
+* Data Duplication:
+    * Full embedding of client data in invoices increases storage but improves read performance
+    * Increases risk of data inconsistency when updating
+6. Complete Relationship Graph
+CompanyInfo (1)
+|
++-- Clients (Many)
+|   |
+|   +-- Invoices (Many)
+|       |
+|       +-- Catalog Items (Many)
+|
++-- Invoices (Many)
+|   |
+|   +-- Clients (1)
+|   |
+|   +-- Catalog Items (Many)
+|
++-- Catalog Items (Many)
+    |
+    +-- Used in Invoices (Many)
+Supabase Migration Plan
+1. Enhanced Database Schema Design
+Users Table
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  email TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+Organizations Table
+CREATE TABLE organizations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  business_name TEXT NOT NULL,
+  currency TEXT NOT NULL,
+  enable_tax BOOLEAN NOT NULL DEFAULT false,
+  tax_rate DECIMAL(5,2),
+  logo_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_organizations_user_id ON organizations(user_id);
+Addresses Table
+CREATE TABLE addresses (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  entity_id UUID NOT NULL,
+  entity_type TEXT NOT NULL CHECK (entity_type IN ('organization', 'client')),
+  country TEXT NOT NULL,
+  address_line1 TEXT NOT NULL,
+  address_line2 TEXT,
+  city TEXT NOT NULL,
+  state TEXT,
+  zip_code TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(entity_id, entity_type)
+);
+
+CREATE INDEX idx_addresses_entity ON addresses(entity_id, entity_type);
+Contact Info Table
+CREATE TABLE contact_info (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  entity_id UUID NOT NULL,
+  entity_type TEXT NOT NULL CHECK (entity_type IN ('organization', 'client')),
+  email TEXT,
+  phone TEXT,
+  website TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(entity_id, entity_type)
+);
+
+CREATE INDEX idx_contact_info_entity ON contact_info(entity_id, entity_type);
+Bank Details Table
+CREATE TABLE bank_details (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  bank_name TEXT,
+  account_name TEXT,
+  account_number TEXT,
+  routing_number TEXT,
+  swift_code TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_bank_details_org_id ON bank_details(organization_id);
+Clients Table
+CREATE TABLE clients (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  client_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('organization', 'person')),
+  amount DECIMAL(12,2) DEFAULT 0,
+  outstanding_amount DECIMAL(12,2) DEFAULT 0,
+  due_amount DECIMAL(12,2) DEFAULT 0,
+  invoice_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(organization_id, client_id)
+);
+
+CREATE INDEX idx_clients_org_id ON clients(organization_id);
+CREATE INDEX idx_clients_org_name ON clients(organization_id, name);
+Catalog Items Table
+CREATE TABLE catalog_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  amount DECIMAL(12,2) NOT NULL,
+  quantity DECIMAL(12,2) NOT NULL,
+  currency TEXT DEFAULT 'USD',
+  usage_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(organization_id, title)
+);
+
+CREATE INDEX idx_catalog_items_org_id ON catalog_items(organization_id);
+CREATE INDEX idx_catalog_items_org_title ON catalog_items(organization_id, title);
+Invoices Table
+CREATE TABLE invoices (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE RESTRICT,
+  invoice_id TEXT NOT NULL,
+  issue_date TIMESTAMP WITH TIME ZONE NOT NULL,
+  due_date TIMESTAMP WITH TIME ZONE NOT NULL,
+  subtotal DECIMAL(12,2) NOT NULL,
+  tax_rate DECIMAL(5,2),
+  tax_amount DECIMAL(12,2),
+  total DECIMAL(12,2) NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('paid', 'outstanding', 'overdue')),
+  template_name TEXT DEFAULT 'Orange',
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(organization_id, invoice_id)
+);
+
+CREATE INDEX idx_invoices_org_id ON invoices(organization_id);
+CREATE INDEX idx_invoices_client_id ON invoices(client_id);
+CREATE INDEX idx_invoices_status ON invoices(organization_id, status);
+CREATE INDEX idx_invoices_dates ON invoices(organization_id, issue_date, due_date);
+Invoice Items Table
+CREATE TABLE invoice_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+  catalog_item_id UUID REFERENCES catalog_items(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  quantity DECIMAL(12,2) NOT NULL,
+  unit_price DECIMAL(12,2) NOT NULL,
+  amount DECIMAL(12,2) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_invoice_items_invoice_id ON invoice_items(invoice_id);
+CREATE INDEX idx_invoice_items_catalog_id ON invoice_items(catalog_item_id) WHERE catalog_item_id IS NOT NULL;
+Invoice Settings Table
+CREATE TABLE invoice_settings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  id_format TEXT,
+  custom_notes TEXT,
+  is_auto_generate BOOLEAN DEFAULT true,
+  id_prefix TEXT DEFAULT 'INV',
+  last_invoice_number INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(organization_id)
+);
+
+CREATE INDEX idx_invoice_settings_org_id ON invoice_settings(organization_id);
+2. Foreign Key Constraint Behaviors
+Client to Invoice Relationship
+* invoices.client_id references clients.id with ON DELETE RESTRICT
+* Prevents client deletion if associated invoices exist
+* Implementation: ALTER TABLE invoices ADD CONSTRAINT fk_invoices_client FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE RESTRICT;
+* 
+Invoice to Invoice Items Relationship
+* invoice_items.invoice_id references invoices.id with ON DELETE CASCADE
+* Automatically deletes invoice items when parent invoice is deleted
+* Implementation: ALTER TABLE invoice_items ADD CONSTRAINT fk_invoice_items_invoice FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE;
+* 
+Invoice Items to Catalog Items Relationship
+* invoice_items.catalog_item_id references catalog_items.id with ON DELETE SET NULL
+* When catalog item is deleted, reference in invoice items becomes NULL but invoice item remains
+* Implementation: ALTER TABLE invoice_items ADD CONSTRAINT fk_invoice_items_catalog FOREIGN KEY (catalog_item_id) REFERENCES catalog_items(id) ON DELETE SET NULL;
+* 
+Organization Cascading Deletions
+* Organization deletion cascades to all related entities
+* Ensures clean removal of all organization data
+* Implementation: ALTER TABLE clientsADD CONSTRAINT fk_clients_organizationFOREIGN KEY (organization_id)REFERENCES organizations(id)ON DELETE CASCADE;
+* 
+3. Unique Constraints
+Client ID Uniqueness
+* Client IDs must be unique within an organization
+* Implementation: ALTER TABLE clients ADD CONSTRAINT unique_client_id_per_org UNIQUE (organization_id, client_id);
+* 
+Catalog Item Title Uniqueness
+* Catalog item titles must be unique within an organization
+* Implementation: ALTER TABLE catalog_items ADD CONSTRAINT unique_catalog_title_per_org UNIQUE (organization_id, title);
+* 
+Invoice ID Uniqueness
+* Invoice IDs must be unique within an organization
+* Implementation: ALTER TABLE invoices ADD CONSTRAINT unique_invoice_id_per_org UNIQUE (organization_id, invoice_id);
+* 
+4. Performance Optimization with Indexes
+Client Lookup Optimization
+* Index on clients(organization_id, client_id) for fast client lookup
+* Implementation: CREATE INDEX idx_clients_lookup ON clients(organization_id, client_id);
+* 
+Invoice Filtering by Status
+* Index on invoices(organization_id, status) for efficient status filtering
+* Implementation: CREATE INDEX idx_invoices_status ON invoices(organization_id, status);
+* 
+Invoice Search Optimization
+* Index on invoices(organization_id, invoice_id) for ID search
+* Index on trigrams for text search: CREATE EXTENSION IF NOT EXISTS pg_trgm;CREATE INDEX idx_clients_name_trgm ON clients USING GIN (name gin_trgm_ops);
+* 
+Polymorphic Relationship Optimization
+* Indexes on addresses(entity_id, entity_type) and contact_info(entity_id, entity_type)
+* Implementation: CREATE INDEX idx_addresses_entity ON addresses(entity_id, entity_type);CREATE INDEX idx_contact_info_entity ON contact_info(entity_id, entity_type);
+* 
+5. Transaction Handling for Complex Operations
+Creating an Invoice with Items
+* Wrap creation in a single transaction to ensure atomicity
+* Implementation: BEGIN;-- Insert invoiceINSERT INTO invoices (...) VALUES (...) RETURNING id;-- Insert invoice items using the returned invoice idINSERT INTO invoice_items (...) VALUES (...);INSERT INTO invoice_items (...) VALUES (...);-- Commit if all operations succeedCOMMIT;
+* 
+Updating a Client Affecting Multiple Invoices
+* For Supabase implementation, use client-side transactions: const { data, error } = await supabase.rpc('update_client_with_invoices', {  p_client_id: clientId,  p_updated_client: updatedClientObject});
+* 
+Batch Updates for Client Statistics
+* Create a stored procedure for efficient batch updates: CREATE OR REPLACE FUNCTION update_client_statistics(  client_ids UUID[]) RETURNS VOID AS $$BEGIN  UPDATE clients  SET    amount = subquery.total_amount,    outstanding_amount = subquery.outstanding,    due_amount = subquery.due,    invoice_count = subquery.count  FROM (    SELECT       client_id,      SUM(total) as total_amount,      SUM(CASE WHEN status = 'outstanding' THEN total ELSE 0 END) as outstanding,      SUM(CASE WHEN status = 'overdue' THEN total ELSE 0 END) as due,      COUNT(*) as count    FROM invoices    WHERE client_id = ANY(client_ids)    GROUP BY client_id  ) AS subquery  WHERE clients.id = subquery.client_id;END;$$ LANGUAGE plpgsql;
+* 
+6. Migration Steps from SharedPreferences to Supabase
+Step 1: Create Abstraction Layer
+abstract class StorageService {
+  // Company operations
+  Future<CompanyInfo?> getCompanyInfo();
+  Future<void> updateCompanyInfo(CompanyInfo info);
+  
+  // Client operations
+  Future<List<Client>> getClients();
+  Future<Client?> getClientById(String clientId);
+  Future<void> createClient(Client client);
+  Future<void> updateClient(String clientId, Client client);
+  Future<bool> deleteClient(String clientId);
+  Future<bool> canDeleteClient(String clientId);
+  Future<String> generateClientId();
+  
+  // Catalog operations
+  Future<List<CatalogItem>> getCatalogItems();
+  Future<CatalogItem?> getItemByTitle(String title);
+  Future<void> createItem(CatalogItem item);
+  Future<void> updateItem(String title, CatalogItem item);
+  Future<void> deleteItem(String title);
+  Future<bool> isItemTitleUnique(String title);
+  
+  // Invoice operations
+  Future<List<Invoice>> getInvoices();
+  Future<List<Invoice>> getInvoicesByStatus(InvoiceStatus status);
+  Future<List<Invoice>> getInvoicesByClient(String clientId);
+  Future<Invoice?> getInvoiceById(String invoiceId);
+  Future<bool> createInvoice(Invoice invoice);
+  Future<bool> updateInvoice(String invoiceId, Invoice invoice);
+  Future<bool> deleteInvoice(String invoiceId);
+  Future<String> generateInvoiceId();
+  
+  // Settings operations
+  Future<InvoiceSettings?> getInvoiceSettings();
+  Future<void> updateInvoiceSettings(InvoiceSettings settings);
+}
+Step 2: Implement SharedPreferences Service
+class SharedPreferencesStorageService implements StorageService {
+  // Implementation using existing SharedPreferences code
+  // This maintains backward compatibility during migration
+}
+Step 3: Implement Supabase Service
+class SupabaseStorageService implements StorageService {
+  final SupabaseClient _supabase;
+  
+  SupabaseStorageService(this._supabase);
+  
+  // Implement all methods using Supabase queries
+  // Handle all async operations and error cases
+}
+Step 4: Update Model Classes for New Relationships
+Invoice Model Changes
+class Invoice {
+  final String invoiceId;
+  
+  // For SharedPreferences (embedded client)
+  final Client client;
+  
+  // For Supabase (reference to client)
+  final String? clientId;  // UUID reference
+  
+  // Other fields...
+  
+  // Helper methods for compatibility
+  Future<Client?> getClient(StorageService storage) async {
+    if (client != null) return client;
+    if (clientId != null) return await storage.getClientById(clientId!);
+    return null;
+  }
+}
+Invoice Item Model (New)
+class InvoiceItem {
+  final String id;
+  final String invoiceId;
+  final String? catalogItemId;
+  final String title;
+  final String? description;
+  final double quantity;
+  final double unitPrice;
+  final double amount;
+  
+  // Constructor and methods...
+}
+Step 5: Implement Specific Integrity Checks
+Client Deletion Check
+// In SupabaseStorageService
+@override
+Future<bool> canDeleteClient(String clientId) async {
+  // Get client UUID from client_id
+  final clientRecord = await _supabase
+    .from('clients')
+    .select('id')
+    .eq('client_id', clientId)
+    .single();
+    
+  if (clientRecord == null) return true; // Client doesn't exist
+  
+  // Check for related invoices
+  final invoices = await _supabase
+    .from('invoices')
+    .select('id')
+    .eq('client_id', clientRecord['id'])
+    .limit(1);
+    
+  return invoices.isEmpty;
+}
+Catalog Item Title Uniqueness Check
+// In SupabaseStorageService
+@override
+Future<bool> isItemTitleUnique(String title) async {
+  final orgId = await _getCurrentOrganizationId();
+  
+  final items = await _supabase
+    .from('catalog_items')
+    .select('id')
+    .eq('organization_id', orgId)
+    .eq('title', title)
+    .limit(1);
+    
+  return items.isEmpty;
+}
+Step 6: Implement Transaction Handling
+Create Invoice with Items
+// In SupabaseStorageService
+@override
+Future<bool> createInvoice(Invoice invoice) async {
+  try {
+    final orgId = await _getCurrentOrganizationId();
+    
+    // Find client UUID from client_id
+    final clientRecord = await _supabase
+      .from('clients')
+      .select('id')
+      .eq('client_id', invoice.client.clientId)
+      .single();
+      
+    if (clientRecord == null) return false;
+    
+    // Begin transaction
+    final result = await _supabase.rpc('create_invoice_with_items', {
+      'p_org_id': orgId,
+      'p_client_id': clientRecord['id'],
+      'p_invoice_id': invoice.invoiceId,
+      'p_issue_date': invoice.issueDate.toIso8601String(),
+      'p_due_date': invoice.dueDate.toIso8601String(),
+      'p_subtotal': invoice.subtotal,
+      'p_tax_rate': invoice.taxRate,
+      'p_tax_amount': invoice.taxAmount,
+      'p_total': invoice.total,
+      'p_status': invoice.status.toString().split('.').last,
+      'p_template_name': invoice.templateName,
+      'p_notes': invoice.notes,
+      'p_items': invoice.items.map((item) => {
+        'title': item.title,
+        'description': item.description,
+        'quantity': item.quantity,
+        'unit_price': item.amount,
+        'amount': item.amount * item.quantity
+      }).toList()
+    });
+    
+    return result != null;
+  } catch (e) {
+    debugPrint('Error creating invoice: $e');
+    return false;
+  }
+}
+Step 7: Data Migration Utility
+class DataMigrationUtility {
+  final SharedPreferencesStorageService _sharedPrefs;
+  final SupabaseStorageService _supabase;
+  
+  DataMigrationUtility(this._sharedPrefs, this._supabase);
+  
+  Future<MigrationResult> migrateAllData() async {
+    try {
+      // 1. Create organization
+      final companyInfo = await _sharedPrefs.getCompanyInfo();
+      if (companyInfo == null) {
+        return MigrationResult(success: false, message: 'No company info found');
+      }
+      
+      final orgId = await _migrateCompanyInfo(companyInfo);
+      
+      // 2. Migrate clients
+      final clients = await _sharedPrefs.getClients();
+      final clientMappings = await _migrateClients(clients, orgId);
+      
+      // 3. Migrate catalog items
+      final catalogItems = await _sharedPrefs.getCatalogItems();
+      final catalogMappings = await _migrateCatalogItems(catalogItems, orgId);
+      
+      // 4. Migrate invoices with relationships
+      final invoices = await _sharedPrefs.getInvoices();
+      await _migrateInvoices(invoices, clientMappings, catalogMappings, orgId);
+      
+      // 5. Migrate settings
+      final settings = await _sharedPrefs.getInvoiceSettings();
+      if (settings != null) {
+        await _migrateInvoiceSettings(settings, orgId);
+      }
+      
+      return MigrationResult(
+        success: true, 
+        message: 'Migration completed successfully'
+      );
+    } catch (e) {
+      return MigrationResult(
+        success: false, 
+        message: 'Migration failed: ${e.toString()}'
+      );
+    }
+  }
+  
+  // Implementation of individual migration methods...
+}
+Step 8: UI Updates for Asynchronous Operations
+// Example: Invoice list screen
+class InvoiceListScreen extends StatefulWidget {
+  @override
+  _InvoiceListScreenState createState() => _InvoiceListScreenState();
+}
+
+class _InvoiceListScreenState extends State<InvoiceListScreen> {
+  final StorageService _storage = GetIt.instance<StorageService>();
+  List<Invoice>? _invoices;
+  bool _isLoading = true;
+  String? _error;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadInvoices();
+  }
+  
+  Future<void> _loadInvoices() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    
+    try {
+      final invoices = await _storage.getInvoices();
+      setState(() {
+        _invoices = invoices;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load invoices: ${e.toString()}';
+        _isLoading = false;
+      });
+    }
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Center(child: CircularProgressIndicator());
+    }
+    
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(_error!),
+            ElevatedButton(
+              onPressed: _loadInvoices,
+              child: Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    if (_invoices == null || _invoices!.isEmpty) {
+      return Center(
+        child: Text('No invoices found. Create your first invoice!'),
+      );
+    }
+    
+    return ListView.builder(
+      itemCount: _invoices!.length,
+      itemBuilder: (context, index) {
+        final invoice = _invoices![index];
+        return InvoiceCard(invoice: invoice);
+      },
+    );
+  }
+}
+Phased Migration Approach
+Phase 1: Setup and Initial Testing
+1. Create Supabase project and database schema
+2. Implement the StorageService interface
+3. Create SharedPreferencesStorageService implementation
+4. Create initial SupabaseStorageService implementation
+5. Add dependency injection to switch between implementations
+6. Test both implementations with simple operations
+Phase 2: Create Migration Utility
+1. Develop data mapping between SharedPreferences and Supabase
+2. Implement migration functions for each data type
+3. Create comprehensive validation checks
+4. Add rollback capability for failed migrations
+5. Test with sample data
+Phase 3: Update UI for Asynchronous Operations
+1. Modify screens to handle loading states
+2. Add error handling and retry mechanisms
+3. Implement offline indicators
+4. Create skeleton screens for better user experience
+5. Test under different network conditions
+Phase 4: Handle Relationship Changes
+1. Update model classes to support both storage types
+2. Implement proper relationship handling
+3. Test circular update prevention
+4. Verify statistics calculation
+5. Implement transaction handling for complex operations
+Phase 5: Gradual Rollout
+1. Deploy both storage mechanisms in parallel
+2. Add feature flag to control which storage is active
+3. Implement data synchronization between systems
+4. Monitor for issues and performance
+5. Gradually transition users to Supabase
+Conclusion
+Migrating from SharedPreferences to Supabase requires significant changes to your app's data handling, but offers substantial benefits in terms of synchronization, multi-device support, and scalability. By following this comprehensive plan, you can maintain data integrity while introducing a more robust storage solution.
+The key to success lies in understanding your current data relationships, implementing proper foreign key constraints, optimizing performance with indexes, and handling asynchronous operations throughout your app. With careful planning and a phased approach, you can successfully transition your Invoice Generator app to a cloud-based database while maintaining and enhancing user experience.
+
+# Comprehensive Supabase Migration Guide for Invoice Generator App
+(Plain English Version)
+
+## Current Application Structure
+
+Your Invoice Generator app currently uses SharedPreferences (a simple local storage system) to save four main types of data:
+
+1. **Company Info** - A single record with your business details
+2. **Clients** - A list of your customers
+3. **Invoices** - A list of all invoices you've created
+4. **Catalog Items** - A list of products/services you offer
+5. **Invoice Settings** - Configuration for how invoices are numbered and formatted
+
+## Current Model Analysis
+
+### 1. Company Info Model
+
+- **What it is**: A single record containing your business information
+- **Important fields**:
+  - Business name
+  - Currency
+  - Tax settings
+  - Address information
+  - Contact details
+  - Bank information
+  - Logo path
+- **How it's stored**: As a single chunk of data in your phone's storage
+- **Special handling**: Your company logo is saved in a backup folder on your device
+
+### 2. Client Model
+
+- **What it is**: Information about each of your customers
+- **ID system**: Each client has an ID like "CL001", "CL002", etc.
+- **How IDs are created**: The app finds the highest existing number and adds 1
+- **Important fields**:
+  - Name
+  - Client ID
+  - Type (organization or person)
+  - Contact and address information
+  - Financial summary (how much they've paid, what's outstanding, etc.)
+- **How it's stored**: As a list of clients in your phone's storage
+- **Current limitations**:
+  - The app doesn't check if a client has invoices before allowing deletion
+  - There's no validation when directly setting client IDs
+
+### 3. Catalog Item Model
+
+- **What it is**: Products or services you offer
+- **ID system**: Uses the item title as its unique identifier
+- **Important fields**:
+  - Title (acts as the ID)
+  - Amount (price)
+  - Quantity
+  - Currency
+  - Usage tracking
+- **How it's stored**: As a list of items in your phone's storage
+- **Current limitations**:
+  - No check to prevent duplicate titles
+  - Relies on title as unique identifier without enforcing uniqueness
+
+### 4. Invoice Model
+
+- **What it is**: Individual invoices you've created for clients
+- **ID system**: Each invoice has an ID like "inv-001", "inv-002", etc.
+- **How IDs are created**: The app finds the highest existing number and adds 1
+- **Alternative ID**: Can use custom formats through settings
+- **Important fields**:
+  - Invoice ID
+  - Client information (entire client record is embedded)
+  - Items (entire catalog items are embedded)
+  - Issue and due dates
+  - Status (overdue, outstanding, paid)
+  - Financial calculations
+  - Template name
+- **How it's stored**: As a list of invoices in your phone's storage
+
+### 5. Invoice Settings
+
+- **What it is**: Configuration for how invoices are numbered and formatted
+- **Important fields**:
+  - ID format
+  - Custom notes
+  - Auto-generation settings
+  - ID prefix
+  - Last invoice number
+- **How it's stored**: As a single chunk of data in your phone's storage
+
+## Current Data Relationships and Integrity
+
+### 1. Client to Invoice Relationship
+
+- **Type of relationship**: One-to-many (one client can have many invoices)
+- **How it's connected**: Invoices contain a complete copy of the client's information
+- **How data stays consistent**:
+  - When you update a client, the app automatically updates that client in all related invoices
+  - Client statistics (how much they owe, etc.) are calculated based on their invoices
+- **Current problems**:
+  - No check for existing invoices before client deletion
+  - Deleting a client could leave invoices referencing a non-existent client
+
+### 2. Catalog Item to Invoice Relationship
+
+- **Type of relationship**: Many-to-many (multiple items can be in multiple invoices)
+- **How it's connected**: Invoices contain complete copies of the catalog items
+- **How data stays consistent**:
+  - When you update a catalog item, the app updates that item in all related invoices
+  - When you delete a catalog item, it's automatically removed from all invoices and totals recalculated
+  - Usage statistics are tracked based on which invoices use the item
+
+### 3. Statistics and Background Updates
+
+- **How it works**: The app updates statistics in the background without freezing the interface
+- **Methods used**:
+  - Various background update functions for different scenarios
+  - Special update methods that prevent circular updates (updates triggering more updates endlessly)
+
+### 4. Transaction Handling and Error Recovery
+
+- **Current approach**:
+  - Uses try-catch blocks to handle errors
+  - No guarantee that complex operations complete fully or not at all
+  - Updates happen in sequence (first one thing, then another)
+  - Risk of inconsistent data if operations fail partway through
+
+### 5. Performance Considerations
+
+- **Current lookups**:
+  - Searches through entire lists to find items
+  - No special optimization for filtering or searching
+- **Data duplication**:
+  - Complete client and item information is copied into invoices
+  - This makes reading data faster but increases storage needs
+  - Increases chance of inconsistency when updating
+
+### 6. Complete Relationship Map
+
+Your data is connected in the following way:
+- Company Info is the central entity
+- Company has many Clients
+- Clients have many Invoices
+- Invoices contain many Catalog Items
+- Catalog Items are used in many Invoices
+
+## Supabase Migration Plan
+
+### 1. Enhanced Database Design
+
+Instead of keeping all data in simple storage, we'll create a proper database with separate tables for each type of information:
+
+#### Users Table
+- Will store basic user information
+- Each user has a unique ID
+
+#### Organizations Table
+- Will store your company information
+- Connected to a user
+- Contains business name, currency, tax settings
+- Has a link to uploaded logo
+
+#### Addresses Table
+- Will store all address information
+- Can be linked to either organizations or clients
+- Contains fields for country, address lines, city, etc.
+
+#### Contact Info Table
+- Will store all contact information
+- Can be linked to either organizations or clients
+- Contains email, phone, website fields
+
+#### Bank Details Table
+- Will store your company's banking information
+- Connected to your organization record
+- Contains bank name, account details, routing numbers, etc.
+
+#### Clients Table
+- Will store client information
+- Connected to your organization
+- Contains client ID, name, type, and financial summary
+- Address and contact info stored in separate tables
+
+#### Catalog Items Table
+- Will store your products and services
+- Connected to your organization
+- Contains title, amount, quantity, currency
+- Usage statistics tracked here
+
+#### Invoices Table
+- Will store invoice information
+- Connected to your organization and to a specific client
+- Contains invoice ID, dates, financial information, status
+- Items stored in a separate table
+
+#### Invoice Items Table
+- Will store the line items for each invoice
+- Connected to an invoice and optionally to a catalog item
+- Contains item details, quantity, pricing
+
+#### Invoice Settings Table
+- Will store your invoice configuration
+- Connected to your organization
+- Contains ID format, notes, numbering settings
+
+### 2. Relationship Behaviors
+
+#### Client to Invoice Relationship
+- If you try to delete a client with invoices, the system will prevent it
+- This ensures you don't have invoices without valid clients
+- You'll need to delete or reassign invoices before deleting a client
+
+#### Invoice to Invoice Items Relationship
+- When you delete an invoice, all its items are automatically deleted
+- This keeps your database clean without orphaned items
+
+#### Invoice Items to Catalog Items Relationship
+- If you delete a catalog item, invoice items keep their information
+- This ensures invoices remain valid even if catalog items change
+- The link to the original catalog item is removed, but the invoice details remain
+
+#### Organization Cascading Deletions
+- If an organization is deleted, all related data is automatically removed
+- This ensures complete cleanup when removing an organization
+
+### 3. Uniqueness Rules
+
+#### Client ID Uniqueness
+- Client IDs must be unique within your organization
+- The system will prevent creating duplicate client IDs
+- You can reuse client IDs across different organizations
+
+#### Catalog Item Title Uniqueness
+- Catalog item titles must be unique within your organization
+- The system will prevent creating items with the same title
+- You can reuse titles across different organizations
+
+#### Invoice ID Uniqueness
+- Invoice IDs must be unique within your organization
+- The system will prevent creating duplicate invoice IDs
+- You can reuse invoice IDs across different organizations
+
+### 4. Performance Improvements
+
+#### Client Lookup Optimization
+- Fast lookup of clients by ID without scanning the entire list
+- The system will find clients instantly regardless of how many you have
+
+#### Invoice Filtering by Status
+- Efficient filtering of invoices by status (paid, outstanding, overdue)
+- Quick retrieval of invoices without scanning the entire list
+
+#### Invoice Search Optimization
+- Fast searching of invoices by ID or client name
+- Text search capabilities for finding invoices by content
+
+#### Relationship Optimization
+- Efficient retrieval of related information (addresses, contact info)
+- Quick access to all information without performance degradation
+
+### 5. Complex Operation Handling
+
+#### Creating an Invoice with Items
+- All parts of a new invoice are created together
+- Either the entire invoice (with all items) is created or nothing is
+- Prevents partial or incomplete invoices
+
+#### Updating a Client Affecting Multiple Invoices
+- When a client is updated, all related invoices are updated correctly
+- Changes are applied consistently across the system
+
+#### Batch Updates for Client Statistics
+- Efficient updating of client financial summaries
+- All statistics updated in one operation for better performance
+
+### 6. Migration Steps from SharedPreferences to Supabase
+
+#### Step 1: Create a Common Interface
+
+Create a system that can work with both storage methods:
+- Define standard operations for all data types
+- Allow switching between storage systems without changing app logic
+
+#### Step 2: Implement Current Storage System
+
+Wrap your current storage approach in the new interface:
+- Keep existing functionality working
+- Prepare for transition without disrupting current usage
+
+#### Step 3: Implement Supabase Storage
+
+Create a new implementation using Supabase:
+- Handle all network operations
+- Manage relationships between data
+- Implement proper error handling
+
+#### Step 4: Update Data Models for New Relationships
+
+Modify your data structures to work with both systems:
+- Support both embedded data and references
+- Add helper methods for compatibility
+- Create new models for data that was previously embedded
+
+#### Step 5: Implement Specific Integrity Checks
+
+Add validation for important rules:
+- Check for existing invoices before client deletion
+- Verify uniqueness of catalog item titles
+- Ensure consistent data relationships
+
+#### Step 6: Implement Transaction Handling
+
+Add proper handling of complex operations:
+- Ensure related operations succeed or fail together
+- Prevent partial updates that could leave data inconsistent
+- Handle network errors appropriately
+
+#### Step 7: Create Data Migration Utility
+
+Develop a tool to move existing data to Supabase:
+- Export data from local storage
+- Create proper relationships in Supabase
+- Validate migrated data for consistency
+- Handle errors and provide feedback
+
+#### Step 8: Update User Interface for Network Operations
+
+Modify screens to handle asynchronous data:
+- Add loading indicators
+- Implement error handling with retry options
+- Show offline indicators when needed
+- Create smooth user experience despite network delays
+
+## Phased Migration Approach
+
+### Phase 1: Setup and Initial Testing
+
+1. Create your Supabase project and set up the database structure
+2. Create a common interface for data operations
+3. Implement the current storage approach using this interface
+4. Create initial Supabase implementation
+5. Add ability to switch between storage methods
+6. Test both systems with simple operations
+
+### Phase 2: Create Migration Tool
+
+1. Develop mappings between local data and Supabase structure
+2. Create functions to migrate each type of data
+3. Add thorough validation checks
+4. Create ability to revert changes if migration fails
+5. Test with sample data
+
+### Phase 3: Update Interface for Network Operations
+
+1. Modify screens to show loading states
+2. Add error handling and retry options
+3. Implement offline indicators
+4. Create placeholder screens for better loading experience
+5. Test under various network conditions
+
+### Phase 4: Handle Relationship Changes
+
+1. Update data models to support both storage approaches
+2. Implement proper relationship management
+3. Test circular update prevention
+4. Verify statistics calculation
+5. Implement proper handling of complex operations
+
+### Phase 5: Gradual Rollout
+
+1. Deploy both storage systems in parallel
+2. Add toggle to control which storage is active
+3. Implement data synchronization between systems
+4. Monitor for issues and performance
+5. Gradually shift users to Supabase
+
+## Conclusion
+
+Moving from local storage (SharedPreferences) to cloud storage (Supabase) requires significant changes to how your app handles data, but offers major benefits like synchronization across devices and better data integrity.
+
+By following this plan, you can maintain the functionality of your Invoice Generator app while transitioning to a more robust storage solution. The key is understanding your current data relationships, implementing proper constraints, optimizing performance, and handling network operations throughout your app.
+
+With careful planning and a gradual approach, you can successfully upgrade your app's storage system while providing a smooth experience for your users.
+
+Supbase Documentation Links
+
+https://supabase.com/docs/guides/database/overview
+
+https://supabase.com/docs/guides/storage
+
+https://supabase.com/docs/guides/auth
+

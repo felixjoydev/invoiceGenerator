@@ -69,7 +69,7 @@ class _NewClientSheetState extends State<NewClientSheet> {
     super.initState();
 
     // Initialize the client service if needed
-    _initClientService();
+    _loadClientId();
 
     // Add listeners to controllers for validation
     _organizationNameController.addListener(_validateForm);
@@ -311,10 +311,11 @@ class _NewClientSheetState extends State<NewClientSheet> {
   }
 
   // Initialize client service and get a unique client ID
-  Future<void> _initClientService() async {
+  Future<void> _loadClientId() async {
     await _clientService.init();
+    final clientId = await _clientService.generateClientId();
     setState(() {
-      _clientIdController.text = _clientService.generateClientId();
+      _clientIdController.text = clientId;
     });
   }
 

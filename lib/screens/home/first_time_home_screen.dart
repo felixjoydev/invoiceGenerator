@@ -8,6 +8,9 @@ import 'package:invoicegenerator/widgets/cards/welcome_action.dart';
 import 'package:invoicegenerator/screens/home/home_screen.dart';
 import 'package:invoicegenerator/screens/settings/settings_screen.dart';
 import 'package:invoicegenerator/utils/route_transitions.dart';
+import 'package:invoicegenerator/screens/clients/add_client_screen.dart';
+import 'package:invoicegenerator/services/mcp/storage_service_factory.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FirstTimeHomeScreen extends StatefulWidget {
   const FirstTimeHomeScreen({super.key});
@@ -19,6 +22,21 @@ class FirstTimeHomeScreen extends StatefulWidget {
 class _FirstTimeHomeScreenState extends State<FirstTimeHomeScreen> {
   // Current active nav item (default to home)
   BottomNavItem _activeNavItem = BottomNavItem.home;
+
+  @override
+  void initState() {
+    super.initState();
+    // Clear all local data when this screen is loaded
+    _clearAllLocalData();
+  }
+
+  // Clear all local data to ensure we start fresh
+  Future<void> _clearAllLocalData() async {
+    debugPrint('FirstTimeHomeScreen: Clearing all local data');
+    final factory = StorageServiceFactory();
+    await factory.forceDeleteAllLocalData();
+    debugPrint('FirstTimeHomeScreen: All local data cleared');
+  }
 
   // Handle bottom navigation item selection
   void _handleNavItemSelected(BottomNavItem item) {

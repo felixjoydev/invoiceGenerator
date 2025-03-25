@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:invoicegenerator/models/catalog_item.dart';
+import 'package:invoicegenerator/services/mcp/storage_service_factory.dart';
 import 'package:invoicegenerator/services/invoice_service.dart';
 
 class CatalogService with ChangeNotifier {
@@ -14,99 +14,33 @@ class CatalogService with ChangeNotifier {
 
   CatalogService._internal();
 
-  // Local storage key
-  static const String _storageKey = 'catalog_items';
-
   // In-memory storage of catalog items
   List<CatalogItem> _catalogItems = [];
 
-  // Default items for first-time initialization
-  final List<CatalogItem> _defaultItems = [
-    // Pre-populated sample items
-    CatalogItem(
-      title: 'Website Design',
-      amount: '4500.00',
-      quantity: 1,
-      usageInfo: 'USED IN 3 INVOICES',
-    ),
-    CatalogItem(
-      title: 'Logo Design',
-      amount: '1500.00',
-      quantity: 1,
-      usageInfo: 'USED IN 2 INVOICES',
-    ),
-    CatalogItem(
-      title: 'Mobile App Development',
-      amount: '8000.00',
-      quantity: 1,
-      usageInfo: 'USED IN 5 INVOICES',
-    ),
-    CatalogItem(
-      title: 'SEO Services',
-      amount: '2000.00',
-      quantity: 1,
-      usageInfo: 'USED IN 4 INVOICES',
-    ),
-  ];
+  // Storage service factory
+  final _storageFactory = StorageServiceFactory();
 
   // Initialize the service - load catalog items from storage
   Future<void> init() async {
     await _loadItems();
   }
 
-  // Load catalog items from shared preferences
+  // Load catalog items from storage
   Future<void> _loadItems() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? itemsJson = prefs.getString(_storageKey);
+      await _storageFactory.init();
 
-      if (itemsJson != null) {
-        final List<dynamic> itemsData = jsonDecode(itemsJson);
-
-        // Clear existing items
-        _catalogItems = [];
-
-        // Convert each item to a CatalogItem object
-        for (var itemData in itemsData) {
-          try {
-            // Make sure itemData is a Map<String, dynamic>
-            if (itemData is Map) {
-              final Map<String, dynamic> itemMap = Map<String, dynamic>.from(
-                itemData,
-              );
-
-              // Create and add the CatalogItem object
-              _catalogItems.add(CatalogItem.fromMap(itemMap));
-            }
-          } catch (e) {
-            debugPrint('Error converting catalog item data: $e');
-          }
-        }
-      } else {
-        // If no data in storage, use default items
-        _catalogItems = List.from(_defaultItems);
-        // Save the default items to storage
-        await _saveItems();
+      // Force clear local data to ensure no default items
+      if (_storageFactory.currentStorageType == StorageType.local) {
+        await _storageFactory.service.clearClientAndCatalogData();
       }
+
+      _catalogItems = await _storageFactory.service.getCatalogItems();
+      notifyListeners();
     } catch (e) {
       debugPrint('Error loading catalog items: $e');
-      // Initialize with default items if there's an error
-      _catalogItems = List.from(_defaultItems);
-    }
-
-    // Notify listeners about the updated data
-    notifyListeners();
-  }
-
-  // Save catalog items to shared preferences
-  Future<void> _saveItems() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final List<Map<String, dynamic>> itemsData =
-          _catalogItems.map((item) => item.toMap()).toList();
-      await prefs.setString(_storageKey, jsonEncode(itemsData));
-    } catch (e) {
-      debugPrint('Error saving catalog items: $e');
+      _catalogItems = [];
+      notifyListeners();
     }
   }
 
@@ -117,107 +51,80 @@ class CatalogService with ChangeNotifier {
 
   // Add a new catalog item at the beginning of the list
   Future<void> addItem(CatalogItem item) async {
-    _catalogItems.insert(0, item);
-    await _saveItems();
-    notifyListeners();
+    try {
+      await _storageFactory.service.createItem(item);
+      await _loadItems(); // Refresh list
+    } catch (e) {
+      debugPrint('Error adding catalog item: $e');
+    }
   }
 
   // Add multiple catalog items at the beginning of the list
   Future<void> addItems(List<CatalogItem> items) async {
-    _catalogItems.insertAll(0, items);
-    await _saveItems();
-    notifyListeners();
+    try {
+      for (var item in items) {
+        await _storageFactory.service.createItem(item);
+      }
+      await _loadItems(); // Refresh list
+    } catch (e) {
+      debugPrint('Error adding multiple catalog items: $e');
+    }
   }
 
   // Update an existing catalog item
   Future<void> updateItem(CatalogItem updatedItem) async {
-    final index = _catalogItems.indexWhere(
-      (item) => item.title == updatedItem.title,
-    );
-    if (index != -1) {
-      _catalogItems[index] = updatedItem;
-      await _saveItems();
-
-      // Update this catalog item in all invoices
-      await _updateCatalogItemInInvoices(updatedItem);
-
-      notifyListeners();
+    try {
+      await _storageFactory.service.updateItem(updatedItem.title, updatedItem);
+      await _loadItems(); // Refresh list
+    } catch (e) {
+      debugPrint('Error updating catalog item: $e');
     }
   }
 
   // Update a catalog item without triggering invoice updates (to prevent circular dependencies)
   Future<void> updateItemSilently(CatalogItem updatedItem) async {
-    final index = _catalogItems.indexWhere(
-      (item) => item.title == updatedItem.title,
-    );
-    if (index != -1) {
-      _catalogItems[index] = updatedItem;
-      await _saveItems();
-      notifyListeners();
-    }
-  }
+    try {
+      final index = _catalogItems.indexWhere(
+        (item) => item.title == updatedItem.title,
+      );
+      if (index != -1) {
+        _catalogItems[index] = updatedItem;
+        notifyListeners();
 
-  // Update catalog item in all invoices
-  Future<void> _updateCatalogItemInInvoices(CatalogItem updatedItem) async {
-    // Get the invoice service
-    final invoiceService = InvoiceService();
-    await invoiceService.init();
-
-    // Get all invoices
-    final invoices = invoiceService.getAllInvoices();
-    bool anyUpdated = false;
-
-    // Loop through all invoices
-    for (int i = 0; i < invoices.length; i++) {
-      final invoice = invoices[i];
-      bool invoiceUpdated = false;
-
-      // Create a new list of items
-      final updatedItems =
-          invoice.items.map((item) {
-            // If this item matches the updated catalog item (by title)
-            if (item.title == updatedItem.title) {
-              invoiceUpdated = true;
-              // Return the updated catalog item with the same quantity from the invoice
-              return updatedItem.copyWith(quantity: item.quantity);
-            }
-            return item;
-          }).toList();
-
-      // If invoice was updated, update it in the service
-      if (invoiceUpdated) {
-        // Create updated invoice with new items
-        final updatedInvoice = invoice.copyWith(items: updatedItems);
-        await invoiceService.updateInvoice(updatedInvoice);
-        anyUpdated = true;
+        // Update storage without triggering cascade
+        await _storageFactory.service.updateItem(
+          updatedItem.title,
+          updatedItem,
+        );
       }
-    }
-
-    // Notify listeners if any invoices were updated
-    if (anyUpdated) {
-      invoiceService.notifyListeners();
+    } catch (e) {
+      debugPrint('Error silently updating catalog item: $e');
     }
   }
 
   // Delete a catalog item by title
   Future<void> deleteItem(String title) async {
-    _catalogItems.removeWhere((item) => item.title == title);
-    await _saveItems();
+    try {
+      await _storageFactory.service.deleteItem(title);
+      await _loadItems(); // Refresh list
+    } catch (e) {
+      debugPrint('Error deleting catalog item: $e');
+    }
+  }
 
-    // Handle deletion in invoices
-    final invoiceService = InvoiceService();
-    await invoiceService.init();
-    await invoiceService.handleDeletedCatalogItem(title);
-
-    notifyListeners();
+  // Check if a title is unique
+  Future<bool> isTitleUnique(String title) async {
+    return await _storageFactory.service.isItemTitleUnique(title);
   }
 
   // Clear all items (for testing)
   Future<void> clearAll() async {
-    _catalogItems.clear();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_storageKey);
-    notifyListeners();
+    // This is a destructive operation that only affects local storage
+    // We don't provide this for remote storage for safety
+    if (_storageFactory.currentStorageType == StorageType.local) {
+      _catalogItems.clear();
+      notifyListeners();
+    }
   }
 
   // Get item count

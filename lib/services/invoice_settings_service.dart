@@ -1,50 +1,48 @@
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
+import 'package:invoicegenerator/services/mcp/storage_service.dart';
+import 'package:invoicegenerator/services/mcp/storage_service_factory.dart';
 
 class InvoiceSettingsService {
-  static const String _prefsKeyInvoiceSettings = 'invoice_settings';
-
   // Singleton instance
   static final InvoiceSettingsService _instance =
       InvoiceSettingsService._internal();
   factory InvoiceSettingsService() => _instance;
   InvoiceSettingsService._internal();
 
-  // Default settings
-  String _idFormat = '001';
-  String _customNotes = '';
-  bool _isAutoGenerate = true;
-  String _idPrefix = 'INV';
-  int _lastInvoiceNumber = 0;
+  // Storage service factory
+  final _storageFactory = StorageServiceFactory();
+
+  // In-memory settings
+  InvoiceSettings? _settings;
+
+  // Flag to check if initialized
   bool _isInitialized = false;
 
   // Getters
-  String get idFormat => _idFormat;
-  String get customNotes => _customNotes;
-  bool get isAutoGenerate => _isAutoGenerate;
-  String get idPrefix => _idPrefix;
-  int get lastInvoiceNumber => _lastInvoiceNumber;
+  String get idFormat => _settings?.idFormat ?? '001';
+  String get customNotes => _settings?.customNotes ?? '';
+  bool get isAutoGenerate => _settings?.isAutoGenerate ?? true;
+  String get idPrefix => _settings?.idPrefix ?? 'INV';
+  int get lastInvoiceNumber => _settings?.lastInvoiceNumber ?? 0;
 
   // Initialize and load settings
   Future<void> init() async {
     if (_isInitialized) return;
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? settingsJson = prefs.getString(_prefsKeyInvoiceSettings);
+      await _storageFactory.init();
+      _settings = await _storageFactory.service.getInvoiceSettings();
 
-      if (settingsJson != null) {
-        final Map<String, dynamic> settings = jsonDecode(settingsJson);
-        _idFormat = settings['idFormat'] ?? '001';
-        _customNotes = settings['customNotes'] ?? '';
-        _isAutoGenerate = settings['isAutoGenerate'] ?? true;
-        _idPrefix = settings['idPrefix'] ?? 'INV';
-        _lastInvoiceNumber = settings['lastInvoiceNumber'] ?? 0;
+      // If settings are null, create default settings
+      if (_settings == null) {
+        _settings = InvoiceSettings();
+        await _saveToStorage();
       }
 
       _isInitialized = true;
     } catch (e) {
-      print('Error initializing InvoiceSettingsService: $e');
+      debugPrint('Error initializing InvoiceSettingsService: $e');
+      _settings = InvoiceSettings(); // Use defaults on error
     }
   }
 
@@ -56,14 +54,19 @@ class InvoiceSettingsService {
     try {
       await init(); // Ensure service is initialized
 
-      // Update values if provided
-      if (idFormat != null) _idFormat = idFormat;
-      if (customNotes != null) _customNotes = customNotes;
+      // Create updated settings
+      _settings = InvoiceSettings(
+        idFormat: idFormat ?? _settings!.idFormat,
+        customNotes: customNotes ?? _settings!.customNotes,
+        isAutoGenerate: _settings!.isAutoGenerate,
+        idPrefix: _settings!.idPrefix,
+        lastInvoiceNumber: _settings!.lastInvoiceNumber,
+      );
 
-      // Save to shared preferences
-      return await _saveToPrefs();
+      // Save to storage
+      return await _saveToStorage();
     } catch (e) {
-      print('Error saving invoice settings: $e');
+      debugPrint('Error saving invoice settings: $e');
       return false;
     }
   }
@@ -76,14 +79,19 @@ class InvoiceSettingsService {
     try {
       await init(); // Ensure service is initialized
 
-      // Update values if provided
-      if (isAutoGenerate != null) _isAutoGenerate = isAutoGenerate;
-      if (idPrefix != null) _idPrefix = idPrefix;
+      // Create updated settings
+      _settings = InvoiceSettings(
+        idFormat: _settings!.idFormat,
+        customNotes: _settings!.customNotes,
+        isAutoGenerate: isAutoGenerate ?? _settings!.isAutoGenerate,
+        idPrefix: idPrefix ?? _settings!.idPrefix,
+        lastInvoiceNumber: _settings!.lastInvoiceNumber,
+      );
 
-      // Save to shared preferences
-      return await _saveToPrefs();
+      // Save to storage
+      return await _saveToStorage();
     } catch (e) {
-      print('Error saving invoice ID settings: $e');
+      debugPrint('Error saving invoice ID settings: $e');
       return false;
     }
   }
@@ -92,43 +100,53 @@ class InvoiceSettingsService {
   Future<bool> incrementInvoiceNumber() async {
     try {
       await init(); // Ensure service is initialized
-      _lastInvoiceNumber++;
-      return await _saveToPrefs();
+
+      // Create updated settings
+      _settings = InvoiceSettings(
+        idFormat: _settings!.idFormat,
+        customNotes: _settings!.customNotes,
+        isAutoGenerate: _settings!.isAutoGenerate,
+        idPrefix: _settings!.idPrefix,
+        lastInvoiceNumber: _settings!.lastInvoiceNumber + 1,
+      );
+
+      return await _saveToStorage();
     } catch (e) {
-      print('Error updating last invoice number: $e');
+      debugPrint('Error updating last invoice number: $e');
       return false;
     }
   }
 
   // Generate next invoice ID based on settings
   String generateNextInvoiceId() {
-    if (!_isAutoGenerate) return 'INV00001'; // Return default for manual mode
+    if (!_isInitialized) {
+      return 'INV00001'; // Default if not initialized
+    }
+
+    if (!_settings!.isAutoGenerate) {
+      return 'INV00001'; // Return default for manual mode
+    }
 
     // Generate next number with padding
-    final nextNumber = _lastInvoiceNumber + 1;
+    final nextNumber = _settings!.lastInvoiceNumber + 1;
     final paddedNumber = nextNumber.toString().padLeft(5, '0');
 
     // Return prefix + number
-    final String prefix = _idPrefix.isNotEmpty ? _idPrefix : 'INV';
+    final String prefix =
+        _settings!.idPrefix.isNotEmpty ? _settings!.idPrefix : 'INV';
     return '$prefix$paddedNumber';
   }
 
-  // Helper method to save to SharedPreferences
-  Future<bool> _saveToPrefs() async {
+  // Helper method to save to storage
+  Future<bool> _saveToStorage() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final Map<String, dynamic> settings = {
-        'idFormat': _idFormat,
-        'customNotes': _customNotes,
-        'isAutoGenerate': _isAutoGenerate,
-        'idPrefix': _idPrefix,
-        'lastInvoiceNumber': _lastInvoiceNumber,
-      };
-
-      await prefs.setString(_prefsKeyInvoiceSettings, jsonEncode(settings));
-      return true;
+      if (_settings != null) {
+        await _storageFactory.service.updateInvoiceSettings(_settings!);
+        return true;
+      }
+      return false;
     } catch (e) {
-      print('Error saving to preferences: $e');
+      debugPrint('Error saving to storage: $e');
       return false;
     }
   }

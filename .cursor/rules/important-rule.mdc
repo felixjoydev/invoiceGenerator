@@ -1,0 +1,9 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Important Rule
+
+Don't make random styling, layout, functionality, animation or theming changes that I don't ask for. Only make changes I ask for. If I made some changes in the code myself, don’t update it. Don't do flutter run unless asked for (I always have a terminal open for that). Always follow the instructions. 

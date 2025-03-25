@@ -272,8 +272,9 @@ class _AddClientScreenState extends State<AddClientScreen> {
   // Initialize client service and get a unique client ID
   Future<void> _initClientService() async {
     await _clientService.init();
+    final clientId = await _clientService.generateClientId();
     setState(() {
-      _clientIdController.text = _clientService.generateClientId();
+      _clientIdController.text = clientId;
     });
   }
 

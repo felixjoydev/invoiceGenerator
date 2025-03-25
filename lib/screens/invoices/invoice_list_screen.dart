@@ -285,21 +285,36 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     }
   }
 
-  // Filtered lists based on search query
-  List<Invoice> get _filteredAllInvoices {
+  // Change _filteredAllInvoices from a getter to an async method
+  Future<List<Invoice>> _filteredAllInvoices() async {
     try {
       // Get all invoices from the service
-      final allInvoices = _invoiceService.getAllInvoices();
+      final allInvoices = await _invoiceService.getAllInvoices();
 
-      // Sort by issueDate (most recent first)
-      // This ensures newly created invoices appear at the top of the "All" tab
+      // Sort by status (overdue first, then outstanding, then paid)
+      // Then by date (due date for overdue/outstanding, paid date for paid)
       allInvoices.sort((a, b) {
-        // Compare by issue date (newest first)
-        final dateComparison = b.issueDate.compareTo(a.issueDate);
-        // If same date, compare by invoice ID (newest ID format typically sorts higher)
-        return dateComparison != 0
-            ? dateComparison
-            : b.invoiceId.compareTo(a.invoiceId);
+        // First sort by status
+        final statusOrder = {
+          InvoiceStatus.overdue: 0,
+          InvoiceStatus.outstanding: 1,
+          InvoiceStatus.paid: 2,
+        };
+        final statusComparison = statusOrder[a.status]!.compareTo(
+          statusOrder[b.status]!,
+        );
+        if (statusComparison != 0) return statusComparison;
+
+        // Then sort by date
+        if (a.status == InvoiceStatus.paid && b.status == InvoiceStatus.paid) {
+          // For paid invoices, newest paid date first
+          final aDate = a.paidDate ?? a.issueDate;
+          final bDate = b.paidDate ?? b.issueDate;
+          return bDate.compareTo(aDate); // Descending order
+        } else {
+          // For other statuses, earliest due date first
+          return a.dueDate.compareTo(b.dueDate); // Ascending order
+        }
       });
 
       if (_searchQuery.isEmpty) {
@@ -317,89 +332,71 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     }
   }
 
-  List<Invoice> get _filteredOverdueInvoices {
-    try {
-      final overdueInvoices = _invoiceService.getInvoicesByStatus(
-        InvoiceStatus.overdue,
-      );
+  Future<List<Invoice>> _filteredOverdueInvoices() async {
+    final overdueInvoices = await _invoiceService.getInvoicesByStatus(
+      InvoiceStatus.overdue,
+    );
 
-      // Sort by due date (most overdue first)
-      overdueInvoices.sort((a, b) => a.dueDate.compareTo(b.dueDate));
+    // Sort by due date (most overdue first)
+    overdueInvoices.sort((a, b) => a.dueDate.compareTo(b.dueDate));
 
-      if (_searchQuery.isEmpty) {
-        return overdueInvoices;
-      }
-
-      final query = _searchQuery.toLowerCase();
-      return overdueInvoices.where((invoice) {
-        return invoice.client.name.toLowerCase().contains(query) ||
-            invoice.invoiceId.toLowerCase().contains(query);
-      }).toList();
-    } catch (e) {
-      debugPrint('Error loading overdue invoices: $e');
-      return [];
+    if (_searchQuery.isEmpty) {
+      return overdueInvoices;
     }
+
+    final query = _searchQuery.toLowerCase();
+    return overdueInvoices.where((invoice) {
+      return invoice.client.name.toLowerCase().contains(query) ||
+          invoice.invoiceId.toLowerCase().contains(query);
+    }).toList();
   }
 
-  List<Invoice> get _filteredOutstandingInvoices {
-    try {
-      final outstandingInvoices = _invoiceService.getInvoicesByStatus(
-        InvoiceStatus.outstanding,
-      );
+  Future<List<Invoice>> _filteredOutstandingInvoices() async {
+    final outstandingInvoices = await _invoiceService.getInvoicesByStatus(
+      InvoiceStatus.outstanding,
+    );
 
-      // Sort by due date (closest due date first)
-      outstandingInvoices.sort((a, b) => a.dueDate.compareTo(b.dueDate));
+    // Sort by due date (closest due date first)
+    outstandingInvoices.sort((a, b) => a.dueDate.compareTo(b.dueDate));
 
-      if (_searchQuery.isEmpty) {
-        return outstandingInvoices;
-      }
-
-      final query = _searchQuery.toLowerCase();
-      return outstandingInvoices.where((invoice) {
-        return invoice.client.name.toLowerCase().contains(query) ||
-            invoice.invoiceId.toLowerCase().contains(query);
-      }).toList();
-    } catch (e) {
-      debugPrint('Error loading outstanding invoices: $e');
-      return [];
+    if (_searchQuery.isEmpty) {
+      return outstandingInvoices;
     }
+
+    final query = _searchQuery.toLowerCase();
+    return outstandingInvoices.where((invoice) {
+      return invoice.client.name.toLowerCase().contains(query) ||
+          invoice.invoiceId.toLowerCase().contains(query);
+    }).toList();
   }
 
-  List<Invoice> get _filteredPaidInvoices {
-    try {
-      final paidInvoices = _invoiceService.getInvoicesByStatus(
-        InvoiceStatus.paid,
-      );
+  Future<List<Invoice>> _filteredPaidInvoices() async {
+    final paidInvoices = await _invoiceService.getInvoicesByStatus(
+      InvoiceStatus.paid,
+    );
 
-      // Sort by paid date (newest first), fallback to issue date if paidDate is null
-      paidInvoices.sort((a, b) {
-        // If both have paid dates, compare them
-        if (a.paidDate != null && b.paidDate != null) {
-          return b.paidDate!.compareTo(a.paidDate!);
-        }
-        // If only one has paid date, it comes first
-        else if (a.paidDate != null) {
-          return -1;
-        } else if (b.paidDate != null) {
-          return 1;
-        }
-        // If neither has paid date, sort by issue date
-        return b.issueDate.compareTo(a.issueDate);
-      });
-
-      if (_searchQuery.isEmpty) {
-        return paidInvoices;
+    // Sort by paid date (newest first), fallback to issue date if paidDate is null
+    paidInvoices.sort((a, b) {
+      // If both have paid dates, compare them
+      if (a.paidDate != null && b.paidDate != null) {
+        return b.paidDate!.compareTo(a.paidDate!);
       }
+      // If only one has a paid date, that one comes first
+      if (a.paidDate != null) return -1;
+      if (b.paidDate != null) return 1;
+      // If neither has a paid date, compare issue dates
+      return b.issueDate.compareTo(a.issueDate);
+    });
 
-      final query = _searchQuery.toLowerCase();
-      return paidInvoices.where((invoice) {
-        return invoice.client.name.toLowerCase().contains(query) ||
-            invoice.invoiceId.toLowerCase().contains(query);
-      }).toList();
-    } catch (e) {
-      debugPrint('Error loading paid invoices: $e');
-      return [];
+    if (_searchQuery.isEmpty) {
+      return paidInvoices;
     }
+
+    final query = _searchQuery.toLowerCase();
+    return paidInvoices.where((invoice) {
+      return invoice.client.name.toLowerCase().contains(query) ||
+          invoice.invoiceId.toLowerCase().contains(query);
+    }).toList();
   }
 
   // Handle bottom navigation item selection
@@ -1099,436 +1096,278 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
   // Build All tab content
   Widget _buildAllCards() {
-    final filteredInvoices = _filteredAllInvoices;
+    return FutureBuilder<List<Invoice>>(
+      future: _filteredAllInvoices(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
 
-    if (filteredInvoices.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.only(top: 32.0),
-          child: Text(
-            'No invoices found',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF8D9694),
-              fontFamily: 'Helvetica Now Display',
-            ),
-          ),
-        ),
-      );
-    }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error loading invoices'));
+        }
 
-    // Wrap in KeyedSubtree to preserve state
-    return KeyedSubtree(
-      key: ValueKey('all-cards-${filteredInvoices.length}'),
-      child: Column(
-        children: List.generate(filteredInvoices.length * 2 - 1, (index) {
-          // Return card for even indices
-          if (index.isEven) {
-            final invoiceIndex = index ~/ 2;
-            final invoice = filteredInvoices[invoiceIndex];
-            final dateFormat = DateFormat('MM/dd/yyyy');
-            final isNewlyAdded = _newlyAddedInvoiceIds.contains(
-              invoice.invoiceId,
+        final filteredInvoices = snapshot.data ?? [];
+
+        if (filteredInvoices.isEmpty) {
+          return _buildEmptyState('No invoices found');
+        }
+
+        return ListView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          itemCount: filteredInvoices.length,
+          itemBuilder: (context, index) {
+            return _buildInvoiceCard(
+              filteredInvoices[index],
+              isLastItem: index == filteredInvoices.length - 1,
             );
-            final itemKey = GlobalKey();
-
-            // Different card types based on invoice status
-            if (invoice.status == InvoiceStatus.overdue) {
-              // Calculate days overdue
-              final now = DateTime.now();
-              final difference = now.difference(invoice.dueDate).inDays;
-              final daysText = '$difference days due';
-
-              // Use animated card for newly added invoices
-              if (isNewlyAdded) {
-                return KeyedSubtree(
-                  key: itemKey,
-                  child: AnimatedInvoiceCard(
-                    companyName: invoice.client.name,
-                    date: dateFormat.format(invoice.issueDate),
-                    invoiceNumber: invoice.invoiceId,
-                    amount: invoice.total.toStringAsFixed(2),
-                    daysText: daysText,
-                    daysColor: const Color(0xFFD61443),
-                    onTap: () => _handleInvoiceTapped(invoice),
-                    onAnimationComplete:
-                        () => _handleAnimationComplete(invoice.invoiceId),
-                    onLongPress: () => _handleLongPress(invoice, itemKey),
-                  ),
-                );
-              }
-
-              return KeyedSubtree(
-                key: itemKey,
-                child: DueCard(
-                  companyName: invoice.client.name,
-                  date: dateFormat.format(invoice.issueDate),
-                  invoiceNumber: invoice.invoiceId,
-                  amount: invoice.total.toStringAsFixed(2),
-                  daysText: daysText,
-                  daysColor: const Color(0xFFD61443),
-                  onTap: () => _handleInvoiceTapped(invoice),
-                  onLongPress: () => _handleLongPress(invoice, itemKey),
-                ),
-              );
-            } else if (invoice.status == InvoiceStatus.outstanding) {
-              // Calculate days until due
-              final now = DateTime.now();
-              final difference = invoice.dueDate.difference(now).inDays;
-              final daysText = 'DUE IN $difference DAYS';
-
-              // Use animated card for newly added invoices
-              if (isNewlyAdded) {
-                return KeyedSubtree(
-                  key: itemKey,
-                  child: AnimatedOutstandingCard(
-                    companyName: invoice.client.name,
-                    date: dateFormat.format(invoice.issueDate),
-                    invoiceNumber: invoice.invoiceId,
-                    amount: invoice.total.toStringAsFixed(2),
-                    daysText: daysText,
-                    daysColor: const Color(0xFFD68814),
-                    onTap: () => _handleInvoiceTapped(invoice),
-                    onAnimationComplete:
-                        () => _handleAnimationComplete(invoice.invoiceId),
-                    onLongPress: () => _handleLongPress(invoice, itemKey),
-                  ),
-                );
-              }
-
-              return KeyedSubtree(
-                key: itemKey,
-                child: Outstanding.DueCard(
-                  companyName: invoice.client.name,
-                  date: dateFormat.format(invoice.issueDate),
-                  invoiceNumber: invoice.invoiceId,
-                  amount: invoice.total.toStringAsFixed(2),
-                  daysText: daysText,
-                  daysColor: const Color(0xFFD68814),
-                  onTap: () => _handleInvoiceTapped(invoice),
-                  onLongPress: () => _handleLongPress(invoice, itemKey),
-                ),
-              );
-            } else {
-              // Paid
-              // Get formatted paid date or fallback to issue date
-              final displayDate =
-                  invoice.paidDate != null
-                      ? dateFormat.format(invoice.paidDate!)
-                      : dateFormat.format(invoice.issueDate);
-              final daysText = 'PAID ON $displayDate';
-
-              // Use animated card for newly added invoices
-              if (isNewlyAdded) {
-                return KeyedSubtree(
-                  key: itemKey,
-                  child: AnimatedPaidCard(
-                    companyName: invoice.client.name,
-                    date: dateFormat.format(invoice.issueDate),
-                    invoiceNumber: invoice.invoiceId,
-                    amount: invoice.total.toStringAsFixed(2),
-                    daysText: daysText,
-                    daysColor: const Color(0xFF13AF5B),
-                    onTap: () => _handleInvoiceTapped(invoice),
-                    onAnimationComplete:
-                        () => _handleAnimationComplete(invoice.invoiceId),
-                    onLongPress: () => _handleLongPress(invoice, itemKey),
-                  ),
-                );
-              }
-
-              return KeyedSubtree(
-                key: itemKey,
-                child: Paid.DueCard(
-                  companyName: invoice.client.name,
-                  date: dateFormat.format(invoice.issueDate),
-                  invoiceNumber: invoice.invoiceId,
-                  amount: invoice.total.toStringAsFixed(2),
-                  daysText: daysText,
-                  daysColor: const Color(0xFF13AF5B),
-                  onTap: () => _handleInvoiceTapped(invoice),
-                  onLongPress: () => _handleLongPress(invoice, itemKey),
-                ),
-              );
-            }
-          }
-          // Return divider for odd indices
-          else {
-            return Column(
-              children: const [
-                SizedBox(height: 16),
-                Divider(height: 1, color: Color(0xFFCAD5D2)),
-                SizedBox(height: 16),
-              ],
-            );
-          }
-        })..add(const SizedBox(height: 16)), // Add bottom spacing
-      ),
+          },
+        );
+      },
     );
   }
 
   // Build the Overdue tab content
   Widget _buildOverdueCards() {
-    final filteredInvoices = _filteredOverdueInvoices;
+    return FutureBuilder<List<Invoice>>(
+      future: _filteredOverdueInvoices(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
 
-    if (filteredInvoices.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.only(top: 32.0),
-          child: Text(
-            'No overdue invoices found',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF8D9694),
-              fontFamily: 'Helvetica Now Display',
-            ),
-          ),
-        ),
-      );
-    }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error loading invoices'));
+        }
 
-    // Wrap in KeyedSubtree to preserve state
-    return KeyedSubtree(
-      key: ValueKey('overdue-cards-${filteredInvoices.length}'),
-      child: Column(
-        children: List.generate(filteredInvoices.length * 2 - 1, (index) {
-          // Return card for even indices
-          if (index.isEven) {
-            final invoiceIndex = index ~/ 2;
-            final invoice = filteredInvoices[invoiceIndex];
-            final dateFormat = DateFormat('MM/dd/yyyy');
-            final isNewlyAdded = _newlyAddedInvoiceIds.contains(
-              invoice.invoiceId,
+        final filteredInvoices = snapshot.data ?? [];
+
+        if (filteredInvoices.isEmpty) {
+          return _buildEmptyState('No overdue invoices found');
+        }
+
+        return ListView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          itemCount: filteredInvoices.length,
+          itemBuilder: (context, index) {
+            return _buildInvoiceCard(
+              filteredInvoices[index],
+              isLastItem: index == filteredInvoices.length - 1,
             );
-            final itemKey = GlobalKey();
-
-            // Calculate days overdue
-            final now = DateTime.now();
-            final difference = now.difference(invoice.dueDate).inDays;
-            final daysText = '$difference days due';
-
-            // Use animated card for newly added invoices
-            if (isNewlyAdded) {
-              return KeyedSubtree(
-                key: itemKey,
-                child: AnimatedInvoiceCard(
-                  companyName: invoice.client.name,
-                  date: dateFormat.format(invoice.issueDate),
-                  invoiceNumber: invoice.invoiceId,
-                  amount: invoice.total.toStringAsFixed(2),
-                  daysText: daysText,
-                  daysColor: const Color(0xFFD61443),
-                  onTap: () => _handleInvoiceTapped(invoice),
-                  onAnimationComplete:
-                      () => _handleAnimationComplete(invoice.invoiceId),
-                  onLongPress: () => _handleLongPress(invoice, itemKey),
-                ),
-              );
-            }
-
-            return KeyedSubtree(
-              key: itemKey,
-              child: DueCard(
-                companyName: invoice.client.name,
-                date: dateFormat.format(invoice.issueDate),
-                invoiceNumber: invoice.invoiceId,
-                amount: invoice.total.toStringAsFixed(2),
-                daysText: daysText,
-                daysColor: const Color(0xFFD61443),
-                onTap: () => _handleInvoiceTapped(invoice),
-                onLongPress: () => _handleLongPress(invoice, itemKey),
-              ),
-            );
-          }
-          // Return divider for odd indices
-          else {
-            return Column(
-              children: const [
-                SizedBox(height: 16),
-                Divider(height: 1, color: Color(0xFFCAD5D2)),
-                SizedBox(height: 16),
-              ],
-            );
-          }
-        })..add(const SizedBox(height: 16)), // Add bottom spacing
-      ),
+          },
+        );
+      },
     );
   }
 
   // Build the Outstanding tab content
   Widget _buildOutstandingCards() {
-    final filteredInvoices = _filteredOutstandingInvoices;
+    return FutureBuilder<List<Invoice>>(
+      future: _filteredOutstandingInvoices(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
 
-    if (filteredInvoices.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.only(top: 32.0),
-          child: Text(
-            'No outstanding invoices found',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF8D9694),
-              fontFamily: 'Helvetica Now Display',
-            ),
-          ),
-        ),
-      );
-    }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error loading invoices'));
+        }
 
-    // Wrap in KeyedSubtree to preserve state
-    return KeyedSubtree(
-      key: ValueKey('outstanding-cards-${filteredInvoices.length}'),
-      child: Column(
-        children: List.generate(filteredInvoices.length * 2 - 1, (index) {
-          // Return card for even indices
-          if (index.isEven) {
-            final invoiceIndex = index ~/ 2;
-            final invoice = filteredInvoices[invoiceIndex];
-            final dateFormat = DateFormat('MM/dd/yyyy');
-            final isNewlyAdded = _newlyAddedInvoiceIds.contains(
-              invoice.invoiceId,
+        final filteredInvoices = snapshot.data ?? [];
+
+        if (filteredInvoices.isEmpty) {
+          return _buildEmptyState('No outstanding invoices found');
+        }
+
+        return ListView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          itemCount: filteredInvoices.length,
+          itemBuilder: (context, index) {
+            return _buildInvoiceCard(
+              filteredInvoices[index],
+              isLastItem: index == filteredInvoices.length - 1,
             );
-            final itemKey = GlobalKey();
-
-            // Calculate days until due
-            final now = DateTime.now();
-            final difference = invoice.dueDate.difference(now).inDays;
-            final daysText = 'DUE IN $difference DAYS';
-
-            // Use animated card for newly added invoices
-            if (isNewlyAdded) {
-              return KeyedSubtree(
-                key: itemKey,
-                child: AnimatedOutstandingCard(
-                  companyName: invoice.client.name,
-                  date: dateFormat.format(invoice.issueDate),
-                  invoiceNumber: invoice.invoiceId,
-                  amount: invoice.total.toStringAsFixed(2),
-                  daysText: daysText,
-                  daysColor: const Color(0xFFD68814),
-                  onTap: () => _handleInvoiceTapped(invoice),
-                  onAnimationComplete:
-                      () => _handleAnimationComplete(invoice.invoiceId),
-                  onLongPress: () => _handleLongPress(invoice, itemKey),
-                ),
-              );
-            }
-
-            return KeyedSubtree(
-              key: itemKey,
-              child: Outstanding.DueCard(
-                companyName: invoice.client.name,
-                date: dateFormat.format(invoice.issueDate),
-                invoiceNumber: invoice.invoiceId,
-                amount: invoice.total.toStringAsFixed(2),
-                daysText: daysText,
-                daysColor: const Color(0xFFD68814),
-                onTap: () => _handleInvoiceTapped(invoice),
-                onLongPress: () => _handleLongPress(invoice, itemKey),
-              ),
-            );
-          }
-          // Return divider for odd indices
-          else {
-            return Column(
-              children: const [
-                SizedBox(height: 16),
-                Divider(height: 1, color: Color(0xFFCAD5D2)),
-                SizedBox(height: 16),
-              ],
-            );
-          }
-        })..add(const SizedBox(height: 16)), // Add bottom spacing
-      ),
+          },
+        );
+      },
     );
   }
 
   // Build the Paid tab content
   Widget _buildPaidCards() {
-    final filteredInvoices = _filteredPaidInvoices;
+    return FutureBuilder<List<Invoice>>(
+      future: _filteredPaidInvoices(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
 
-    if (filteredInvoices.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.only(top: 32.0),
-          child: Text(
-            'No paid invoices found',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF8D9694),
-              fontFamily: 'Helvetica Now Display',
-            ),
+        if (snapshot.hasError) {
+          return Center(child: Text('Error loading invoices'));
+        }
+
+        final filteredInvoices = snapshot.data ?? [];
+
+        if (filteredInvoices.isEmpty) {
+          return _buildEmptyState('No paid invoices found');
+        }
+
+        return ListView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          itemCount: filteredInvoices.length,
+          itemBuilder: (context, index) {
+            return _buildInvoiceCard(
+              filteredInvoices[index],
+              isLastItem: index == filteredInvoices.length - 1,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildInvoiceCard(Invoice invoice, {bool isLastItem = false}) {
+    final dateFormat = DateFormat('MM/dd/yyyy');
+    final isNewlyAdded = _newlyAddedInvoiceIds.contains(invoice.invoiceId);
+    final itemKey = GlobalKey();
+
+    // Different card types based on invoice status
+    if (invoice.status == InvoiceStatus.overdue) {
+      // Calculate days overdue
+      final now = DateTime.now();
+      final difference = now.difference(invoice.dueDate).inDays;
+      final daysText = '$difference days due';
+
+      // Use animated card for newly added invoices
+      if (isNewlyAdded) {
+        return KeyedSubtree(
+          key: itemKey,
+          child: AnimatedInvoiceCard(
+            companyName: invoice.client.name,
+            date: dateFormat.format(invoice.issueDate),
+            invoiceNumber: invoice.invoiceId,
+            amount: invoice.total.toStringAsFixed(2),
+            daysText: daysText,
+            daysColor: const Color(0xFFD61443),
+            onTap: () => _handleInvoiceTapped(invoice),
+            onAnimationComplete:
+                () => _handleAnimationComplete(invoice.invoiceId),
+            onLongPress: () => _handleLongPress(invoice, itemKey),
           ),
+        );
+      }
+
+      return KeyedSubtree(
+        key: itemKey,
+        child: DueCard(
+          companyName: invoice.client.name,
+          date: dateFormat.format(invoice.issueDate),
+          invoiceNumber: invoice.invoiceId,
+          amount: invoice.total.toStringAsFixed(2),
+          daysText: daysText,
+          daysColor: const Color(0xFFD61443),
+          onTap: () => _handleInvoiceTapped(invoice),
+          onLongPress: () => _handleLongPress(invoice, itemKey),
+        ),
+      );
+    } else if (invoice.status == InvoiceStatus.outstanding) {
+      // Calculate days until due
+      final now = DateTime.now();
+      final difference = invoice.dueDate.difference(now).inDays;
+      final daysText = 'DUE IN $difference DAYS';
+
+      // Use animated card for newly added invoices
+      if (isNewlyAdded) {
+        return KeyedSubtree(
+          key: itemKey,
+          child: AnimatedOutstandingCard(
+            companyName: invoice.client.name,
+            date: dateFormat.format(invoice.issueDate),
+            invoiceNumber: invoice.invoiceId,
+            amount: invoice.total.toStringAsFixed(2),
+            daysText: daysText,
+            daysColor: const Color(0xFFD68814),
+            onTap: () => _handleInvoiceTapped(invoice),
+            onAnimationComplete:
+                () => _handleAnimationComplete(invoice.invoiceId),
+            onLongPress: () => _handleLongPress(invoice, itemKey),
+          ),
+        );
+      }
+
+      return KeyedSubtree(
+        key: itemKey,
+        child: Outstanding.DueCard(
+          companyName: invoice.client.name,
+          date: dateFormat.format(invoice.issueDate),
+          invoiceNumber: invoice.invoiceId,
+          amount: invoice.total.toStringAsFixed(2),
+          daysText: daysText,
+          daysColor: const Color(0xFFD68814),
+          onTap: () => _handleInvoiceTapped(invoice),
+          onLongPress: () => _handleLongPress(invoice, itemKey),
+        ),
+      );
+    } else {
+      // Paid
+      // Get formatted paid date or fallback to issue date
+      final displayDate =
+          invoice.paidDate != null
+              ? dateFormat.format(invoice.paidDate!)
+              : dateFormat.format(invoice.issueDate);
+      final daysText = 'PAID ON $displayDate';
+
+      // Use animated card for newly added invoices
+      if (isNewlyAdded) {
+        return KeyedSubtree(
+          key: itemKey,
+          child: AnimatedPaidCard(
+            companyName: invoice.client.name,
+            date: dateFormat.format(invoice.issueDate),
+            invoiceNumber: invoice.invoiceId,
+            amount: invoice.total.toStringAsFixed(2),
+            daysText: daysText,
+            daysColor: const Color(0xFF13AF5B),
+            onTap: () => _handleInvoiceTapped(invoice),
+            onAnimationComplete:
+                () => _handleAnimationComplete(invoice.invoiceId),
+            onLongPress: () => _handleLongPress(invoice, itemKey),
+          ),
+        );
+      }
+
+      return KeyedSubtree(
+        key: itemKey,
+        child: Paid.DueCard(
+          companyName: invoice.client.name,
+          date: dateFormat.format(invoice.issueDate),
+          invoiceNumber: invoice.invoiceId,
+          amount: invoice.total.toStringAsFixed(2),
+          daysText: daysText,
+          daysColor: const Color(0xFF13AF5B),
+          onTap: () => _handleInvoiceTapped(invoice),
+          onLongPress: () => _handleLongPress(invoice, itemKey),
         ),
       );
     }
+  }
 
-    // Wrap in KeyedSubtree to preserve state
-    return KeyedSubtree(
-      key: ValueKey('paid-cards-${filteredInvoices.length}'),
-      child: Column(
-        children: List.generate(filteredInvoices.length * 2 - 1, (index) {
-          // Return card for even indices
-          if (index.isEven) {
-            final invoiceIndex = index ~/ 2;
-            final invoice = filteredInvoices[invoiceIndex];
-            final dateFormat = DateFormat('MM/dd/yyyy');
-            final isNewlyAdded = _newlyAddedInvoiceIds.contains(
-              invoice.invoiceId,
-            );
-            final itemKey = GlobalKey();
-
-            // Get formatted paid date or fallback to issue date
-            final displayDate =
-                invoice.paidDate != null
-                    ? dateFormat.format(invoice.paidDate!)
-                    : dateFormat.format(invoice.issueDate);
-            final daysText = 'PAID ON $displayDate';
-
-            // Use animated card for newly added invoices
-            if (isNewlyAdded) {
-              return KeyedSubtree(
-                key: itemKey,
-                child: AnimatedPaidCard(
-                  companyName: invoice.client.name,
-                  date: dateFormat.format(invoice.issueDate),
-                  invoiceNumber: invoice.invoiceId,
-                  amount: invoice.total.toStringAsFixed(2),
-                  daysText: daysText,
-                  daysColor: const Color(0xFF13AF5B),
-                  onTap: () => _handleInvoiceTapped(invoice),
-                  onAnimationComplete:
-                      () => _handleAnimationComplete(invoice.invoiceId),
-                  onLongPress: () => _handleLongPress(invoice, itemKey),
-                ),
-              );
-            }
-
-            return KeyedSubtree(
-              key: itemKey,
-              child: Paid.DueCard(
-                companyName: invoice.client.name,
-                date: dateFormat.format(invoice.issueDate),
-                invoiceNumber: invoice.invoiceId,
-                amount: invoice.total.toStringAsFixed(2),
-                daysText: daysText,
-                daysColor: const Color(0xFF13AF5B),
-                onTap: () => _handleInvoiceTapped(invoice),
-                onLongPress: () => _handleLongPress(invoice, itemKey),
-              ),
-            );
-          }
-          // Return divider for odd indices
-          else {
-            return Column(
-              children: const [
-                SizedBox(height: 16),
-                Divider(height: 1, color: Color(0xFFCAD5D2)),
-                SizedBox(height: 16),
-              ],
-            );
-          }
-        })..add(const SizedBox(height: 16)), // Add bottom spacing
+  Widget _buildEmptyState(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(top: 32.0),
+        child: Text(
+          message,
+          style: const TextStyle(
+            fontSize: 16,
+            color: Color(0xFF8D9694),
+            fontFamily: 'Helvetica Now Display',
+          ),
+        ),
       ),
     );
   }

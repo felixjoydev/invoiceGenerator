@@ -3,6 +3,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/widgets/display/MainHeading.dart';
 import 'package:invoicegenerator/bottom_sheets/settings/business_details.dart';
 import 'package:invoicegenerator/bottom_sheets/settings/invoice_settings.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:invoicegenerator/screens/auth/auth_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -42,9 +44,41 @@ class SettingsScreen extends StatelessWidget {
 
   // Handle logout
   void _handleLogout(BuildContext context) {
+    // Capture the navigator context before closing the sheet
+    final navigatorContext = Navigator.of(context).context;
+
     // Close bottom sheet
     Navigator.pop(context);
-    // TODO: Implement logout functionality
+
+    // Implement logout functionality using Supabase
+    final supabase = Supabase.instance.client;
+    supabase.auth
+        .signOut()
+        .then((_) {
+          debugPrint('User signed out');
+          // Navigation will be handled by the auth state listener in main.dart
+
+          // Add a manual navigation after a short delay in case the auth listener doesn't trigger
+          Future.delayed(const Duration(milliseconds: 500), () {
+            // Check if still logged in and if context is still active
+            if (supabase.auth.currentUser == null && navigatorContext.mounted) {
+              // Manually navigate to auth screen with the stable context
+              Navigator.of(navigatorContext).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const AuthScreen()),
+                (route) => false, // Remove all previous routes
+              );
+            }
+          });
+        })
+        .catchError((error) {
+          debugPrint('Error signing out: $error');
+          // Show error using a stable context if possible
+          if (navigatorContext.mounted) {
+            ScaffoldMessenger.of(navigatorContext).showSnackBar(
+              SnackBar(content: Text('Error signing out: ${error.toString()}')),
+            );
+          }
+        });
   }
 
   @override
@@ -138,9 +172,15 @@ class SettingsScreen extends StatelessWidget {
                         20,
                         MediaQuery.of(context).padding.bottom + 16,
                       ),
-                      child: GestureDetector(
-                        onTap: () => _handleLogout(context),
-                        child: const LogoutSection(),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => _handleLogout(context),
+                          splashColor: Colors.grey.withOpacity(0.2),
+                          highlightColor: Colors.grey.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          child: const LogoutSection(),
+                        ),
                       ),
                     ),
                   ],
@@ -364,25 +404,29 @@ class LogoutSection extends StatelessWidget {
             ),
           ),
           SizedBox(height: 24),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CustomLogoutIcon(
-                width: 24,
-                height: 24,
-                color: Color.fromRGBO(55, 60, 58, 1),
-              ),
-              SizedBox(width: 7),
-              Text(
-                'Logout',
-                style: TextStyle(
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CustomLogoutIcon(
+                  width: 24,
+                  height: 24,
                   color: Color.fromRGBO(55, 60, 58, 1),
-                  fontSize: 16,
-                  fontFamily: 'Helvetica Now Display',
-                  fontWeight: FontWeight.bold,
                 ),
-              ),
-            ],
+                SizedBox(width: 7),
+                Text(
+                  'Logout',
+                  style: TextStyle(
+                    color: Color.fromRGBO(55, 60, 58, 1),
+                    fontSize: 16,
+                    fontFamily: 'Helvetica Now Display',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

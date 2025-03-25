@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:invoicegenerator/models/invoice.dart';
 import 'package:invoicegenerator/models/client.dart';
 import 'package:invoicegenerator/services/client_service.dart';
 import 'package:invoicegenerator/services/catalog_service.dart';
 import 'package:invoicegenerator/models/catalog_item.dart';
+import 'package:invoicegenerator/services/mcp/storage_service_factory.dart';
 
 class InvoiceService with ChangeNotifier {
   // Singleton pattern
@@ -17,11 +17,11 @@ class InvoiceService with ChangeNotifier {
 
   InvoiceService._internal();
 
-  // Local storage key
-  static const String _storageKey = 'invoices';
-
   // In-memory storage for invoices
   List<Invoice> _invoices = [];
+
+  // Storage service factory
+  final _storageFactory = StorageServiceFactory();
 
   List<Invoice> get invoices => _invoices;
 
@@ -41,16 +41,11 @@ class InvoiceService with ChangeNotifier {
     }
   }
 
-  // Load invoices from local storage
+  // Load invoices from storage
   Future<void> _loadInvoices() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? invoicesJson = prefs.getString(_storageKey);
-
-      if (invoicesJson != null) {
-        final List<dynamic> decodedList = jsonDecode(invoicesJson);
-        _invoices = decodedList.map((item) => Invoice.fromMap(item)).toList();
-      }
+      await _storageFactory.init();
+      _invoices = await _storageFactory.service.getInvoices();
     } catch (e) {
       debugPrint('Error loading invoices: $e');
       _invoices = [];
@@ -60,11 +55,7 @@ class InvoiceService with ChangeNotifier {
   // Save invoices to local storage
   Future<void> _saveInvoices() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String invoicesJson = jsonEncode(
-        _invoices.map((i) => i.toMap()).toList(),
-      );
-      await prefs.setString(_storageKey, invoicesJson);
+      await _storageFactory.service.saveInvoices(_invoices);
     } catch (e) {
       debugPrint('Error saving invoices: $e');
     }
@@ -73,14 +64,12 @@ class InvoiceService with ChangeNotifier {
   // Add a new invoice
   Future<bool> addInvoice(Invoice invoice) async {
     try {
-      _invoices.add(invoice);
-      await _saveInvoices();
-
-      // Update statistics in the background
-      _updateStatisticsForInvoiceChangesInBackground(invoice);
-
-      notifyListeners();
-      return true;
+      final success = await _storageFactory.service.createInvoice(invoice);
+      if (success) {
+        await _loadInvoices(); // Refresh from storage
+        notifyListeners();
+      }
+      return success;
     } catch (e) {
       debugPrint('Error adding invoice: $e');
       return false;
@@ -90,27 +79,16 @@ class InvoiceService with ChangeNotifier {
   // Update an existing invoice
   Future<bool> updateInvoice(Invoice invoice) async {
     try {
-      final index = _invoices.indexWhere(
-        (i) => i.invoiceId == invoice.invoiceId,
+      final success = await _storageFactory.service.updateInvoice(
+        invoice.invoiceId,
+        invoice,
       );
-      if (index >= 0) {
-        // Get old invoice for reference
-        final oldInvoice = _invoices[index];
 
-        // Update the invoice
-        _invoices[index] = invoice;
-        await _saveInvoices();
-
-        // Update statistics in the background
-        _updateStatisticsForInvoiceChangesInBackground(
-          invoice,
-          oldInvoice: oldInvoice,
-        );
-
+      if (success) {
+        await _loadInvoices(); // Refresh from storage
         notifyListeners();
-        return true;
       }
-      return false;
+      return success;
     } catch (e) {
       debugPrint('Error updating invoice: $e');
       return false;
@@ -120,25 +98,13 @@ class InvoiceService with ChangeNotifier {
   // Delete an invoice
   Future<bool> deleteInvoice(String invoiceId) async {
     try {
-      // Find the invoice index
-      final index = _invoices.indexWhere((i) => i.invoiceId == invoiceId);
+      final success = await _storageFactory.service.deleteInvoice(invoiceId);
 
-      // If found, get invoice before removing
-      if (index >= 0) {
-        final invoiceToDelete = _invoices[index];
-
-        // Remove the invoice
-        _invoices.removeAt(index);
-        await _saveInvoices();
-
-        // Update statistics in the background
-        _updateStatisticsForDeletedInvoiceInBackground(invoiceToDelete);
-
+      if (success) {
+        await _loadInvoices(); // Refresh from storage
         notifyListeners();
-        return true;
       }
-
-      return false;
+      return success;
     } catch (e) {
       debugPrint('Error deleting invoice: $e');
       return false;
@@ -146,8 +112,8 @@ class InvoiceService with ChangeNotifier {
   }
 
   // Get invoices by status
-  List<Invoice> getInvoicesByStatus(InvoiceStatus status) {
-    return _invoices.where((i) => i.status == status).toList();
+  Future<List<Invoice>> getInvoicesByStatus(InvoiceStatus status) async {
+    return await _storageFactory.service.getInvoicesByStatus(status);
   }
 
   // Search invoices
@@ -166,62 +132,38 @@ class InvoiceService with ChangeNotifier {
     String clientId,
     Client updatedClient,
   ) async {
-    // Don't update if client ID is empty
-    if (clientId.isEmpty) return;
+    // Get all invoices for this client
+    final clientInvoices = await _storageFactory.service.getInvoicesByClient(
+      clientId,
+    );
 
-    bool anyUpdated = false;
-
-    // Loop through all invoices to find ones with matching client ID
-    List<Invoice> updatedInvoices = [];
-
-    for (int i = 0; i < _invoices.length; i++) {
-      if (_invoices[i].client.clientId == clientId) {
-        // Create a new invoice with updated client information
-        final updatedInvoice = _invoices[i].copyWith(client: updatedClient);
-        updatedInvoices.add(updatedInvoice);
-        anyUpdated = true;
-      } else {
-        updatedInvoices.add(_invoices[i]);
-      }
+    // Loop through each invoice and update it
+    for (var invoice in clientInvoices) {
+      final updatedInvoice = invoice.copyWith(client: updatedClient);
+      await _storageFactory.service.updateInvoice(
+        invoice.invoiceId,
+        updatedInvoice,
+      );
     }
 
-    // Save invoices if any were updated
-    if (anyUpdated) {
-      _invoices = updatedInvoices;
-      await _saveInvoices();
-      notifyListeners();
-    }
+    // Refresh the in-memory list
+    await _loadInvoices();
+    notifyListeners();
   }
 
   // Generate a new invoice ID
-  String generateInvoiceId() {
-    // Simple implementation - can be enhanced
-    int highestNumber = 0;
-
-    for (var invoice in _invoices) {
-      if (invoice.invoiceId.startsWith('inv-')) {
-        try {
-          final int num = int.parse(invoice.invoiceId.substring(4));
-          if (num > highestNumber) {
-            highestNumber = num;
-          }
-        } catch (_) {}
-      }
-    }
-
-    return 'inv-${(highestNumber + 1).toString().padLeft(3, '0')}';
+  Future<String> generateInvoiceId() async {
+    return await _storageFactory.service.generateInvoiceId();
   }
 
   // Handle deleted catalog item
   Future<void> handleDeletedCatalogItem(String itemTitle) async {
-    bool anyUpdated = false;
+    // Get all invoices
+    final allInvoices = await _storageFactory.service.getInvoices();
 
-    // Loop through all invoices to remove the deleted catalog item
-    for (int i = 0; i < _invoices.length; i++) {
-      final invoice = _invoices[i];
+    // Loop through invoices to check for the deleted item
+    for (var invoice in allInvoices) {
       final originalItems = invoice.items;
-
-      // Filter out the deleted item
       final updatedItems =
           originalItems.where((item) => item.title != itemTitle).toList();
 
@@ -244,17 +186,17 @@ class InvoiceService with ChangeNotifier {
           total: total,
         );
 
-        // Update the invoice in the list
-        _invoices[i] = updatedInvoice;
-        anyUpdated = true;
+        // Update the invoice
+        await _storageFactory.service.updateInvoice(
+          invoice.invoiceId,
+          updatedInvoice,
+        );
       }
     }
 
-    // Save invoices if any were updated
-    if (anyUpdated) {
-      await _saveInvoices();
-      notifyListeners();
-    }
+    // Refresh the in-memory list
+    await _loadInvoices();
+    notifyListeners();
   }
 
   // Get all invoices

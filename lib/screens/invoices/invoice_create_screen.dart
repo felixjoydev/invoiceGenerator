@@ -1108,7 +1108,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
               ? _invoiceIdController.text
               : (_invoiceIdController.text.isNotEmpty
                   ? _invoiceIdController.text
-                  : invoiceService.generateInvoiceId());
+                  : await invoiceService.generateInvoiceId());
 
       // Create the invoice object
       final invoice = Invoice(

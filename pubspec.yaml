@@ -55,6 +55,7 @@ dependencies:
   http: ^1.2.1
   shared_preferences: ^2.2.2
   uuid: ^4.3.3
+  google_sign_in: ^6.2.1
 
   # PDF Generation
   pdf: ^3.10.8
@@ -73,6 +74,7 @@ dependencies:
   syncfusion_flutter_pdfviewer: ^28.2.12
   file_picker: ^9.2.1
   permission_handler: ^11.4.0
+  supabase_auth_ui: ^0.5.4
 
 dev_dependencies:
   flutter_test:
