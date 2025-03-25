@@ -22,31 +22,7 @@ class CatalogService with ChangeNotifier {
 
   // Default items for first-time initialization
   final List<CatalogItem> _defaultItems = [
-    // Pre-populated sample items
-    CatalogItem(
-      title: 'Website Design',
-      amount: '4500.00',
-      quantity: 1,
-      usageInfo: 'USED IN 3 INVOICES',
-    ),
-    CatalogItem(
-      title: 'Logo Design',
-      amount: '1500.00',
-      quantity: 1,
-      usageInfo: 'USED IN 2 INVOICES',
-    ),
-    CatalogItem(
-      title: 'Mobile App Development',
-      amount: '8000.00',
-      quantity: 1,
-      usageInfo: 'USED IN 5 INVOICES',
-    ),
-    CatalogItem(
-      title: 'SEO Services',
-      amount: '2000.00',
-      quantity: 1,
-      usageInfo: 'USED IN 4 INVOICES',
-    ),
+    // No default items for production app
   ];
 
   // Initialize the service - load catalog items from storage
@@ -83,15 +59,14 @@ class CatalogService with ChangeNotifier {
           }
         }
       } else {
-        // If no data in storage, use default items
-        _catalogItems = List.from(_defaultItems);
-        // Save the default items to storage
-        await _saveItems();
+        // If no data in storage, initialize with empty list instead of default items
+        _catalogItems = [];
+        // No need to save empty list to storage
       }
     } catch (e) {
       debugPrint('Error loading catalog items: $e');
-      // Initialize with default items if there's an error
-      _catalogItems = List.from(_defaultItems);
+      // Initialize with empty list if there's an error
+      _catalogItems = [];
     }
 
     // Notify listeners about the updated data

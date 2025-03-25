@@ -7,8 +7,9 @@ import 'package:invoicegenerator/widgets/display/ItemDivider.dart';
 import 'package:invoicegenerator/widgets/inputs/text_input.dart';
 import 'package:invoicegenerator/widgets/buttons/secondary_button.dart';
 import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
-import 'package:invoicegenerator/models/catalog_item.dart';
-import 'package:invoicegenerator/services/catalog_service.dart';
+import 'package:invoicegenerator/models/hive/catalog_item_model.dart';
+import 'package:invoicegenerator/services/hive/catalog_service.dart';
+import 'package:invoicegenerator/services/hive/service_provider.dart';
 
 class AddCatalogScreen extends StatefulWidget {
   const AddCatalogScreen({super.key});
@@ -22,7 +23,7 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
   final List<CatalogItemInput> _catalogItems = [];
 
   // Service to manage catalog items
-  final _catalogService = CatalogService();
+  late CatalogService _catalogService;
 
   // Track if button should be enabled
   bool _isButtonEnabled = false;
@@ -36,6 +37,10 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
   @override
   void initState() {
     super.initState();
+
+    // Get the catalog service from the provider
+    _catalogService = HiveServiceProvider().catalogService;
+
     // Add the first item by default
     _addNewItem();
   }
@@ -165,9 +170,9 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
         validItems.add(
           CatalogItem(
             title: item.nameController.text,
-            amount: item.priceController.text,
+            amount: double.tryParse(item.priceController.text) ?? 0.0,
             quantity: int.tryParse(item.qtyController.text) ?? 1,
-            // usageInfo defaults to 'USED IN 0 INVOICES' in the model
+            usageCount: 0,
           ),
         );
       }
@@ -175,7 +180,9 @@ class _AddCatalogScreenState extends State<AddCatalogScreen> {
 
     // Add to service
     if (validItems.isNotEmpty) {
-      _catalogService.addItems(validItems);
+      for (var item in validItems) {
+        _catalogService.addItem(item);
+      }
 
       // Show success snackbar
       ScaffoldMessenger.of(context).showSnackBar(

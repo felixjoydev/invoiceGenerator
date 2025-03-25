@@ -43,6 +43,29 @@ class Client {
     this.hasDue = false,
   });
 
+  // Convert from Hive Client model
+  factory Client.fromHiveClient(dynamic hiveClient) {
+    return Client(
+      name: hiveClient.name,
+      clientId: hiveClient.clientId,
+      country: hiveClient.country,
+      addressLine1: hiveClient.addressLine1,
+      addressLine2: hiveClient.addressLine2,
+      city: hiveClient.city,
+      zip: hiveClient.zipCode,
+      phone: hiveClient.phone,
+      email: hiveClient.email,
+      type: hiveClient.type,
+      invoiceCount: hiveClient.invoiceCount,
+      currency: hiveClient.currency,
+      amount: hiveClient.amount,
+      outstandingAmount: hiveClient.outstandingAmount,
+      hasOutstanding: hiveClient.hasOutstanding,
+      dueAmount: hiveClient.dueAmount,
+      hasDue: hiveClient.hasDue,
+    );
+  }
+
   // Convert Client to a Map for JSON serialization
   Map<String, dynamic> toMap() {
     return {

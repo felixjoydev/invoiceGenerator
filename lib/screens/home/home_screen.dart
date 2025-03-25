@@ -14,6 +14,7 @@ import 'package:invoicegenerator/utils/route_transitions.dart';
 import 'package:invoicegenerator/screens/settings/settings_screen.dart';
 import 'package:invoicegenerator/services/revenue_service.dart';
 import 'package:invoicegenerator/services/invoice_service.dart';
+import 'package:invoicegenerator/services/hive/service_provider.dart';
 import 'package:provider/provider.dart';
 
 class HomeScreen extends StatefulWidget {

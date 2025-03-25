@@ -3,14 +3,39 @@ import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
 import 'package:invoicegenerator/widgets/buttons/secondary_button.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/widgets/inputs/SearchInput.dart';
-import 'package:invoicegenerator/services/client_service.dart';
-import 'package:invoicegenerator/models/client.dart';
+import 'package:invoicegenerator/services/hive/client_service.dart';
+import 'package:invoicegenerator/models/hive/client_model.dart';
 import 'package:invoicegenerator/widgets/display/app_icon.dart';
 import 'package:invoicegenerator/bottom_sheets/invoices/new_client.dart';
+import 'package:invoicegenerator/models/client.dart' as old_client;
+import 'package:invoicegenerator/services/hive/service_provider.dart';
+
+/// Bridge class to convert between Hive Client model and old Client model
+class ClientBridge {
+  /// Convert from Hive Client to old Client model
+  static old_client.Client toOldModel(Client hiveClient) {
+    return old_client.Client(
+      name: hiveClient.name,
+      clientId: hiveClient.clientId,
+      type: hiveClient.type,
+      email: hiveClient.email,
+      phone: hiveClient.phone,
+      addressLine1: hiveClient.addressLine1,
+      addressLine2: hiveClient.addressLine2,
+      city: hiveClient.city,
+      country: hiveClient.country,
+      zip: hiveClient.zipCode,
+      invoiceCount: hiveClient.invoiceCount,
+      amount: hiveClient.amount,
+      outstandingAmount: hiveClient.outstandingAmount,
+      dueAmount: hiveClient.dueAmount,
+    );
+  }
+}
 
 class SelectClientSheet extends StatefulWidget {
   final VoidCallback? onAddNewClientPressed;
-  final Function(Client)? onClientSelected;
+  final Function(old_client.Client)? onClientSelected;
   final String? preSelectedClientId;
 
   const SelectClientSheet({
@@ -26,7 +51,7 @@ class SelectClientSheet extends StatefulWidget {
 
 class _SelectClientSheetState extends State<SelectClientSheet> {
   final TextEditingController _searchController = TextEditingController();
-  final _clientService = ClientService();
+  late final ClientService _clientService;
   final ScrollController _scrollController = ScrollController();
   bool _isAtTop = true;
 
@@ -39,6 +64,9 @@ class _SelectClientSheetState extends State<SelectClientSheet> {
   @override
   void initState() {
     super.initState();
+
+    // Get shared client service
+    _clientService = HiveServiceProvider().clientService;
 
     // Initialize with pre-selected client
     if (widget.preSelectedClientId != null) {
@@ -68,10 +96,7 @@ class _SelectClientSheetState extends State<SelectClientSheet> {
     });
 
     try {
-      // Initialize the service
-      await _clientService.init();
-
-      // Get all clients
+      // Get all clients from the shared service
       final clients = _clientService.clients;
 
       setState(() {
@@ -106,9 +131,10 @@ class _SelectClientSheetState extends State<SelectClientSheet> {
     showNewClientSheet(
       context,
       onClientAdded: (client) {
-        // If a client was added and there's a callback, call it
+        // Convert Hive Client to old Client model before passing back
         if (widget.onClientSelected != null) {
-          widget.onClientSelected!(client);
+          final oldClient = ClientBridge.toOldModel(client);
+          widget.onClientSelected!(oldClient);
         }
       },
     );
@@ -157,7 +183,9 @@ class _SelectClientSheetState extends State<SelectClientSheet> {
   // Close the sheet and pass selected client back to parent
   void _applySelection() {
     if (widget.onClientSelected != null && _selectedClient != null) {
-      widget.onClientSelected!(_selectedClient!);
+      // Convert Hive Client to old Client model before passing back
+      final oldClient = ClientBridge.toOldModel(_selectedClient!);
+      widget.onClientSelected!(oldClient);
     }
     Navigator.pop(context);
   }

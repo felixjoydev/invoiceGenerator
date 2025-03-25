@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/theme/app_theme.dart';
 import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
-import 'package:invoicegenerator/screens/auth/auth_screen.dart';
+import 'package:invoicegenerator/screens/onboarding/company_basic_details_screen.dart';
 
 class GetStartedScreen extends StatelessWidget {
   const GetStartedScreen({Key? key}) : super(key: key);
@@ -23,9 +23,11 @@ class GetStartedScreen extends StatelessWidget {
               child: PrimaryButton(
                 label: 'GET STARTED',
                 onPressed: () {
-                  // Navigate to the auth screen
+                  // Navigate directly to company basic details screen
                   Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => const AuthScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const CompanyBasicDetailsScreen(),
+                    ),
                   );
                 },
               ),

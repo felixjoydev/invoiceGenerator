@@ -11,13 +11,15 @@ import 'package:invoicegenerator/screens/home/home_screen.dart';
 import 'package:invoicegenerator/screens/clients/client_list_screen.dart';
 import 'package:invoicegenerator/utils/route_transitions.dart';
 import 'package:invoicegenerator/screens/catalog/add_catalog_screen.dart';
-import 'package:invoicegenerator/services/catalog_service.dart';
-import 'package:invoicegenerator/models/catalog_item.dart';
+import 'package:invoicegenerator/services/hive/catalog_service.dart';
+import 'package:invoicegenerator/models/hive/catalog_item_model.dart';
+import 'package:invoicegenerator/models/catalog_item.dart' as ui;
 import 'package:invoicegenerator/widgets/display/BlurredBackground.dart';
 import 'package:invoicegenerator/widgets/cards/HighlightedCatalogCard.dart';
 import 'package:invoicegenerator/widgets/display/PressWidget.dart';
 import 'package:invoicegenerator/bottom_sheets/catalog/catalog_sort.dart';
 import 'package:invoicegenerator/bottom_sheets/catalog/edit_catalog.dart';
+import 'package:invoicegenerator/services/hive/service_provider.dart';
 
 class CatalogListScreen extends StatefulWidget {
   const CatalogListScreen({super.key});
@@ -39,7 +41,7 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
   String _searchQuery = '';
 
   // Catalog service
-  final _catalogService = CatalogService();
+  late CatalogService _catalogService;
 
   // List of newly added items that are being animated
   final Set<String> _animatingItems = <String>{};
@@ -59,24 +61,15 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialize catalog service
-    _loadCatalogItems();
+
+    // Get the catalog service from the provider
+    _catalogService = HiveServiceProvider().catalogService;
 
     // Listen for changes from the service
     _catalogService.addListener(_onCatalogDataChanged);
-  }
 
-  // Load catalog items from the service
-  Future<void> _loadCatalogItems() async {
-    try {
-      // Initialize the service
-      await _catalogService.init();
-
-      // Update state with items
-      setState(() {});
-    } catch (e) {
-      debugPrint('Error loading catalog items: $e');
-    }
+    // Force recalculation of statistics when screen loads
+    _recalculateStatistics();
   }
 
   // Handler for catalog data changes
@@ -86,12 +79,51 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
     }
   }
 
+  // Method to recalculate statistics
+  void _recalculateStatistics() async {
+    // Get the service provider
+    final serviceProvider = HiveServiceProvider();
+
+    // Ensure statistics are calculated
+    await serviceProvider.ensureStatisticsCalculated();
+
+    // Refresh state after recalculation
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  // Convert Hive CatalogItem to UI CatalogItem
+  ui.CatalogItem _convertToUICatalogItem(CatalogItem hiveItem) {
+    return ui.CatalogItem(
+      title: hiveItem.title,
+      amount: hiveItem.amount.toString(),
+      quantity: hiveItem.quantity,
+      currency: hiveItem.currency,
+      usageInfo:
+          'USED IN ${hiveItem.usageCount} ${hiveItem.usageCount == 1 ? 'INVOICE' : 'INVOICES'}',
+    );
+  }
+
+  // Convert UI CatalogItem to Hive CatalogItem
+  CatalogItem _convertToHiveCatalogItem(ui.CatalogItem uiItem) {
+    return CatalogItem(
+      title: uiItem.title,
+      amount:
+          double.tryParse(uiItem.amount.replaceAll(RegExp(r'[^\d.]'), '')) ??
+          0.0,
+      quantity: uiItem.quantity,
+      currency: uiItem.currency,
+      usageCount: 0, // Default to 0
+    );
+  }
+
   // Get filtered catalog items based on search query
   List<CatalogItem> get _filteredCatalogItems {
     // Get filtered items based on search query
     List<CatalogItem> items =
         _searchQuery.isEmpty
-            ? List<CatalogItem>.from(_catalogService.getAllItems())
+            ? List<CatalogItem>.from(_catalogService.items)
             : List<CatalogItem>.from(_catalogService.searchItems(_searchQuery));
 
     // Apply sorting based on the current sort option
@@ -148,7 +180,7 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
         .push(MaterialPageRoute(builder: (context) => const AddCatalogScreen()))
         .then((_) {
           // When returning from the Add screen, check if new items were added
-          final catalogItems = _catalogService.getAllItems();
+          final catalogItems = _catalogService.items;
           final currentItemsCount = catalogItems.length;
 
           // Get previous count (this is approximate as we don't have the exact previous count)
@@ -260,37 +292,43 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
     if (_selectedItem == null) return;
 
     // Store a reference to the selected item
-    final itemToEdit = _selectedItem;
+    final itemToEdit = _selectedItem!;
 
     // Store the original title for comparison
-    final originalTitle = itemToEdit!.title;
+    final originalTitle = itemToEdit.title;
 
     // Clear the selection
     setState(() {
       _selectedItem = null;
     });
 
+    // Convert to UI model for edit sheet
+    final uiItem = _convertToUICatalogItem(itemToEdit);
+
     // Show the edit catalog bottom sheet
     showEditCatalogSheet(
       context,
-      item: itemToEdit,
-      onSave: (updatedItem) {
+      item: uiItem,
+      onSave: (updatedUiItem) {
         // Debug print to verify data flow
         debugPrint(
-          'Updating catalog item from edit button: ${updatedItem.title} - ${updatedItem.amount}',
+          'Updating catalog item from edit button: ${updatedUiItem.title} - ${updatedUiItem.amount}',
         );
 
+        // Convert back to Hive model
+        final updatedHiveItem = _convertToHiveCatalogItem(updatedUiItem);
+
         // Check if the title was changed
-        if (originalTitle != updatedItem.title) {
+        if (originalTitle != updatedHiveItem.title) {
           debugPrint(
-            'Title changed from $originalTitle to ${updatedItem.title}',
+            'Title changed from $originalTitle to ${updatedHiveItem.title}',
           );
           // If title changed, we need to delete the old one and add the new one
           _catalogService.deleteItem(originalTitle);
-          _catalogService.addItem(updatedItem);
+          _catalogService.addItem(updatedHiveItem);
         } else {
           // Title unchanged, just update normally
-          _catalogService.updateItem(updatedItem);
+          _catalogService.updateItem(updatedHiveItem);
         }
 
         // Refresh the display
@@ -623,7 +661,9 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
                     width: _selectedItemSize.width,
                     child: Material(
                       color: Colors.transparent,
-                      child: HighlightedCatalogCard(item: _selectedItem!),
+                      child: HighlightedCatalogCard(
+                        item: _convertToUICatalogItem(_selectedItem!),
+                      ),
                     ),
                   ),
 
@@ -675,23 +715,31 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
       );
     }
 
+    // Debug print to check if usageCount is being populated
+    for (var item in filteredItems.take(5)) {
+      debugPrint(
+        '🔍 Catalog item ${item.title} has usageCount: ${item.usageCount}, amount: ${item.amount}',
+      );
+    }
+
     return Column(
       children: List.generate(filteredItems.length * 2 - 1, (index) {
         // Return card for even indices
         if (index.isEven) {
           final itemIndex = index ~/ 2;
-          final item = filteredItems[itemIndex];
+          final hiveItem = filteredItems[itemIndex];
           final itemKey = GlobalKey();
 
           // Check if this item is being animated
-          if (_animatingItems.contains(item.title)) {
+          if (_animatingItems.contains(hiveItem.title)) {
             return KeyedSubtree(
               key: itemKey,
               child: AnimatedCatalogCard(
-                item: item,
-                onAnimationComplete: () => _handleAnimationComplete(item.title),
-                onLongPress: () => _handleLongPress(item, itemKey),
-                onTap: () => _handleCardTap(item),
+                item: _convertToUICatalogItem(hiveItem),
+                onAnimationComplete:
+                    () => _handleAnimationComplete(hiveItem.title),
+                onLongPress: () => _handleLongPress(hiveItem, itemKey),
+                onTap: () => _handleCardTap(hiveItem),
               ),
             );
           }
@@ -699,12 +747,13 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
           return KeyedSubtree(
             key: itemKey,
             child: CatalogCard(
-              title: item.title,
-              usageInfo: item.usageInfo,
-              currency: item.currency,
-              amount: item.amount,
-              onLongPress: () => _handleLongPress(item, itemKey),
-              onTap: () => _handleCardTap(item),
+              title: hiveItem.title,
+              usageInfo:
+                  'USED IN ${hiveItem.usageCount} ${hiveItem.usageCount == 1 ? 'INVOICE' : 'INVOICES'}',
+              currency: hiveItem.currency,
+              amount: hiveItem.amount.toString(),
+              onLongPress: () => _handleLongPress(hiveItem, itemKey),
+              onTap: () => _handleCardTap(hiveItem),
             ),
           );
         }
@@ -727,27 +776,33 @@ class _CatalogListScreenState extends State<CatalogListScreen> {
     // Store the original title for comparison
     final originalTitle = item.title;
 
+    // Convert to UI model for edit sheet
+    final uiItem = _convertToUICatalogItem(item);
+
     // Show the edit catalog bottom sheet directly
     showEditCatalogSheet(
       context,
-      item: item,
-      onSave: (updatedItem) {
+      item: uiItem,
+      onSave: (updatedUiItem) {
         // Debug print to verify data flow
         debugPrint(
-          'Updating catalog item: ${updatedItem.title} - ${updatedItem.amount}',
+          'Updating catalog item: ${updatedUiItem.title} - ${updatedUiItem.amount}',
         );
 
+        // Convert back to Hive model
+        final updatedHiveItem = _convertToHiveCatalogItem(updatedUiItem);
+
         // Check if the title was changed
-        if (originalTitle != updatedItem.title) {
+        if (originalTitle != updatedHiveItem.title) {
           debugPrint(
-            'Title changed from $originalTitle to ${updatedItem.title}',
+            'Title changed from $originalTitle to ${updatedHiveItem.title}',
           );
           // If title changed, we need to delete the old one and add the new one
           _catalogService.deleteItem(originalTitle);
-          _catalogService.addItem(updatedItem);
+          _catalogService.addItem(updatedHiveItem);
         } else {
           // Title unchanged, just update normally
-          _catalogService.updateItem(updatedItem);
+          _catalogService.updateItem(updatedHiveItem);
         }
 
         // Refresh the display

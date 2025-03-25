@@ -4,9 +4,44 @@ import 'package:invoicegenerator/widgets/buttons/secondary_button.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/widgets/inputs/SearchInput.dart';
 import 'package:invoicegenerator/widgets/actions/ItemAdd.dart';
-import 'package:invoicegenerator/services/catalog_service.dart';
-import 'package:invoicegenerator/models/catalog_item.dart';
+import 'package:invoicegenerator/services/hive/catalog_service.dart';
+import 'package:invoicegenerator/models/hive/catalog_item_model.dart';
 import 'package:invoicegenerator/bottom_sheets/invoices/new_item.dart';
+import 'package:invoicegenerator/models/catalog_item.dart' as old_model;
+import 'package:invoicegenerator/services/hive/service_provider.dart';
+
+// Add extension method to add copyWith functionality to Hive CatalogItem
+extension CatalogItemExtension on CatalogItem {
+  CatalogItem copyWith({
+    String? title,
+    double? amount,
+    int? quantity,
+    String? currency,
+    int? usageCount,
+  }) {
+    return CatalogItem(
+      title: title ?? this.title,
+      amount: amount ?? this.amount,
+      quantity: quantity ?? this.quantity,
+      currency: currency ?? this.currency,
+      usageCount: usageCount ?? this.usageCount,
+    );
+  }
+
+  // For compatibility with old model
+  bool get isNew => false;
+  Map<String, dynamic> get usageInfo => {'usageCount': usageCount};
+
+  // Convert to old model format for compatibility
+  old_model.CatalogItem toOldModel() {
+    return old_model.CatalogItem(
+      title: title,
+      amount: amount.toString(),
+      quantity: quantity,
+      currency: currency,
+    );
+  }
+}
 
 // Helper class to track item selection info
 class SelectedItemInfo {
@@ -19,8 +54,8 @@ class SelectedItemInfo {
 
 class InvoiceItemSheet extends StatefulWidget {
   final VoidCallback? onAddNewItemPressed;
-  final Function(List<CatalogItem>)? onItemsSelected;
-  final List<CatalogItem> preSelectedItems;
+  final Function(List<old_model.CatalogItem>)? onItemsSelected;
+  final List<old_model.CatalogItem> preSelectedItems;
 
   const InvoiceItemSheet({
     super.key,
@@ -35,7 +70,7 @@ class InvoiceItemSheet extends StatefulWidget {
 
 class _InvoiceItemSheetState extends State<InvoiceItemSheet> {
   final TextEditingController _searchController = TextEditingController();
-  final _catalogService = CatalogService();
+  late final CatalogService _catalogService;
   final ScrollController _scrollController = ScrollController();
   bool _isAtTop = true;
 
@@ -51,6 +86,9 @@ class _InvoiceItemSheetState extends State<InvoiceItemSheet> {
   @override
   void initState() {
     super.initState();
+
+    // Get the shared catalog service
+    _catalogService = HiveServiceProvider().catalogService;
 
     // Initialize with empty selection states
     _newlySelectedItems = [];
@@ -79,11 +117,8 @@ class _InvoiceItemSheetState extends State<InvoiceItemSheet> {
     });
 
     try {
-      // Initialize the service
-      await _catalogService.init();
-
-      // Get all items
-      final items = _catalogService.getAllItems();
+      // Get all items directly from the shared service
+      final items = _catalogService.items;
 
       setState(() {
         _catalogItems = items;
@@ -108,7 +143,22 @@ class _InvoiceItemSheetState extends State<InvoiceItemSheet> {
       onItemsAdded: (items) {
         // When items are added, select them in the invoice
         if (widget.onItemsSelected != null) {
-          widget.onItemsSelected!(items);
+          // Convert to old model format if needed
+          final oldModelItems =
+              items.map((item) {
+                if (item is CatalogItem) {
+                  // Use our extension method to convert
+                  return old_model.CatalogItem(
+                    title: item.title,
+                    amount: item.amount.toString(),
+                    quantity: item.quantity,
+                    currency: item.currency,
+                  );
+                } else {
+                  return item as old_model.CatalogItem;
+                }
+              }).toList();
+          widget.onItemsSelected!(oldModelItems);
         }
       },
     );
@@ -280,21 +330,18 @@ class _InvoiceItemSheetState extends State<InvoiceItemSheet> {
   // Close the sheet and pass selected items back to parent
   void _applySelection() {
     // Create copies of selected items to be added to the invoice
-    final List<CatalogItem> itemsToReturn = [];
+    final List<old_model.CatalogItem> itemsToReturn = [];
 
     // Process all selected items with quantity > 0
     for (int i = 0; i < _newlySelectedItems.length; i++) {
       final item = _newlySelectedItems[i];
       if (item.quantity > 0) {
-        // Create a copy of the item with the correct quantity
-        // Each copy will be treated as a new item when added to the invoice
-        final selectedItem = CatalogItem(
+        // Convert Hive CatalogItem to old model format
+        final selectedItem = old_model.CatalogItem(
           title: item.title,
-          amount: item.amount,
+          amount: item.amount.toString(),
           quantity: item.quantity,
           currency: item.currency,
-          usageInfo: item.usageInfo,
-          isNew: item.isNew,
         );
 
         itemsToReturn.add(selectedItem);
@@ -510,7 +557,7 @@ class _InvoiceItemSheetState extends State<InvoiceItemSheet> {
           return ItemAdd(
             key: ValueKey(itemKey),
             title: item.title,
-            amount: item.amount,
+            amount: item.amount.toString(),
             currency: item.currency,
             isSelected: isSelected,
             initialQuantity: quantity,

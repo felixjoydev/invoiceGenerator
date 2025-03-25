@@ -16,6 +16,8 @@ import 'package:invoicegenerator/bottom_sheets/invoices/new_item.dart';
 import 'package:invoicegenerator/bottom_sheets/invoices/editItem.dart';
 import 'package:invoicegenerator/models/catalog_item.dart';
 import 'package:invoicegenerator/models/client.dart';
+// Import Hive client model with alias to avoid conflicts
+import 'package:invoicegenerator/models/hive/client_model.dart' as hive;
 import 'package:invoicegenerator/bottom_sheets/invoices/issue_date_picker.dart';
 import 'package:invoicegenerator/bottom_sheets/invoices/due_date_picker.dart';
 import 'package:flutter/services.dart';
@@ -28,6 +30,8 @@ import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
 import 'package:invoicegenerator/services/pdf_service.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
+// Import Hive catalog item with alias
+import 'package:invoicegenerator/models/catalog_item.dart' as old_model;
 
 class InvoiceCreateScreen extends StatefulWidget {
   final Invoice? invoiceToEdit;
@@ -287,8 +291,21 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     showNewItemSheet(
       context,
       onItemsAdded: (items) {
+        // Convert Hive catalog items to old model format
+        final oldItems =
+            items
+                .map(
+                  (item) => old_model.CatalogItem(
+                    title: item.title,
+                    amount: item.amount.toString(),
+                    quantity: item.quantity,
+                    currency: item.currency,
+                  ),
+                )
+                .toList();
+
         // When items are added, select them in the invoice
-        _handleItemsSelected(items);
+        _handleItemsSelected(oldItems);
       },
     );
   }
@@ -357,7 +374,9 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
             // Show the new client bottom sheet directly
             new_client_sheet.showNewClientSheet(
               context,
-              onClientAdded: (client) {
+              onClientAdded: (hiveClient) {
+                // Convert Hive Client to the old Client model
+                final client = _convertHiveClientToOldModel(hiveClient);
                 // When client is added, select it in the invoice
                 _handleCustomerSelected(client);
               },
@@ -365,6 +384,26 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
           },
         );
       },
+    );
+  }
+
+  // Helper function to convert Hive Client to old Client model
+  Client _convertHiveClientToOldModel(hive.Client hiveClient) {
+    return Client(
+      name: hiveClient.name,
+      clientId: hiveClient.clientId,
+      type: hiveClient.type,
+      email: hiveClient.email,
+      phone: hiveClient.phone,
+      addressLine1: hiveClient.addressLine1,
+      addressLine2: hiveClient.addressLine2,
+      city: hiveClient.city,
+      country: hiveClient.country,
+      zip: hiveClient.zipCode,
+      invoiceCount: hiveClient.invoiceCount,
+      amount: hiveClient.amount,
+      outstandingAmount: hiveClient.outstandingAmount,
+      dueAmount: hiveClient.dueAmount,
     );
   }
 

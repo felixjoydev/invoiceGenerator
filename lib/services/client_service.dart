@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:invoicegenerator/models/client.dart';
 import 'package:invoicegenerator/services/invoice_service.dart';
+import 'package:invoicegenerator/services/hive/service_provider.dart';
+import 'package:invoicegenerator/models/hive/client_model.dart' as hive;
+import 'package:invoicegenerator/utils/client_adapter.dart';
 
 class ClientService with ChangeNotifier {
   // Singleton pattern
@@ -12,7 +15,19 @@ class ClientService with ChangeNotifier {
     return _instance;
   }
 
-  ClientService._internal();
+  ClientService._internal() {
+    // Set up a listener to sync with Hive clients when they change
+    try {
+      // Listen for changes to Hive clients
+      HiveServiceProvider().clientService.addListener(() {
+        if (_instance != null) {
+          _loadClientsFromHive();
+        }
+      });
+    } catch (e) {
+      debugPrint('Error setting up Hive client listener: $e');
+    }
+  }
 
   // Local storage key
   static const String _storageKey = 'clients';
@@ -25,10 +40,43 @@ class ClientService with ChangeNotifier {
 
   // Initialize the service - load clients from storage
   Future<void> init() async {
-    await _loadClients();
+    await _loadClientsFromHive();
   }
 
-  // Load clients from shared preferences
+  // Load clients from Hive instead of shared preferences
+  Future<void> _loadClientsFromHive() async {
+    try {
+      final hiveClientService = HiveServiceProvider().clientService;
+      final hiveClients = hiveClientService.clients;
+
+      // Clear existing clients
+      _clients = [];
+
+      // If no clients in Hive, no need to proceed further
+      if (hiveClients.isEmpty) {
+        notifyListeners();
+        return;
+      }
+
+      // Convert Hive clients to old model (do this in batches if there are many clients)
+      for (var hiveClient in hiveClients) {
+        try {
+          _clients.add(ClientAdapter.fromHiveClient(hiveClient));
+        } catch (e) {
+          debugPrint('Error converting Hive client data: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading clients from Hive: $e');
+      // Initialize with empty list if there's an error
+      _clients = [];
+    }
+
+    // Notify listeners about the updated data
+    notifyListeners();
+  }
+
+  // Load clients from shared preferences (keeping as a fallback)
   Future<void> _loadClients() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -94,6 +142,30 @@ class ClientService with ChangeNotifier {
 
   // Add a client to the list
   Future<void> addClient(Client client) async {
+    // Also add to Hive service
+    try {
+      final hiveClientService = HiveServiceProvider().clientService;
+      final hiveClient = hive.Client(
+        name: client.name,
+        clientId: client.clientId,
+        type: client.type,
+        email: client.email,
+        phone: client.phone,
+        addressLine1: client.addressLine1,
+        addressLine2: client.addressLine2,
+        city: client.city,
+        zipCode: client.zip,
+        country: client.country,
+        invoiceCount: client.invoiceCount,
+        amount: client.amount,
+        outstandingAmount: client.outstandingAmount,
+        dueAmount: client.dueAmount,
+      );
+      hiveClientService.addClient(hiveClient);
+    } catch (e) {
+      debugPrint('Error adding client to Hive: $e');
+    }
+
     // Add to beginning of list for newest clients to appear at top
     _clients.insert(0, client);
 
@@ -167,5 +239,10 @@ class ClientService with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_storageKey);
     notifyListeners();
+  }
+
+  // Synchronize with Hive
+  Future<void> syncWithHive() async {
+    await _loadClientsFromHive();
   }
 }

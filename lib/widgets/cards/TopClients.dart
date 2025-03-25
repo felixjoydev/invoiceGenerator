@@ -5,6 +5,7 @@ import 'package:invoicegenerator/models/client.dart';
 import 'package:invoicegenerator/screens/clients/client_list_screen.dart';
 import 'package:invoicegenerator/utils/route_transitions.dart';
 import 'package:invoicegenerator/widgets/charts/client_chart.dart';
+import 'package:invoicegenerator/utils/client_adapter.dart';
 
 class TopClients extends StatefulWidget {
   const TopClients({super.key});
@@ -20,11 +21,18 @@ class _TopClientsState extends State<TopClients> {
   // List to store top clients
   List<Client> _topClients = [];
 
+  // Loading state
+  bool _isLoading = true;
+
   @override
   void initState() {
     super.initState();
-    // Load clients and listen for changes
-    _loadClients();
+
+    // Initialize with empty state to prevent delay
+    _updateTopClients();
+
+    // Load clients in background and listen for changes
+    _loadClientsAsync();
     _clientService.addListener(_onClientDataChanged);
   }
 
@@ -35,10 +43,32 @@ class _TopClientsState extends State<TopClients> {
     super.dispose();
   }
 
-  // Load clients from the service
-  Future<void> _loadClients() async {
-    await _clientService.init();
-    _updateTopClients();
+  // Load clients from the service (async but don't block UI)
+  void _loadClientsAsync() async {
+    // Set loading state
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _clientService.init();
+      // Force a sync with Hive to get the latest clients
+      await _clientService.syncWithHive();
+
+      if (mounted) {
+        _updateTopClients();
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading clients: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   // Update when client data changes
@@ -96,7 +126,20 @@ class _TopClientsState extends State<TopClients> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children:
-                    _topClients.isNotEmpty
+                    _isLoading
+                        ? [
+                          // Show loading indicator when loading
+                          SizedBox(
+                            height: 100,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: Color(0xFFF05022),
+                                strokeWidth: 2,
+                              ),
+                            ),
+                          ),
+                        ]
+                        : _topClients.isNotEmpty
                         ? _buildClientList(maxAmount)
                         : [
                           // Show placeholder message if no clients
@@ -162,7 +205,7 @@ class _TopClientsState extends State<TopClients> {
                 Row(
                   children: [
                     Text(
-                      client.currency,
+                      client.currency ?? 'USD',
                       style: TextStyle(
                         color: Color(0xFF8D9694),
                         fontSize: 14,

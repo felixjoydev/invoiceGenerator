@@ -7,8 +7,9 @@ import 'package:invoicegenerator/widgets/display/SmallHeading.dart';
 import 'package:invoicegenerator/widgets/inputs/text_input.dart';
 import 'package:invoicegenerator/widgets/inputs/dropdown_input.dart';
 import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
-import 'package:invoicegenerator/models/client.dart';
-import 'package:invoicegenerator/services/client_service.dart';
+import 'package:invoicegenerator/models/hive/client_model.dart';
+import 'package:invoicegenerator/services/hive/client_service.dart';
+import 'package:invoicegenerator/services/hive/service_provider.dart';
 
 class AddClientScreen extends StatefulWidget {
   const AddClientScreen({super.key});
@@ -63,14 +64,17 @@ class _AddClientScreenState extends State<AddClientScreen> {
   bool _isButtonEnabled = false;
 
   // Service to manage clients
-  final _clientService = ClientService();
+  late ClientService _clientService;
 
   @override
   void initState() {
     super.initState();
 
-    // Initialize the client service if needed
-    _initClientService();
+    // Get the client service from the provider
+    _clientService = HiveServiceProvider().clientService;
+
+    // Generate a new client ID
+    _clientIdController.text = _clientService.generateClientId();
 
     // Add listeners to controllers for validation
     _organizationNameController.addListener(_validateForm);
@@ -269,22 +273,14 @@ class _AddClientScreenState extends State<AddClientScreen> {
     });
   }
 
-  // Initialize client service and get a unique client ID
-  Future<void> _initClientService() async {
-    await _clientService.init();
-    setState(() {
-      _clientIdController.text = _clientService.generateClientId();
-    });
-  }
-
   // Save client data
   void _saveClient() {
-    // Validate fields before saving (only name is required)
+    // Validate form
     if (_organizationNameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please enter a name'),
-          duration: Duration(seconds: 2),
+          backgroundColor: Colors.red,
         ),
       );
       return;
@@ -324,25 +320,26 @@ class _AddClientScreenState extends State<AddClientScreen> {
       return;
     }
 
-    // Create client object - only name and clientId are absolutely required
-    // along with a type which is derived from the selected tab
+    // Create a new client object
     final client = Client(
-      name: _organizationNameController.text,
       clientId: _clientIdController.text,
-      taxId: _taxIdController.text.isEmpty ? null : _taxIdController.text,
-      country: _selectedCountry,
-      addressLine1: _addressLine1Controller.text,
+      name: _organizationNameController.text,
+      type: _selectedTabIndex == 0 ? 'organization' : 'person',
+      email: _emailController.text.isEmpty ? null : _emailController.text,
+      phone: _phoneController.text.isEmpty ? null : _phoneController.text,
+      addressLine1:
+          _addressLine1Controller.text.isEmpty
+              ? null
+              : _addressLine1Controller.text,
       addressLine2:
           _addressLine2Controller.text.isEmpty
               ? null
               : _addressLine2Controller.text,
       city: _cityController.text.isEmpty ? null : _cityController.text,
-      zip: _zipController.text.isEmpty ? null : _zipController.text,
-      phone: _phoneController.text.isEmpty ? null : _phoneController.text,
-      email: _emailController.text.isEmpty ? null : _emailController.text,
-      website: _websiteController.text.isEmpty ? null : _websiteController.text,
-      notes: _notesController.text.isEmpty ? null : _notesController.text,
-      type: _selectedTabIndex == 0 ? 'organization' : 'person',
+      state: null, // Not used in this form
+      zipCode: _zipController.text.isEmpty ? null : _zipController.text,
+      country: _selectedCountry,
+      // Statistics fields are initialized with 0 by default
     );
 
     // Add client to the service

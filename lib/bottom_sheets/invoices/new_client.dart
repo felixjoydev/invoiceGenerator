@@ -3,9 +3,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
 import 'package:invoicegenerator/widgets/display/SmallHeading.dart';
 import 'package:invoicegenerator/widgets/inputs/text_input.dart';
-import 'package:invoicegenerator/models/client.dart';
-import 'package:invoicegenerator/services/client_service.dart';
+import 'package:invoicegenerator/models/hive/client_model.dart';
+import 'package:invoicegenerator/services/hive/client_service.dart';
 import 'package:invoicegenerator/bottom_sheets/invoices/select_client.dart';
+import 'package:invoicegenerator/services/hive/service_provider.dart';
 
 class NewClientSheet extends StatefulWidget {
   final Function(Client)? onClientAdded;
@@ -62,14 +63,17 @@ class _NewClientSheetState extends State<NewClientSheet> {
   bool _isButtonEnabled = false;
 
   // Service to manage clients
-  final _clientService = ClientService();
+  late final ClientService _clientService;
 
   @override
   void initState() {
     super.initState();
 
-    // Initialize the client service if needed
-    _initClientService();
+    // Initialize the client service from the provider
+    _clientService = HiveServiceProvider().clientService;
+
+    // Set the client ID
+    _clientIdController.text = _clientService.generateClientId();
 
     // Add listeners to controllers for validation
     _organizationNameController.addListener(_validateForm);
@@ -310,14 +314,6 @@ class _NewClientSheetState extends State<NewClientSheet> {
     });
   }
 
-  // Initialize client service and get a unique client ID
-  Future<void> _initClientService() async {
-    await _clientService.init();
-    setState(() {
-      _clientIdController.text = _clientService.generateClientId();
-    });
-  }
-
   // Save client data
   void _saveClient() {
     // Validate fields before saving (only name is required)
@@ -365,25 +361,29 @@ class _NewClientSheetState extends State<NewClientSheet> {
       return;
     }
 
-    // Create client object - only name and clientId are absolutely required
-    // along with a type which is derived from the selected tab
+    // Create client object using the Hive Client model
     final client = Client(
       name: _organizationNameController.text,
       clientId: _clientIdController.text,
-      taxId: _taxIdController.text.isEmpty ? null : _taxIdController.text,
-      country: _selectedCountry,
-      addressLine1: _addressLine1Controller.text,
+      type: _selectedTabIndex == 0 ? 'organization' : 'person',
+      email: _emailController.text.isEmpty ? null : _emailController.text,
+      phone: _phoneController.text.isEmpty ? null : _phoneController.text,
+      addressLine1:
+          _addressLine1Controller.text.isEmpty
+              ? null
+              : _addressLine1Controller.text,
       addressLine2:
           _addressLine2Controller.text.isEmpty
               ? null
               : _addressLine2Controller.text,
       city: _cityController.text.isEmpty ? null : _cityController.text,
-      zip: _zipController.text.isEmpty ? null : _zipController.text,
-      phone: _phoneController.text.isEmpty ? null : _phoneController.text,
-      email: _emailController.text.isEmpty ? null : _emailController.text,
-      website: _websiteController.text.isEmpty ? null : _websiteController.text,
-      notes: _notesController.text.isEmpty ? null : _notesController.text,
-      type: _selectedTabIndex == 0 ? 'organization' : 'person',
+      zipCode: _zipController.text.isEmpty ? null : _zipController.text,
+      country: _selectedCountry,
+      // Note: These parameters from the Hive model have default values in the constructor
+      invoiceCount: 0,
+      amount: 0.0,
+      outstandingAmount: 0.0,
+      dueAmount: 0.0,
     );
 
     // Add client to the service

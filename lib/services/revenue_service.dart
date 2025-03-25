@@ -16,7 +16,7 @@ class RevenueService with ChangeNotifier {
   Map<String, double> _monthlyRevenue = {};
 
   // Debug flag
-  bool _verbose = true;
+  final bool _verbose = true;
 
   // Getters
   DateTime get selectedMonth => _selectedMonth;
@@ -66,6 +66,7 @@ class RevenueService with ChangeNotifier {
   }
 
   // Cleanup resources
+  @override
   void dispose() {
     InvoiceService().removeListener(_handleInvoiceServiceChanged);
     super.dispose();
@@ -378,8 +379,6 @@ class RevenueService with ChangeNotifier {
 
       // Check and fix each invoice
       for (var invoice in allInvoices) {
-        bool needsUpdate = false;
-
         // Check if total is NaN or infinity
         if (invoice.total.isNaN || invoice.total.isInfinite) {
           debugPrint('Found invalid total in invoice ${invoice.invoiceId}');

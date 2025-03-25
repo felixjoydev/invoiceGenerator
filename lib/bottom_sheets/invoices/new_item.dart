@@ -6,8 +6,13 @@ import 'package:invoicegenerator/widgets/buttons/primary_button.dart';
 import 'package:invoicegenerator/widgets/buttons/secondary_button.dart';
 import 'package:invoicegenerator/widgets/display/ItemDivider.dart';
 import 'package:invoicegenerator/widgets/inputs/text_input.dart';
-import 'package:invoicegenerator/models/catalog_item.dart';
-import 'package:invoicegenerator/services/catalog_service.dart';
+// Use Hive implementations
+import 'package:invoicegenerator/models/hive/catalog_item_model.dart';
+import 'package:invoicegenerator/services/hive/catalog_service.dart';
+// For service provider
+import 'package:invoicegenerator/services/hive/service_provider.dart';
+// Keep old model for compatibility
+import 'package:invoicegenerator/models/catalog_item.dart' as old_model;
 import 'package:invoicegenerator/bottom_sheets/invoices/invoice_item.dart';
 
 class NewItemSheet extends StatefulWidget {
@@ -24,7 +29,7 @@ class _NewItemSheetState extends State<NewItemSheet> {
   final List<CatalogItemInput> _catalogItems = [];
 
   // Service to manage catalog items
-  final _catalogService = CatalogService();
+  late final CatalogService _catalogService;
 
   // Track if button should be enabled
   bool _isButtonEnabled = false;
@@ -39,6 +44,10 @@ class _NewItemSheetState extends State<NewItemSheet> {
   @override
   void initState() {
     super.initState();
+
+    // Get the catalog service from the provider
+    _catalogService = HiveServiceProvider().catalogService;
+
     // Add the first item by default
     _addNewItem(isInitialLoad: true);
     _scrollController.addListener(_scrollListener);
@@ -228,13 +237,16 @@ class _NewItemSheetState extends State<NewItemSheet> {
 
     for (var item in _catalogItems) {
       if (item.isValid()) {
-        // Convert input to CatalogItem
+        // Convert input to CatalogItem (Hive version)
+        final priceValue = double.tryParse(item.priceController.text) ?? 0.0;
+        final quantityValue = int.tryParse(item.qtyController.text) ?? 1;
+
         validItems.add(
           CatalogItem(
             title: item.nameController.text,
-            amount: item.priceController.text,
-            quantity: int.tryParse(item.qtyController.text) ?? 1,
-            // usageInfo defaults to 'USED IN 0 INVOICES' in the model
+            amount: priceValue, // Hive model uses double, not String
+            quantity: quantityValue,
+            currency: 'USD', // Default currency
           ),
         );
       }
@@ -242,7 +254,10 @@ class _NewItemSheetState extends State<NewItemSheet> {
 
     // Add to service
     if (validItems.isNotEmpty) {
-      _catalogService.addItems(validItems);
+      // Hive CatalogService doesn't have addItems method, so add one by one
+      for (var item in validItems) {
+        _catalogService.addItem(item);
+      }
 
       // Show success snackbar
       ScaffoldMessenger.of(context).showSnackBar(
@@ -252,7 +267,7 @@ class _NewItemSheetState extends State<NewItemSheet> {
         ),
       );
 
-      // Close the bottom sheet and pass the items back to the parent
+      // Close the sheet and pass the items back to the parent
       Navigator.pop(context);
 
       // Call the callback if it exists

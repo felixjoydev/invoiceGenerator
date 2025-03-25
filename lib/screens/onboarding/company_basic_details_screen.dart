@@ -10,6 +10,9 @@ import 'package:invoicegenerator/screens/onboarding/company_address_screen.dart'
 import 'package:invoicegenerator/widgets/utils/slide_page_route.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+import 'package:invoicegenerator/services/hive/company_info_service.dart';
+import 'package:invoicegenerator/models/hive/company_info_model.dart';
+import 'package:invoicegenerator/services/hive/service_provider.dart';
 
 class CompanyBasicDetailsScreen extends StatefulWidget {
   const CompanyBasicDetailsScreen({super.key});
@@ -26,9 +29,21 @@ class _CompanyBasicDetailsScreenState extends State<CompanyBasicDetailsScreen> {
   String _selectedCurrency = 'USD';
   String? _logoPath;
 
+  // Service provider reference
+  late HiveServiceProvider _serviceProvider;
+
   @override
   void initState() {
     super.initState();
+    // Data will be loaded in didChangeDependencies
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Get the service provider
+    _serviceProvider = HiveServiceProviderWidget.of(context);
+    // Load data
     _loadSavedData();
   }
 
@@ -39,68 +54,52 @@ class _CompanyBasicDetailsScreenState extends State<CompanyBasicDetailsScreen> {
     super.dispose();
   }
 
-  // Load any saved data from shared preferences
+  // Load any saved data from Hive
   Future<void> _loadSavedData() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final companyInfo = _serviceProvider.companyInfoService.companyInfo;
 
-      final savedBusinessName = prefs.getString('temp_business_name');
-      final savedLogoPath = prefs.getString('temp_logo_path');
-      final savedCurrency = prefs.getString('temp_currency');
-      final savedTaxEnabled = prefs.getBool('temp_enable_tax');
-      final savedTaxRate = prefs.getString('temp_tax_rate');
-
-      if (mounted) {
+      if (companyInfo != null && mounted) {
         setState(() {
-          if (savedBusinessName != null) {
-            _businessNameController.text = savedBusinessName;
+          if (companyInfo.businessName.isNotEmpty) {
+            _businessNameController.text = companyInfo.businessName;
           }
-          if (savedLogoPath != null) {
-            _logoPath = savedLogoPath;
+          if (companyInfo.logoPath != null) {
+            _logoPath = companyInfo.logoPath;
           }
-          if (savedCurrency != null) {
-            _selectedCurrency = savedCurrency;
-          }
-          if (savedTaxEnabled != null) {
-            _isTaxEnabled = savedTaxEnabled;
-          }
-          if (savedTaxRate != null) {
-            _taxController.text = savedTaxRate;
+          _selectedCurrency = companyInfo.currency;
+          _isTaxEnabled = companyInfo.enableTax;
+
+          // Set tax rate if it exists
+          if (companyInfo.enableTax && companyInfo.taxNumber != null) {
+            _taxController.text = companyInfo.taxNumber!;
           }
         });
       }
     } catch (e) {
-      debugPrint('Error loading temporary company data: $e');
+      debugPrint('Error loading company data: $e');
     }
   }
 
-  // Save data to shared preferences temporarily
+  // Save data to Hive
   Future<void> _saveDataTemporarily() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      // Create a CompanyInfo object
+      final companyInfo = CompanyInfo(
+        businessName: _businessNameController.text,
+        currency: _selectedCurrency,
+        enableTax: _isTaxEnabled,
+        logoPath: _logoPath,
+        taxNumber:
+            _isTaxEnabled && _taxController.text.isNotEmpty
+                ? _taxController.text
+                : null,
+      );
 
-      await prefs.setString('temp_business_name', _businessNameController.text);
-      if (_logoPath != null) {
-        debugPrint('Saving temp logo path: $_logoPath');
-        // Verify the logo file exists
-        final logoFile = File(_logoPath!);
-        final exists = await logoFile.exists();
-        debugPrint('Logo file exists: $exists');
-
-        if (exists) {
-          await prefs.setString('temp_logo_path', _logoPath!);
-        } else {
-          debugPrint('Logo file does not exist, not saving');
-        }
-      }
-      await prefs.setString('temp_currency', _selectedCurrency);
-      await prefs.setBool('temp_enable_tax', _isTaxEnabled);
-
-      if (_isTaxEnabled && _taxController.text.isNotEmpty) {
-        await prefs.setString('temp_tax_rate', _taxController.text);
-      }
+      // Save to Hive
+      await _serviceProvider.companyInfoService.saveCompanyInfo(companyInfo);
     } catch (e) {
-      debugPrint('Error saving temporary company data: $e');
+      debugPrint('Error saving company data: $e');
     }
   }
 

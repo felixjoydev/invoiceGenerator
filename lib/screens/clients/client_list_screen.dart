@@ -12,13 +12,16 @@ import 'package:invoicegenerator/screens/home/home_screen.dart';
 import 'package:invoicegenerator/screens/catalog/catalog_list_screen.dart';
 import 'package:invoicegenerator/utils/route_transitions.dart';
 import 'package:invoicegenerator/screens/clients/add_client_screen.dart';
+import 'package:invoicegenerator/models/hive/client_model.dart' as hive;
 import 'package:invoicegenerator/models/client.dart';
-import 'package:invoicegenerator/services/client_service.dart';
+import 'package:invoicegenerator/services/hive/client_service.dart';
+import 'package:invoicegenerator/services/hive/service_provider.dart';
 import 'package:invoicegenerator/widgets/display/BlurredBackground.dart';
 import 'package:invoicegenerator/widgets/cards/HighlightedClientCard.dart';
 import 'package:invoicegenerator/widgets/display/PressWidget.dart';
 import 'package:invoicegenerator/bottom_sheets/clients/client_sort.dart';
 import 'package:invoicegenerator/bottom_sheets/clients/edit_client.dart';
+import 'package:invoicegenerator/utils/client_adapter.dart';
 
 class ClientListScreen extends StatefulWidget {
   const ClientListScreen({super.key});
@@ -40,13 +43,13 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
   String _searchQuery = '';
 
   // Client service
-  final _clientService = ClientService();
+  late ClientService _clientService;
 
   // List of clients
-  List<Client> _clients = [];
+  List<hive.Client> _clients = [];
 
   // Currently selected item (for long press)
-  Client? _selectedClient;
+  hive.Client? _selectedClient;
 
   // Current sort option
   int? _currentSortOption;
@@ -65,14 +68,17 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
   @override
   void initState() {
     super.initState();
-    // Load clients from the service
-    _loadClients();
+    // Get the client service from the provider
+    _clientService = HiveServiceProvider().clientService;
 
     // Listen for changes from the service
     _clientService.addListener(_onClientDataChanged);
 
     // Reset any selected client when screen initializes
     _selectedClient = null;
+
+    // Force recalculation of statistics when screen loads
+    _recalculateStatistics();
   }
 
   @override
@@ -96,64 +102,6 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
     super.dispose();
   }
 
-  // Load clients from the service
-  Future<void> _loadClients() async {
-    try {
-      // Initialize the service if needed
-      await _clientService.init();
-
-      setState(() {
-        _clients = _clientService.clients;
-      });
-
-      // If no clients, add a sample one
-      if (_clients.isEmpty) {
-        _addSampleClient();
-      }
-    } catch (e) {
-      debugPrint('Error loading clients: $e');
-      // Initialize with empty list if there's an error
-      setState(() {
-        _clients = [];
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error loading clients: $e'),
-          duration: const Duration(seconds: 2),
-          action: SnackBarAction(
-            label: 'Clear Data',
-            onPressed: () {
-              _clientService.clearAllClients();
-              _addSampleClient();
-            },
-          ),
-        ),
-      );
-    }
-  }
-
-  // Add a sample client for first-time use
-  Future<void> _addSampleClient() async {
-    // Create a sample client - only name is required
-    final client = Client(
-      name: 'Acuro',
-      clientId: 'CL001',
-      type: 'organization',
-      // Optional fields for a better sample
-      addressLine1: '123 Main St',
-      email: 'contact@acuro.com',
-      invoiceCount: 2,
-      currency: 'USD',
-      amount: 4500.00,
-      outstandingAmount: 1000.00,
-      hasOutstanding: true,
-    );
-
-    // Add to service
-    await _clientService.addClient(client);
-  }
-
   // Update _onClientDataChanged to no longer detect new clients for animation
   void _onClientDataChanged() {
     if (mounted) {
@@ -171,19 +119,14 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
   }
 
   // Filtered and sorted clients based on search query and sort option
-  List<Client> get _filteredClients {
-    // Create a new list to avoid modifying the original unmodifiable list
-    List<Client> result = List<Client>.from(_clients);
-
-    // First apply search filter
-    if (_searchQuery.isNotEmpty) {
-      final query = _searchQuery.toLowerCase();
-      result =
-          result.where((client) {
-            return client.name.toLowerCase().contains(query) ||
-                client.clientId.toLowerCase().contains(query);
-          }).toList();
-    }
+  List<hive.Client> get _filteredClients {
+    // Get filtered items based on search query
+    List<hive.Client> result =
+        _searchQuery.isEmpty
+            ? List<hive.Client>.from(_clientService.clients)
+            : List<hive.Client>.from(
+              _clientService.searchClients(_searchQuery),
+            );
 
     // Then apply sorting
     if (_currentSortOption != null) {
@@ -305,7 +248,7 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
   }
 
   // Get the position of a client card for long press
-  Rect _getClientPosition(Client client) {
+  Rect _getClientPosition(hive.Client client) {
     // First try to get from pre-calculated positions
     if (_clientPositions.containsKey(client.clientId)) {
       return _clientPositions[client.clientId]!;
@@ -338,7 +281,7 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
   }
 
   // Handle when long press on client card
-  void _handleLongPress(Client client, GlobalKey itemKey) {
+  void _handleLongPress(hive.Client client, GlobalKey itemKey) {
     debugPrint('Long press detected on client: ${client.name}');
 
     // Provide haptic feedback immediately
@@ -395,7 +338,7 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
     if (_selectedClient == null) return;
 
     // Store a reference to the selected client before clearing the selection
-    final clientToEdit = _selectedClient;
+    final clientToEdit = ClientAdapter.fromHiveClient(_selectedClient!);
 
     // Dismiss the selection
     setState(() {
@@ -405,7 +348,7 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
     // Show the edit client bottom sheet
     showEditClientSheet(
       context,
-      client: clientToEdit!,
+      client: clientToEdit,
       onClientUpdated: (updatedClient) {
         // The client service should already have updated the client
         // Refresh the display
@@ -556,6 +499,22 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
     overlayState.insert(overlayEntry);
     overlayAnimController.forward();
     sheetAnimController.forward();
+  }
+
+  // Method to recalculate statistics
+  void _recalculateStatistics() async {
+    // Get the service provider
+    final serviceProvider = HiveServiceProvider();
+
+    // Ensure statistics are calculated
+    await serviceProvider.ensureStatisticsCalculated();
+
+    // Refresh state after recalculation
+    if (mounted) {
+      setState(() {
+        _clients = _clientService.clients;
+      });
+    }
   }
 
   @override
@@ -718,7 +677,9 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
                     width: _selectedItemSize.width,
                     child: Material(
                       color: Colors.transparent,
-                      child: HighlightedClientCard(client: _selectedClient!),
+                      child: HighlightedClientCard(
+                        client: ClientAdapter.fromHiveClient(_selectedClient!),
+                      ),
                     ),
                   ),
 
@@ -770,6 +731,13 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
       );
     }
 
+    // Debug print to check if invoiceCount is being populated
+    for (var client in filteredClients.take(5)) {
+      debugPrint(
+        '🔍 Client ${client.name} [ID: ${client.clientId}] has invoiceCount: ${client.invoiceCount}, amount: ${client.amount}',
+      );
+    }
+
     return Column(
       children: List.generate(filteredClients.length * 2 - 1, (index) {
         // Return card for even indices
@@ -787,7 +755,7 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
                 clientName: client.name,
                 clientId: client.clientId,
                 invoiceCount: client.invoiceCount,
-                currency: client.currency,
+                currency: client.currencyOrDefault,
                 amount: client.amount,
                 outstandingAmount: client.outstandingAmount,
                 hasOutstanding: client.hasOutstanding,
@@ -808,7 +776,7 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
               clientName: client.name,
               clientId: client.clientId,
               invoiceCount: client.invoiceCount,
-              currency: client.currency,
+              currency: client.currencyOrDefault,
               amount: client.amount,
               outstandingAmount: client.outstandingAmount,
               hasOutstanding: client.hasOutstanding,
@@ -834,11 +802,11 @@ class _ClientListScreenState extends State<ClientListScreen> with RouteAware {
   }
 
   // Handle when a client card is tapped (regular tap)
-  void _handleCardTap(Client client) {
+  void _handleCardTap(hive.Client client) {
     // Show the edit client bottom sheet directly
     showEditClientSheet(
       context,
-      client: client,
+      client: ClientAdapter.fromHiveClient(client),
       onClientUpdated: (updatedClient) {
         // The client service should already have updated the client
         // Refresh the display

@@ -94,7 +94,7 @@ class ClientCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      "$invoiceCount invoices".toUpperCase(),
+                      "$invoiceCount ${invoiceCount == 1 ? 'INVOICE' : 'INVOICES'}",
                       style: const TextStyle(
                         fontFamily: 'Victor Mono',
                         fontWeight: FontWeight.bold,

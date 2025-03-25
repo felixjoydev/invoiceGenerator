@@ -1,0 +1,202 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Invoice Generator App: Migrating to Hive Database - Conceptual Guide
+
+This document provides guidance for migrating the Invoice Generator app from SharedPreferences to Hive database. The focus is on maintaining all existing data relationships, business logic, and functionality while transitioning to a more robust local storage solution.
+
+## Current Architecture Overview
+
+The Invoice Generator app currently uses SharedPreferences to store four primary data models: Company Info, Clients, Invoices, and Catalog Items. These models maintain relationships through service-level code that handles data integrity across the application.
+
+## Migration Approach
+
+We will adopt a hybrid approach where complex data structures move to Hive while simple settings remain in SharedPreferences if desired. This migration must preserve all existing ID structures, naming conventions, and relationships.
+
+## Data Model Structures
+
+### Company Info Model
+
+The Company Info model functions as a singleton representing the user's business. Currently it has no explicit ID and is stored as a single JSON object with SharedPreferences key 'company_info'. Required fields include businessName, currency, and enableTax, along with address fields (country, addressLine1, city). Optional fields include contact information (phone, email, website) and bank details.
+
+In Hive, this should be stored as a single object in a dedicated box. The model needs Hive type annotations with each field receiving a unique index number. Since this model has no ID in the current system, it can be stored with a fixed key (like 0) in its Hive box.
+
+### Client Model
+
+The Client model uses clientId in format "CLxxx" (e.g., "CL001") as its unique identifier. IDs are generated incrementally based on the highest existing ID. Required fields include name, clientId, and type ('organization' or 'person'). The model also contains various optional address and contact fields, along with financial tracking fields (invoiceCount, amount, outstandingAmount, dueAmount).
+
+In Hive, clients should be stored in a dedicated box with the clientId as the key. The model requires Hive type annotations for all fields. The ID generation logic should remain unchanged to maintain compatibility with existing data.
+
+### Catalog Item Model
+
+The Catalog Item model uses the title field as its unique identifier. Required fields include title, amount, and quantity. It also stores currency (defaulting to "USD") and usage statistics tracking how often the item appears in invoices.
+
+In Hive, catalog items should be stored in their own box with the title as the key. The model needs Hive type annotations for all fields. Special care must be taken when updating a catalog item's title, as this changes its unique identifier.
+
+### Invoice Model
+
+The Invoice model uses invoiceId in format "inv-xxx" (e.g., "inv-001") as its unique identifier, with support for custom ID formats through InvoiceSettingsService. Required fields include invoiceId, client (a full embedded Client object), items (an array of CatalogItem objects), issueDate, dueDate, and financial fields (subtotal, taxRate, taxAmount, total). It also stores status (overdue, outstanding, paid) and templateName (defaulting to "Orange").
+
+In Hive, this requires a significant structural change. Rather than embedding full objects, the invoice should store references (clientId and item identifiers) and use relationship fetching when complete objects are needed. The model needs Hive type annotations for all fields.
+
+### Invoice Settings Model
+
+The Invoice Settings model contains configuration for invoice generation including idFormat, customNotes, isAutoGenerate, idPrefix (defaulting to "INV"), and lastInvoiceNumber. This is stored as a JSON object with SharedPreferences key 'invoice_settings'.
+
+In Hive, this can be stored as a singleton object in its own box with a fixed key (like 0). The model needs Hive type annotations for all fields.
+
+## Data Relationships and Integrity
+
+### Client-Invoice Relationship
+
+The current implementation represents a one-to-many relationship where one client can have many invoices. Currently, invoices contain a full embedded Client object. When a client is updated, the application calls InvoiceService.updateClientInInvoices() to update the client in all related invoices. Client statistics (invoiceCount, amount, outstandingAmount, dueAmount) are updated based on related invoices.
+
+In Hive, this should be redesigned as a reference relationship. The Invoice will store the clientId rather than embedding the full client. When displaying an invoice, the application will fetch the client by ID from the clients box. This change requires modifying how client updates propagate to invoices and how client statistics are calculated.
+
+### Catalog Item-Invoice Relationship
+
+This represents a many-to-many relationship where multiple catalog items can appear in multiple invoices. Currently, invoices contain an array of embedded CatalogItem objects. When a catalog item is updated, the application calls _updateCatalogItemInInvoices() to update the item in all related invoices. When a catalog item is deleted, CatalogService.deleteItem() calls InvoiceService.handleDeletedCatalogItem() to remove it from all invoices. Usage statistics for catalog items are updated based on invoice references.
+
+In Hive, this should be redesigned as a reference relationship. Instead of embedding catalog items, invoices should contain invoice line items that reference catalog items by title. This requires creating a new InvoiceItem model that can either reference a catalog item or stand alone if the catalog item is deleted.
+
+### Statistics and Background Updates
+
+The application maintains statistics in background processes to avoid blocking the UI. This includes methods like InvoiceService._updateStatisticsInBackground(), InvoiceService._updateStatisticsForInvoiceChangesInBackground(), and InvoiceService._updateStatisticsForDeletedInvoiceInBackground(). To prevent circular updates, the application uses special methods like updateClientSilently() and updateItemSilently().
+
+In Hive, this pattern should be maintained but implemented using Hive's transaction capabilities where appropriate. The background update mechanisms remain important for performance but should leverage Hive's strengths for atomic operations.
+
+## Foreign Key Behavior
+
+The current implementation simulates foreign key constraints through service-level code:
+
+### Client Deletion Behavior
+
+Currently, clients can be deleted without checking for existing invoices, potentially leaving orphaned invoices. In the Hive implementation, this should be improved by adding a canDeleteClient() method that checks if a client has associated invoices before allowing deletion.
+
+### Catalog Item Deletion Behavior
+
+When a catalog item is deleted, the application removes it from all invoices and recalculates totals. This CASCADE behavior should be maintained in the Hive implementation, ensuring that invoice data remains consistent even when catalog items are deleted.
+
+### Invoice Deletion Behavior
+
+When an invoice is deleted, the application updates client statistics to reflect the change. This behavior should be maintained in the Hive implementation, ensuring that client statistics remain consistent after invoice deletion.
+
+## Unique Constraints
+
+The current implementation enforces uniqueness through code checks:
+
+### Client ID Uniqueness
+
+The application generates unique client IDs by finding the highest existing ID and incrementing it. However, it lacks a check when directly setting a client ID. The Hive implementation should maintain the ID generation logic but add validation to prevent duplicate IDs.
+
+### Catalog Item Title Uniqueness
+
+The application relies on the title as a unique identifier but doesn't explicitly check for uniqueness when adding items. The Hive implementation should add validation to ensure that catalog item titles are unique before saving.
+
+### Invoice ID Uniqueness
+
+The application generates unique invoice IDs by finding the highest existing ID and incrementing it. This behavior should be maintained in the Hive implementation.
+
+## Performance Considerations
+
+The current implementation uses linear searches for data access. In Hive, this can be optimized:
+
+### Client Lookups
+
+Currently using linear scans through the client list, this can be optimized in Hive with direct key-based lookups, improving performance from O(n) to O(1).
+
+### Invoice Filtering by Status
+
+Currently filtering with O(n) complexity, this can be maintained in Hive but potentially optimized with indexing strategies for frequent queries.
+
+### Invoice Search
+
+Currently using case-insensitive search with no indexing, this should be maintained in Hive but could benefit from additional search optimization strategies.
+
+## Polymorphic Relationships
+
+The current implementation embeds full objects rather than using true polymorphic relationships:
+
+### Client Data in Invoice
+
+Currently, client data is fully embedded in invoices, which increases storage size but improves read performance. In Hive, this should be changed to reference-based relationships, decreasing storage requirements but requiring relationship resolution on read.
+
+## Transaction Handling
+
+The current implementation simulates transactions through sequential operations with error handling:
+
+### Creating an Invoice with Items
+
+Currently wrapped in try-catch blocks but without true transaction guarantees. In Hive, this should leverage transaction capabilities to ensure atomic operations when creating or updating invoices with multiple related items.
+
+### Updating a Client Affecting Multiple Invoices
+
+Currently implemented as sequential operations that update the client first, then all affected invoices. In Hive, this should use transactions to ensure all updates succeed or fail together, maintaining data consistency.
+
+### Batch Updates
+
+The application performs batch processing of client updates for performance. In Hive, this should use batch operations and transactions for improved performance and data integrity.
+
+## Migration Utility
+
+A critical component of the migration is a utility that transfers existing data from SharedPreferences to Hive. This utility should:
+
+1. Check if migration has already been performed to avoid duplicate migrations
+2. Read all existing data from SharedPreferences
+3. Convert the data to the appropriate Hive model formats
+4. Save the converted data to Hive boxes
+5. Handle relationship mapping between models
+6. Verify successful migration before removing old data
+7. Create a flag indicating successful migration
+
+## Data Backup Implementation
+
+The migration should include implementation of backup and restore functionality for Hive data:
+
+1. Create a function to export all Hive boxes to a single JSON structure
+2. Save this structure to a file with timestamp information
+3. Provide an option to share or save this file externally
+4. Implement restore functionality to import data from a backup file
+5. Verify backup integrity before restoration
+6. Consider implementing automatic backups on significant changes
+
+## Special Considerations
+
+### Logo File Handling
+
+The current implementation backs up company logo files to a special directory with the original path stored in CompanyInfo.logoPath. This functionality should be maintained in the Hive implementation, ensuring that logo files remain accessible after the migration.
+
+### Legacy Models
+
+The application contains alternative/legacy model definitions with additional fields and relationships. These should be either migrated to Hive or deprecated depending on their current usage in the application.
+
+## Testing Strategy
+
+To ensure successful migration, implement a comprehensive testing strategy:
+
+1. Test model serialization to verify that all data is properly stored and retrieved
+2. Test all CRUD operations with the new Hive implementation
+3. Verify that data relationships are maintained correctly
+4. Test data migration from SharedPreferences to Hive
+5. Test backup and restore functionality
+6. Verify that all business logic continues to function correctly
+7. Test performance under various conditions (large datasets, frequent updates)
+
+## Implementation Phases
+
+The migration should be implemented in phases to minimize risk:
+
+1. Setup Hive infrastructure (dependencies, initialization)
+2. Create model classes with Hive annotations
+3. Implement data repositories with Hive storage
+4. Create the migration utility
+5. Implement backup and restore functionality
+6. Test thoroughly before release
+
+## Conclusion
+
+This migration from SharedPreferences to Hive represents a significant improvement in the app's data storage capabilities without changing the user experience. The hybrid approach recommended here (potentially keeping simple settings in SharedPreferences) minimizes code changes while leveraging Hive's strengths for complex data storage.
+
+By following this guidance and paying special attention to maintaining existing relationships, business logic, and data integrity rules, the migration can be completed successfully with minimal risk to application functionality.
